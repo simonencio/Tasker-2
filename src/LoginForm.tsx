@@ -65,7 +65,7 @@ export default function LoginForm() {
 
             {error && <p className="text-red-600">{error}</p>}
             <p className="text-center">
-                Hai già un account? <Link className="text-blue-600 underline" to="/register">Registrati</Link>
+                Non hai un account? <Link className="text-blue-600 underline" to="/register">Registrati</Link>
             </p>
         </form>
     );
