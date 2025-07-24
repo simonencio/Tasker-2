@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "./supporto/supabaseClient";
-import { useNavigate, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Eye, EyeOff } from "lucide-react";
 
 export default function RegisterForm() {
@@ -21,7 +21,6 @@ export default function RegisterForm() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
-    const navigate = useNavigate();
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setForm({ ...form, [e.target.name]: e.target.value });
