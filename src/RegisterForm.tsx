@@ -1,38 +1,72 @@
 import { useState } from "react";
 import { supabase } from "./supporto/supabaseClient";
+import { useNavigate, Link } from 'react-router-dom'
+import { Eye, EyeOff } from "lucide-react";
 
 export default function RegisterForm() {
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [nome, setNome] = useState("");
-    const [cognome, setCognome] = useState("");
+    const [form, setForm] = useState({
+        email: '',
+        confermaEmail: '',
+        password: '',
+        confermaPassword: '',
+        nome: '',
+        cognome: '',
+        avatar: ''
+    });
+
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+
+    const navigate = useNavigate();
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setForm({ ...form, [e.target.name]: e.target.value });
+    };
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
 
+        if (form.email !== form.confermaEmail) {
+            setError("Le email non coincidono.");
+            setLoading(false);
+            return;
+        }
+
+        if (form.password !== form.confermaPassword) {
+            setError("Le password non coincidono.");
+            setLoading(false);
+            return;
+        }
+
         try {
             const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-                email,
-                password,
+                email: form.email,
+                password: form.password,
                 options: {
                     emailRedirectTo: "http://localhost:5173/confirm-email",
-                    data: { nome, cognome },
+                    data: {
+                        nome: form.nome,
+                        cognome: form.cognome,
+                        avatar: form.avatar
+                    },
                 },
             });
 
             if (signUpError || !signUpData.user) throw signUpError || new Error("Registrazione fallita.");
+
             const userId = signUpData.user.id;
 
             const { error: insertUserError } = await supabase.from("utenti").insert({
                 id: userId,
-                email,
-                nome,
-                cognome,
+                email: form.email,
+                nome: form.nome,
+                cognome: form.cognome,
                 ruolo: 1,
             });
             if (insertUserError) throw insertUserError;
@@ -48,7 +82,7 @@ export default function RegisterForm() {
                     .from("notifiche")
                     .insert({
                         tipo_id: tipo.id,
-                        messaggio: `🎉 Benvenuto ${nome} in Tasker`,
+                        messaggio: `🎉 Benvenuto ${form.nome} in Tasker`,
                         destinatari_tutti: false,
                         creatore_id: null,
                     })
@@ -82,16 +116,62 @@ export default function RegisterForm() {
     }
 
     return (
-        <form onSubmit={handleRegister} className="max-w-md mx-auto mt-10 p-6 border rounded-lg shadow space-y-4 bg-white">
-            <h2 className="text-xl font-bold text-center text-gray-800">Registrati su Tasker</h2>
-            <input type="text" placeholder="Nome" value={nome} onChange={(e) => setNome(e.target.value)} required className="w-full p-2 border rounded" />
-            <input type="text" placeholder="Cognome" value={cognome} onChange={(e) => setCognome(e.target.value)} required className="w-full p-2 border rounded" />
-            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full p-2 border rounded" />
-            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full p-2 border rounded" />
-            {error && <p className="text-red-600 text-sm">{error}</p>}
-            <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50">
-                {loading ? "Registrazione in corso..." : "Registrati"}
-            </button>
-        </form>
+        <div className="max-w-md mx-auto mt-20 space-y-4">
+            <h1 className="text-2xl font-bold">Registrati</h1>
+            <form onSubmit={handleRegister} className="space-y-4">
+                <input name="nome" placeholder="Nome" value={form.nome} onChange={handleChange} className="w-full p-2 border rounded" />
+                <input name="cognome" placeholder="Cognome" value={form.cognome} onChange={handleChange} className="w-full p-2 border rounded" />
+                <input name="email" type="email" placeholder="Email" value={form.email} onChange={handleChange} className="w-full p-2 border rounded" />
+                <input name="confermaEmail" type="email" placeholder="Conferma Email" value={form.confermaEmail} onChange={handleChange} className="w-full p-2 border rounded" />
+
+                <div className="relative">
+                    <input
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Password"
+                        value={form.password}
+                        onChange={handleChange}
+                        className="w-full p-2 border rounded"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-blue-600"
+                    >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                </div>
+
+                <div className="relative">
+                    <input
+                        name="confermaPassword"
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="Conferma Password"
+                        value={form.confermaPassword}
+                        onChange={handleChange}
+                        className="w-full p-2 border rounded"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword((prev) => !prev)}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-blue-600"
+                    >
+                        {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                </div>
+
+                <input name="avatar" placeholder="URL Avatar (opzionale)" value={form.avatar} onChange={handleChange} className="w-full p-2 border rounded" />
+
+                {error && <p className="text-red-600 text-sm">{error}</p>}
+
+                <button type="submit" disabled={loading} className="bg-blue-600 text-white px-4 py-2 rounded w-full">
+                    {loading ? "Registrazione in corso..." : "Registrati"}
+                </button>
+            </form>
+
+            <p className="text-center">
+                Hai già un account? <Link className="text-blue-600 underline" to="/">Accedi</Link>
+            </p>
+        </div>
     );
 }
