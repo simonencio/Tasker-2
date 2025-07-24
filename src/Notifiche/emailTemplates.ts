@@ -24,3 +24,5 @@ Hai ricevuto questa email in base alle tue preferenze notifiche.
 
     return { subject, body };
 }
+
+//////////////////////////////////////////////////////////////
