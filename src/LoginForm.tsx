@@ -35,7 +35,7 @@ export default function LoginForm() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email"
                 required
-                className="w-full border p-2 rounded"
+                className="w-full border p-2 rounded "
             />
 
             <input
@@ -59,4 +59,3 @@ export default function LoginForm() {
         </form>
     );
 }
-// aaaaaaaaaaaaaaaaaaaaaaaaaaaaa
