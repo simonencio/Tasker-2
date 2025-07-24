@@ -34,9 +34,7 @@ export default function LoginForm() {
         <form onSubmit={handleLogin} className="max-w-sm mx-auto mt-8 p-6 bg-white shadow-md rounded-xl space-y-4">
             <h2 className="text-xl font-semibold">Login</h2>
 
-            <div className="relative">
-
-                <input
+            <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -45,23 +43,35 @@ export default function LoginForm() {
                     className="w-full border p-2 rounded "
                 />
 
+            <div className="relative">
+
                 <input
-                    type="password"
+                    name="password"
                     value={password}
+                    type={showPassword ? "text" : "password"}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Password"
                     required
                     className="w-full border p-2 rounded"
                 />
-
                 <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded disabled:opacity-50"
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-blue-600"
                 >
-                    {loading ? "Caricamento..." : "Login"}
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
+
             </div>
+
+            <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded disabled:opacity-50"
+            >
+                {loading ? "Caricamento..." : "Login"}
+            </button>
+
 
             {error && <p className="text-red-600">{error}</p>}
             <p className="text-center">
@@ -70,4 +80,3 @@ export default function LoginForm() {
         </form>
     );
 }
-/////aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
