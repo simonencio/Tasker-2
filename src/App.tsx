@@ -4,7 +4,7 @@ import {
     Routes,
     Route,
     Navigate,
-    Link,
+
 } from "react-router-dom";
 import RegisterForm from "./RegisterForm";
 import ConfirmEmailWelcome from "./ConfirmEmailWelcome";
@@ -15,6 +15,9 @@ import { supabase } from "./supporto/supabaseClient";
 import "./App.css";
 import LoginForm from "./LoginForm";
 import Home from "./Home";
+import Header from "./Header/Header";
+import Profilo from "./Profilo/Profilo";
+import NotificheBell from "./Notifiche/NotificheBell";
 
 export default function App() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -37,33 +40,18 @@ export default function App() {
     }, []);
 
     return (
+
         <Router>
             {loggedIn && (
                 <>
-                    {/* 🔔 Pulsante notifiche */}
-                    <div className="fixed top-4 right-4 z-50">
-                        <button
-                            onClick={() => setSidebarOpen(true)}
-                            className="bg-blue-600 text-white font-bold rounded-full w-10 h-10 flex items-center justify-center shadow hover:bg-blue-700"
-                            title="Apri notifiche"
-                        >
-                            N
-                        </button>
-                    </div>
+                    <Header loggedIn={loggedIn} />
+                    <NotificheBell />
                     <NotificheSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-                    {/* 📌 Menu navigazione (solo da loggati) */}
-                    <nav className="bg-gray-100 p-4 flex gap-4 shadow border-b mt-14">
-                        <Link to="/home" className="text-blue-600 hover:underline">🏠 Home</Link>
-                        <Link to="/notifiche-manuali" className="text-blue-600 hover:underline">📨 Notifiche Manuali</Link>
-                        <Link to="/preferenze-notifiche" className="text-blue-600 hover:underline">📬 Preferenze Notifiche</Link>
-                        <Link to="/register" className="text-blue-600 hover:underline">Registrati</Link>
-                        <Link to="/login" className="text-blue-600 hover:underline">Login</Link>
-                    </nav>
                 </>
             )}
 
             <Routes>
+                <Route path="/profilo" element={<Profilo />} />
                 <Route path="/" element={<Navigate to={loggedIn ? "/home" : "/login"} replace />} />
                 <Route path="/register" element={<RegisterForm />} />
                 <Route path="/confirm-email" element={<ConfirmEmailWelcome />} />
@@ -73,5 +61,6 @@ export default function App() {
                 <Route path="/preferenze-notifiche" element={<NotificationPreferencesSelector />} />
             </Routes>
         </Router>
+
     );
 }
