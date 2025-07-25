@@ -30,7 +30,7 @@ export default function NotificheSidebar({
         });
     }, [open, userId]);
 
-    const segnaComeLetta = async (notificaUtenteId: string, notificaId: string) => {
+    const segnaComeLetta = async (notificaUtenteId: string) => {
         const now = new Date().toISOString();
 
         const { error } = await supabase
@@ -50,17 +50,13 @@ export default function NotificheSidebar({
 
             setTimeout(async () => {
                 await supabase
-                    .from("notifiche")
-                    .update({ deleted_at: new Date().toISOString() })
-                    .eq("id", notificaId);
-
-                await supabase
                     .from("notifiche_utenti")
                     .update({ deleted_at: new Date().toISOString() })
                     .eq("id", notificaUtenteId);
             }, 10000);
         }
     };
+
 
     return (
         <div
@@ -100,11 +96,12 @@ export default function NotificheSidebar({
                                         <span className="text-green-600 text-xs ml-2">✅ Letta</span>
                                     ) : (
                                         <button
-                                            onClick={() => segnaComeLetta(n.id, n.notifica_id)}
+                                            onClick={() => segnaComeLetta(n.id)}
                                             className="text-sm text-blue-600 hover:underline ml-2"
                                         >
                                             Segna come letta
                                         </button>
+
                                     )}
                                 </div>
                             </li>

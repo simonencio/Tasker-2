@@ -7,22 +7,28 @@ export function generaContenutoEmail({
     descrizioneTipo: string;
     messaggio: string;
 }): { subject: string; body: string } {
-    const subject = `📌 ${descrizioneTipo}`;
+    const subject = `📢 ${descrizioneTipo}`;
 
     const body = `
 Ciao ${nomeUtente},
 
-Hai ricevuto una nuova notifica:
+Hai ricevuto una nuova notifica sulla piattaforma *Tasker*:
 
-🔔 ${messaggio}
+──────────────────────────────
+📌 Tipo: ${descrizioneTipo}
+💬 Messaggio: ${messaggio}
+──────────────────────────────
 
-Accedi alla piattaforma per maggiori dettagli
+🔗 Puoi accedere a Tasker per maggiori dettagli al seguente link:
+http://localhost:5173/home
+
+Se non desideri ricevere queste email, puoi aggiornare le tue preferenze di notifica direttamente dal tuo profilo utente.
+
+Grazie per utilizzare Tasker!
 
 —
-Hai ricevuto questa email in base alle tue preferenze notifiche.
-`.trim();
+Questa email è stata inviata automaticamente in base alle tue impostazioni di notifica.
+  `.trim();
 
     return { subject, body };
 }
-
-//////////////////////////////////////////////////////////////
