@@ -1,15 +1,9 @@
-// src/NotificheSidebar.tsx
+// src/Notifiche/NotificheSidebar.tsx
 import { useEffect, useState } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import { getNotificheUtente, type Notifica } from "./notificheUtils";
 
-export default function NotificheSidebar({
-    open,
-    onClose,
-}: {
-    open: boolean;
-    onClose: () => void;
-}) {
+export default function NotificheSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
     const [notifiche, setNotifiche] = useState<Notifica[]>([]);
     const [loading, setLoading] = useState(true);
     const [userId, setUserId] = useState<string | null>(null);
@@ -22,12 +16,26 @@ export default function NotificheSidebar({
 
     useEffect(() => {
         if (!open || !userId) return;
-        setLoading(true);
 
-        getNotificheUtente(userId).then((notifiche) => {
-            setNotifiche(notifiche);
+        const markAsViewed = async () => {
+            await supabase
+                .from("notifiche_utenti")
+                .update({
+                    visualizzato: true,
+                    visualizzato_al: new Date().toISOString(),
+                })
+                .eq("utente_id", userId)
+                .is("visualizzato", false);
+        };
+
+        const loadNotifiche = async () => {
+            setLoading(true);
+            const data = await getNotificheUtente(userId);
+            setNotifiche(data);
             setLoading(false);
-        });
+        };
+
+        markAsViewed().then(loadNotifiche);
     }, [open, userId]);
 
     const segnaComeLetta = async (notificaUtenteId: string) => {
@@ -35,17 +43,12 @@ export default function NotificheSidebar({
 
         const { error } = await supabase
             .from("notifiche_utenti")
-            .update({
-                letto: true,
-                letto_al: now,
-            })
+            .update({ letto: true, letto_al: now })
             .eq("id", notificaUtenteId);
 
         if (!error) {
             setNotifiche((prev) =>
-                prev.map((n) =>
-                    n.id === notificaUtenteId ? { ...n, letto: true } : n
-                )
+                prev.map((n) => (n.id === notificaUtenteId ? { ...n, letto: true } : n))
             );
 
             setTimeout(async () => {
@@ -56,7 +59,6 @@ export default function NotificheSidebar({
             }, 10000);
         }
     };
-
 
     return (
         <div
@@ -83,9 +85,24 @@ export default function NotificheSidebar({
                                 </p>
                                 {(n.task_nome || n.progetto_nome || n.creatore_nome) && (
                                     <div className="text-xs text-gray-500 mt-1 pl-1 space-y-1">
-                                        {n.task_nome && <div>📝 Task: <span className="font-medium">{n.task_nome}</span></div>}
-                                        {n.progetto_nome && <div>📁 Progetto: <span className="font-medium">{n.progetto_nome}</span></div>}
-                                        {n.creatore_nome && <div>👤 Azione di: <span className="font-medium">{n.creatore_nome}</span></div>}
+                                        {n.task_nome && (
+                                            <div>
+                                                📝 Task:{" "}
+                                                <span className="font-medium">{n.task_nome}</span>
+                                            </div>
+                                        )}
+                                        {n.progetto_nome && (
+                                            <div>
+                                                📁 Progetto:{" "}
+                                                <span className="font-medium">{n.progetto_nome}</span>
+                                            </div>
+                                        )}
+                                        {n.creatore_nome && (
+                                            <div>
+                                                👤 Azione di:{" "}
+                                                <span className="font-medium">{n.creatore_nome}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                                 <div className="flex justify-between items-center mt-1">
@@ -101,7 +118,6 @@ export default function NotificheSidebar({
                                         >
                                             Segna come letta
                                         </button>
-
                                     )}
                                 </div>
                             </li>

@@ -6,6 +6,7 @@ import { generaContenutoEmail } from "./emailTemplates";
 export type Notifica = {
     id: string;
     letto: boolean;
+    visualizzato: boolean;
     messaggio: string;
     data_creazione: string;
     notifica_id: string;
@@ -21,6 +22,7 @@ export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
         .select(`
             id,
             letto,
+            visualizzato,
             notifica_id,
             notifiche (
                 messaggio,
@@ -43,6 +45,7 @@ export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
     return data.map((row: any) => ({
         id: String(row.id),
         letto: row.letto,
+        visualizzato: row.visualizzato,
         notifica_id: row.notifica_id,
         messaggio: row.notifiche?.messaggio ?? "(nessun messaggio)",
         data_creazione: row.notifiche?.data_creazione ?? "",
@@ -109,6 +112,8 @@ export async function inviaNotifica(
             utente_id: userId,
             inviato: inviaEmail,
             inviato_al: inviaEmail ? new Date().toISOString() : null,
+            visualizzato: false,
+            visualizzato_al: null,
         });
 
         if (inviaEmail) {

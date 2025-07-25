@@ -7,20 +7,20 @@ import {
 } from "react-router-dom";
 import RegisterForm from "./RegisterForm";
 import ConfirmEmailWelcome from "./ConfirmEmailWelcome";
-import NotificheManualSender from "./Notifiche/NotificheManualSender";
-import NotificationPreferencesSelector from "./Notifiche/NotificationPreferencesSelector";
+// import NotificheManualSender from "./Notifiche/NotificheManualSender";
+// import NotificationPreferencesSelector from "./Notifiche/NotificationPreferencesSelector";
 import { supabase } from "./supporto/supabaseClient";
 import "./App.css";
 import LoginForm from "./LoginForm";
 import Home from "./Home";
 import AppLayout from "./Layout/AppLayout";
 import Profilo from "./Profilo/Profilo";
-import AggiungiCliente from "./Creazione/Clienti";
+// import AggiungiCliente from "./Creazione/Clienti";
 // import ProjectMemberAssignment from "./ProjectMembersAssigner";
 
 export default function App() {
     const [loggedIn, setLoggedIn] = useState(false);
-    const [userId, setUserId] = useState<string | null>(null);
+    const [, setUserId] = useState<string | null>(null);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -58,22 +58,22 @@ export default function App() {
                         </AppLayout>
                     }
                 />
-                <Route
+                {/* <Route
                     path="/notifiche-manuali"
                     element={
                         <AppLayout loggedIn={loggedIn}>
                             <NotificheManualSender />
                         </AppLayout>
                     }
-                />
-                <Route
+                /> */}
+                {/* <Route
                     path="/preferenze-notifiche"
                     element={
                         <AppLayout loggedIn={loggedIn}>
                             <NotificationPreferencesSelector />
                         </AppLayout>
                     }
-                />
+                /> */}
                 <Route
                     path="/profilo"
                     element={
