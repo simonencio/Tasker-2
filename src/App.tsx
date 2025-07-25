@@ -7,7 +7,6 @@ import {
 } from "react-router-dom";
 import RegisterForm from "./RegisterForm";
 import ConfirmEmailWelcome from "./ConfirmEmailWelcome";
-import NotificheSidebar from "./Notifiche/NotificheSidebar";
 import NotificheManualSender from "./Notifiche/NotificheManualSender";
 import NotificationPreferencesSelector from "./Notifiche/NotificationPreferencesSelector";
 import { supabase } from "./supporto/supabaseClient";
@@ -16,15 +15,12 @@ import LoginForm from "./LoginForm";
 import Home from "./Home";
 import AppLayout from "./Layout/AppLayout";
 import Profilo from "./Profilo/Profilo";
-import NotificheBell from "./Notifiche/NotificheBell";
-import Header from "./Header/Header";
 
 // ✅ Importa il componente di assegnazione membri
 import ProjectMemberAssignment from "./ProjectMembersAssigner";
 
 
 export default function App() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [loggedIn, setLoggedIn] = useState(false);
     const [userId, setUserId] = useState<string | null>(null);
 
