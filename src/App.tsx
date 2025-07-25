@@ -14,6 +14,8 @@ import LoginForm from "./LoginForm";
 import Home from "./Home";
 import AppLayout from "./Layout/AppLayout";
 import Profilo from "./Profilo/Profilo";
+import Progetti from "./Progetto";
+import Task from "./Task";
 
 
 export default function App() {
@@ -53,6 +55,24 @@ export default function App() {
                     element={
                         <AppLayout loggedIn={loggedIn}>
                             <Home />
+                        </AppLayout>
+                    }
+                />
+
+                <Route
+                    path="/progetti"
+                    element={
+                        <AppLayout loggedIn={loggedIn}>
+                            <Progetti />
+                        </AppLayout>
+                    }
+                />
+
+                <Route
+                    path="/task"
+                    element={
+                        <AppLayout loggedIn={loggedIn}>
+                            <Task />
                         </AppLayout>
                     }
                 />
