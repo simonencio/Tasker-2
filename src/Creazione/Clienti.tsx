@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { supabase } from './supporto/supabaseClient';
+import { supabase } from '../supporto/supabaseClient';
 
 
 // type da poter spostare in un eventuale file entities

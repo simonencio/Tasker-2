@@ -15,7 +15,7 @@ import LoginForm from "./LoginForm";
 import Home from "./Home";
 import AppLayout from "./Layout/AppLayout";
 import Profilo from "./Profilo/Profilo";
-import AggiungiCliente from "./Clienti";
+import AggiungiCliente from "./Creazione/Clienti";
 // import ProjectMemberAssignment from "./ProjectMembersAssigner";
 
 export default function App() {
@@ -82,7 +82,7 @@ export default function App() {
                         </AppLayout>
                     }
                 />
-        
+
 
             </Routes>
 

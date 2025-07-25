@@ -4,8 +4,8 @@ import { useNavigate, Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUserCircle, faBars, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { supabase } from "../supporto/supabaseClient";
-import MiniTaskCreatorModal from "../Task-Creazione/MiniTaskCreatorModal";
-import AggiungiCliente from "../Clienti";
+import MiniTaskCreatorModal from "../Creazione/MiniTaskCreatorModal";
+import AggiungiCliente from "../Creazione/Clienti";
 
 type HeaderProps = {
     onToggleSidebar: () => void;
