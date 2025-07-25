@@ -10,7 +10,6 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { inviaNotifica } from "../Notifiche/notificheUtils";
 
-// Tipi
 type Stato = { id: number; nome: string };
 type Priorita = { id: number; nome: string };
 type Progetto = { id: string; nome: string };
@@ -27,6 +26,7 @@ export default function MiniTaskCreatorModal({ onClose }: Props) {
     const [consegna, setConsegna] = useState<string>("");
     const [ore, setOre] = useState("0");
     const [minuti, setMinuti] = useState("0");
+
     const [popupOpen, setPopupOpen] = useState<PopupType | null>(null);
     const [selecting, setSelecting] = useState<"progetto" | "utente" | null>(null);
 
@@ -87,23 +87,19 @@ export default function MiniTaskCreatorModal({ onClose }: Props) {
         setErrore(null);
         setLoading(true);
 
-        if (!progettoId || !assegnatario) {
-            setErrore("Seleziona un progetto e un assegnatario.");
-            setLoading(false);
-            return;
-        }
+        const tempoStimato =
+            ore === "0" && minuti === "0" ? null : `${ore} hours ${minuti} minutes`;
 
-        const tempoStimato = `${ore} hours ${minuti} minutes`;
-        const user = await supabase.auth.getUser();
+        const { data: userInfo } = await supabase.auth.getUser();
 
         const { data: createdTask, error: taskError } = await supabase
             .from("tasks")
             .insert({
                 nome,
                 note: note || null,
-                stato_id: Number(statoId),
-                priorita_id: Number(prioritaId),
-                consegna,
+                stato_id: statoId ? Number(statoId) : null,
+                priorita_id: prioritaId ? Number(prioritaId) : null,
+                consegna: consegna || null,
                 tempo_stimato: tempoStimato,
             })
             .select()
@@ -117,52 +113,58 @@ export default function MiniTaskCreatorModal({ onClose }: Props) {
 
         const taskId = createdTask.id;
 
-        const { data: existing } = await supabase
-            .from("utenti_progetti")
-            .select("id")
-            .eq("utente_id", assegnatario.id)
-            .eq("progetto_id", progettoId)
-            .maybeSingle();
+        if (progettoId) {
+            await supabase.from("progetti_task").insert({
+                task_id: taskId,
+                progetti_id: progettoId,
+            });
+        }
 
-        if (!existing) {
-            await supabase.from("utenti_progetti").insert({
+        if (assegnatario) {
+            if (progettoId) {
+                const { data: existing } = await supabase
+                    .from("utenti_progetti")
+                    .select("id")
+                    .eq("utente_id", assegnatario.id)
+                    .eq("progetto_id", progettoId)
+                    .maybeSingle();
+
+                if (!existing) {
+                    await supabase.from("utenti_progetti").insert({
+                        utente_id: assegnatario.id,
+                        progetto_id: progettoId,
+                    });
+
+                    await inviaNotifica(
+                        "PROGETTO_ASSEGNATO",
+                        [assegnatario.id],
+                        `Sei stato assegnato al progetto contenente la nuova attività: ${nome}`,
+                        userInfo.user?.id,
+                        { progetto_id: progettoId }
+                    );
+                }
+            }
+
+            await supabase.from("utenti_task").insert({
                 utente_id: assegnatario.id,
-                progetto_id: progettoId,
+                task_id: taskId,
             });
 
             await inviaNotifica(
-                "PROGETTO_ASSEGNATO",
+                "TASK_ASSEGNATO",
                 [assegnatario.id],
-                `Sei stato assegnato al progetto contenente la nuova attività: ${nome}`,
-                user.data?.user?.id,
-                { progetto_id: progettoId }
+                `Ti è stata assegnata una nuova attività: ${nome}`,
+                userInfo.user?.id,
+                { progetto_id: progettoId || undefined, task_id: taskId }
             );
         }
-
-        await supabase.from("utenti_task").insert({
-            utente_id: assegnatario.id,
-            task_id: taskId,
-        });
-
-        await supabase.from("progetti_task").insert({
-            task_id: taskId,
-            progetti_id: progettoId,
-        });
-
-        await inviaNotifica(
-            "TASK_ASSEGNATO",
-            [assegnatario.id],
-            `Ti è stata assegnata una nuova attività: ${nome}`,
-            user.data?.user?.id,
-            { progetto_id: progettoId, task_id: taskId }
-        );
 
         setLoading(false);
         setSuccess(true);
         setTimeout(() => onClose(), 1200);
     };
 
-    const popupButtons: { icon: any; popup: PopupType; color: string; activeColor: string }[] = [
+    const popupButtons = [
         { icon: faFlag, popup: "stato", color: "text-red-400", activeColor: "text-red-600" },
         { icon: faSignal, popup: "priorita", color: "text-yellow-400", activeColor: "text-yellow-600" },
         { icon: faCalendarDays, popup: "consegna", color: "text-blue-400", activeColor: "text-blue-600" },
@@ -174,7 +176,6 @@ export default function MiniTaskCreatorModal({ onClose }: Props) {
             <h2 className="text-xl font-semibold mb-4 text-center">Crea Nuova Attività</h2>
 
             <form onSubmit={handleSubmit} className="space-y-4 text-sm">
-
                 {/* Progetto e Utente */}
                 <div className="flex flex-wrap items-center gap-2 border border-gray-200 p-3 rounded bg-gray-50">
                     <span className="font-medium">in</span>
@@ -267,7 +268,7 @@ export default function MiniTaskCreatorModal({ onClose }: Props) {
                     {popupButtons.map(({ icon, popup, color, activeColor }) => {
                         const isActive = popupOpen === popup;
                         return (
-                            <button key={popup} type="button" title={popup} onClick={() => setPopupOpen(isActive ? null : popup)} className={`${isActive ? activeColor : color} transition-colors duration-200`}>
+                            <button key={popup} type="button" title={popup} onClick={() => setPopupOpen((isActive ? null : popup) as PopupType | null)} className={`${isActive ? activeColor : color} transition-colors duration-200`}>
                                 <FontAwesomeIcon icon={icon} />
                             </button>
                         );

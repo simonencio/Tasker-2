@@ -3,10 +3,7 @@ import { NavLink } from 'react-router-dom'
 
 const navItems = [
   { to: '/home', label: 'Home' },
-  { to: '/notifiche-manuali', label: 'Notifiche' },
-  { to: '/preferenze-notifiche', label: 'Check Notifiche' },
-  { to: '/clienti', label: 'Clienti'},
-  { to: '/progetti', label: 'Progetto'}
+
 ]
 
 export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
@@ -20,9 +17,8 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose:
       `}
     >
       <div
-        className={`flex flex-col justify-between h-full px-4 py-6 transition-opacity duration-300 ${
-          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
+        className={`flex flex-col justify-between h-full px-4 py-6 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
       >
         <div>
           <nav className="space-y-2">
@@ -32,8 +28,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose:
                 to={to}
                 onClick={onClose}
                 className={({ isActive }) =>
-                  `block p-2 rounded transition ${
-                    isActive ? 'bg-gray-700 font-semibold text-white' : 'hover:bg-gray-200'
+                  `block p-2 rounded transition ${isActive ? 'bg-gray-700 font-semibold text-white' : 'hover:bg-gray-200'
                   }`
                 }
               >
