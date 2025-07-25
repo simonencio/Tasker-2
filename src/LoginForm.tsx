@@ -35,13 +35,14 @@ export default function LoginForm() {
             <h2 className="text-xl font-semibold">Login</h2>
 
             <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email"
-                required
-                className="w-full border p-2 rounded "
-            />
+
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Email"
+                    required
+                    className="w-full border p-2 rounded "
+                />
 
             <div className="relative">
 
