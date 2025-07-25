@@ -15,7 +15,8 @@ import LoginForm from "./LoginForm";
 import Home from "./Home";
 import AppLayout from "./Layout/AppLayout";
 import Profilo from "./Profilo/Profilo";
-import ProjectMemberAssignment from "./ProjectMembersAssigner";
+import AggiungiCliente from "./Clienti";
+// import ProjectMemberAssignment from "./ProjectMembersAssigner";
 
 export default function App() {
     const [loggedIn, setLoggedIn] = useState(false);
@@ -84,7 +85,7 @@ export default function App() {
         
 
             </Routes>
-            
+
             {/* ✅ Mostra il componente di assegnazione membri al progetto
             {loggedIn && userId && (
                 <div className="fixed bottom-4 right-4 bg-white p-4 rounded shadow-lg border">
