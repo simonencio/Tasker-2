@@ -50,6 +50,10 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                     </button>
 
 
+                <div className="flex items-center gap-8">
+                    <div className="text-xl font-bold text-gray-800 tracking-wide"><img className="h-auto max-w-[50%]" src="../public/kalimero_logo.png" ></img></div>
+                </div>
+
 
                     {loggedIn && (
                         <nav className="flex gap-4 text-sm font-medium text-gray-700">

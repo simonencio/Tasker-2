@@ -15,10 +15,10 @@ import LoginForm from "./LoginForm";
 import Home from "./Home";
 import AppLayout from "./Layout/AppLayout";
 import Profilo from "./Profilo/Profilo";
-
-// ✅ Importa il componente di assegnazione membri
+import NotificheBell from "./Notifiche/NotificheBell";
+import Header from "./Header/Header";
+import AggiungiCliente from "./Clienti";
 import ProjectMemberAssignment from "./ProjectMembersAssigner";
-
 
 export default function App() {
     const [loggedIn, setLoggedIn] = useState(false);
@@ -84,6 +84,15 @@ export default function App() {
                         </AppLayout>
                     }
                 />
+                <Route
+                    path="/clienti"
+                    element={
+                        <AppLayout loggedIn={loggedIn}>
+                            <AggiungiCliente />
+                        </AppLayout>
+                    }
+                />
+
             </Routes>
 
             {/* ✅ Mostra il componente di assegnazione membri al progetto */}
