@@ -15,6 +15,7 @@ import LoginForm from "./LoginForm";
 import Home from "./Home";
 import AppLayout from "./Layout/AppLayout";
 import Profilo from "./Profilo/Profilo";
+import Progetto from "./Progetto";
 import AggiungiCliente from "./Creazione/Clienti";
 // import ProjectMemberAssignment from "./ProjectMembersAssigner";
 
@@ -55,6 +56,14 @@ export default function App() {
                     element={
                         <AppLayout loggedIn={loggedIn}>
                             <Home />
+                        </AppLayout>
+                    }
+                />
+                <Route
+                    path="/progetti"
+                    element={
+                        <AppLayout loggedIn={loggedIn}>
+                            <Progetto />
                         </AppLayout>
                     }
                 />

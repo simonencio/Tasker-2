@@ -6,6 +6,7 @@ const navItems = [
   { to: '/notifiche-manuali', label: 'Notifiche' },
   { to: '/preferenze-notifiche', label: 'Check Notifiche' },
   { to: '/clienti', label: 'Clienti'},
+  { to: '/progetti', label: 'Progetto'}
 ]
 
 export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
