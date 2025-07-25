@@ -19,6 +19,7 @@ import AppLayout from "./Layout/AppLayout";
 import Profilo from "./Profilo/Profilo";
 import NotificheBell from "./Notifiche/NotificheBell";
 import Header from "./Header/Header";
+import AggiungiCliente from "./Clienti";
 
 export default function App() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -82,6 +83,15 @@ export default function App() {
                         </AppLayout>
                     }
                 />
+                <Route
+                    path="/clienti"
+                    element={
+                        <AppLayout loggedIn={loggedIn}>
+                            <AggiungiCliente />
+                        </AppLayout>
+                    }
+                />
+
             </Routes>
         </Router>
 
