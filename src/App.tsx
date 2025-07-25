@@ -15,9 +15,10 @@ import { supabase } from "./supporto/supabaseClient";
 import "./App.css";
 import LoginForm from "./LoginForm";
 import Home from "./Home";
-import Header from "./Header/Header";
+import AppLayout from "./Layout/AppLayout";
 import Profilo from "./Profilo/Profilo";
 import NotificheBell from "./Notifiche/NotificheBell";
+import Header from "./Header/Header";
 
 export default function App() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -42,23 +43,45 @@ export default function App() {
     return (
 
         <Router>
-            {loggedIn && (
-                <>
-                    <Header loggedIn={loggedIn} />
-                    <NotificheBell />
-                    <NotificheSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-                </>
-            )}
-
             <Routes>
-                <Route path="/profilo" element={<Profilo />} />
                 <Route path="/" element={<Navigate to={loggedIn ? "/home" : "/login"} replace />} />
                 <Route path="/register" element={<RegisterForm />} />
                 <Route path="/confirm-email" element={<ConfirmEmailWelcome />} />
                 <Route path="/login" element={<LoginForm />} />
-                <Route path="/home" element={<Home />} />
-                <Route path="/notifiche-manuali" element={<NotificheManualSender />} />
-                <Route path="/preferenze-notifiche" element={<NotificationPreferencesSelector />} />
+
+                {/* Le rotte protette usano AppLayout */}
+                <Route
+                    path="/home"
+                    element={
+                        <AppLayout loggedIn={loggedIn}>
+                            <Home />
+                        </AppLayout>
+                    }
+                />
+                <Route
+                    path="/notifiche-manuali"
+                    element={
+                        <AppLayout loggedIn={loggedIn}>
+                            <NotificheManualSender />
+                        </AppLayout>
+                    }
+                />
+                <Route
+                    path="/preferenze-notifiche"
+                    element={
+                        <AppLayout loggedIn={loggedIn}>
+                            <NotificationPreferencesSelector />
+                        </AppLayout>
+                    }
+                />
+                <Route
+                    path="/profilo"
+                    element={
+                        <AppLayout loggedIn={loggedIn}>
+                            <Profilo />
+                        </AppLayout>
+                    }
+                />
             </Routes>
         </Router>
 
