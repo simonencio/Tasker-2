@@ -45,11 +45,32 @@ export default function App() {
         <Router>
             <Routes>
                 <Route path="/" element={<Navigate to={loggedIn ? "/home" : "/login"} replace />} />
-                <Route path="/register" element={<RegisterForm />} />
-                <Route path="/confirm-email" element={<ConfirmEmailWelcome />} />
-                <Route path="/login" element={<LoginForm />} />
 
-                {/* Le rotte protette usano AppLayout */}
+                <Route
+                    path="/login"
+                    element={
+                        <AppLayout loggedIn={loggedIn}>
+                            <LoginForm />
+                        </AppLayout>
+                    }
+                />
+                <Route
+                    path="/register"
+                    element={
+                        <AppLayout loggedIn={loggedIn}>
+                            <RegisterForm />
+                        </AppLayout>
+                    }
+                />
+                <Route
+                    path="/confirm-email"
+                    element={
+                        <AppLayout loggedIn={loggedIn}>
+                            <ConfirmEmailWelcome />
+                        </AppLayout>
+                    }
+                />
+
                 <Route
                     path="/home"
                     element={
@@ -58,7 +79,6 @@ export default function App() {
                         </AppLayout>
                     }
                 />
-
                 <Route
                     path="/progetti"
                     element={
@@ -85,12 +105,8 @@ export default function App() {
                         </AppLayout>
                     }
                 />
-
-
             </Routes>
-
-         
-
         </Router>
+
     );
 }
