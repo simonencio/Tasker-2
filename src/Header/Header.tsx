@@ -5,6 +5,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUserCircle, faBars, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { supabase } from "../supporto/supabaseClient";
 import MiniTaskCreatorModal from "../Task-Creazione/MiniTaskCreatorModal";
+import AggiungiCliente from "../Clienti";
 
 type HeaderProps = {
     onToggleSidebar: () => void;
@@ -15,6 +16,7 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
     const [open, setOpen] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
     const [showTaskModal, setShowTaskModal] = useState(false);
+    const [showClientModal, setShowClientModal] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const createRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
@@ -50,9 +52,9 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                     </button>
 
 
-                <div className="flex items-center gap-8">
-                    <div className="text-xl font-bold text-gray-800 tracking-wide"><img className="h-auto max-w-[50%]" src="../public/kalimero_logo.png" ></img></div>
-                </div>
+                    <div className="flex items-center gap-8">
+                        <div className="text-xl font-bold text-gray-800 tracking-wide"><img className="h-auto max-w-[50%]" src="../public/kalimero_logo.png" ></img></div>
+                    </div>
 
 
                     {loggedIn && (
@@ -81,12 +83,21 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                             <div className="absolute right-0 mt-2 w-40 bg-white border rounded-lg shadow-lg p-2 z-50">
                                 <button
                                     onClick={() => {
-                                        setCreateOpen(false);
-                                        setShowTaskModal(true);
+                                        setCreateOpen(false)
+                                        setShowTaskModal(true)
                                     }}
                                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
                                 >
                                     Attività
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setCreateOpen(false)
+                                        setShowClientModal(true)
+                                    }}
+                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
+                                >
+                                    Clienti
                                 </button>
                             </div>
                         )}
@@ -127,6 +138,7 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
 
             {/* Modale per creare attività */}
             {showTaskModal && <MiniTaskCreatorModal onClose={() => setShowTaskModal(false)} />}
+            {showClientModal && <AggiungiCliente onClose={() => setShowClientModal(false)} />}
         </>
     );
 }
