@@ -1,8 +1,13 @@
 import { useState } from "react";
 import { supabase } from "./supporto/supabaseClient";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
+
+
 
 export default function LoginForm() {
+
+    const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
@@ -35,17 +40,29 @@ export default function LoginForm() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email"
                 required
-                className="w-full border p-2 rounded"
+                className="w-full border p-2 rounded "
             />
 
-            <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                required
-                className="w-full border p-2 rounded"
-            />
+            <div className="relative">
+
+                <input
+                    name="password"
+                    value={password}
+                    type={showPassword ? "text" : "password"}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Password"
+                    required
+                    className="w-full border p-2 rounded"
+                />
+                <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-blue-600"
+                >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+
+            </div>
 
             <button
                 type="submit"
@@ -55,8 +72,11 @@ export default function LoginForm() {
                 {loading ? "Caricamento..." : "Login"}
             </button>
 
+
             {error && <p className="text-red-600">{error}</p>}
+            <p className="text-center">
+                Non hai un account? <Link className="text-blue-600 underline" to="/register">Registrati</Link>
+            </p>
         </form>
     );
 }
-/////aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

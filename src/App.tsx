@@ -4,7 +4,6 @@ import {
     Routes,
     Route,
     Navigate,
-
 } from "react-router-dom";
 import RegisterForm from "./RegisterForm";
 import ConfirmEmailWelcome from "./ConfirmEmailWelcome";
@@ -19,19 +18,27 @@ import Header from "./Header/Header";
 import Profilo from "./Profilo/Profilo";
 import NotificheBell from "./Notifiche/NotificheBell";
 
+// ✅ Importa il componente di assegnazione membri
+import ProjectMemberAssignment from "./ProjectMembersAssigner";
+
+
 export default function App() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [loggedIn, setLoggedIn] = useState(false);
+    const [userId, setUserId] = useState<string | null>(null);
 
     useEffect(() => {
         const checkAuth = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             setLoggedIn(!!user);
+            setUserId(user?.id ?? null);
         };
         checkAuth();
 
         const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-            setLoggedIn(!!session?.user);
+            const newUser = session?.user;
+            setLoggedIn(!!newUser);
+            setUserId(newUser?.id ?? null);
         });
 
         return () => {
@@ -40,7 +47,6 @@ export default function App() {
     }, []);
 
     return (
-
         <Router>
             {loggedIn && (
                 <>
@@ -60,7 +66,14 @@ export default function App() {
                 <Route path="/notifiche-manuali" element={<NotificheManualSender />} />
                 <Route path="/preferenze-notifiche" element={<NotificationPreferencesSelector />} />
             </Routes>
-        </Router>
 
+            {/* ✅ Mostra il componente di assegnazione membri al progetto */}
+            {loggedIn && userId && (
+                <div className="fixed bottom-4 right-4 bg-white p-4 rounded shadow-lg border">
+                    <ProjectMemberAssignment creatore_id={userId} />
+                </div>
+            )}
+
+        </Router>
     );
 }
