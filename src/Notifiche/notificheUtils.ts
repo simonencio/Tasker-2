@@ -1,3 +1,4 @@
+// src/supporto/notificheUtils.ts
 import { supabase } from "../supporto/supabaseClient";
 import { inviaEmailNotifica } from "./emailUtils";
 import { generaContenutoEmail } from "./emailTemplates";
@@ -8,6 +9,9 @@ export type Notifica = {
     messaggio: string;
     data_creazione: string;
     notifica_id: string;
+    task_nome?: string;
+    progetto_nome?: string;
+    creatore_nome?: string;
 };
 
 // ✅ Recupera notifiche visibili per l'utente corrente
@@ -15,14 +19,17 @@ export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
     const { data, error } = await supabase
         .from("notifiche_utenti")
         .select(`
-      id,
-      letto,
-      notifica_id,
-      notifica: notifica_id (
-        messaggio,
-        data_creazione
-      )
-    `)
+            id,
+            letto,
+            notifica_id,
+            notifiche (
+                messaggio,
+                data_creazione,
+                tasks ( nome ),
+                progetti ( nome ),
+                creatore: creatore_id ( nome, cognome )
+            )
+        `)
         .eq("utente_id", userId)
         .is("deleted_at", null)
         .order("id", { ascending: false })
@@ -37,8 +44,13 @@ export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
         id: String(row.id),
         letto: row.letto,
         notifica_id: row.notifica_id,
-        messaggio: row.notifica?.messaggio ?? "(nessun messaggio)",
-        data_creazione: row.notifica?.data_creazione ?? "",
+        messaggio: row.notifiche?.messaggio ?? "(nessun messaggio)",
+        data_creazione: row.notifiche?.data_creazione ?? "",
+        task_nome: row.notifiche?.tasks?.nome ?? undefined,
+        progetto_nome: row.notifiche?.progetti?.nome ?? undefined,
+        creatore_nome: row.notifiche?.creatore
+            ? `${row.notifiche.creatore.nome} ${row.notifiche.creatore.cognome}`
+            : undefined,
     }));
 }
 

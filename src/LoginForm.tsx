@@ -35,6 +35,7 @@ export default function LoginForm() {
             <h2 className="text-xl font-semibold">Login</h2>
 
             <input
+
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}

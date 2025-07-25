@@ -30,7 +30,7 @@ export default function NotificheSidebar({
         });
     }, [open, userId]);
 
-    const segnaComeLetta = async (notificaUtenteId: string, notificaId: string) => {
+    const segnaComeLetta = async (notificaUtenteId: string) => {
         const now = new Date().toISOString();
 
         const { error } = await supabase
@@ -50,17 +50,13 @@ export default function NotificheSidebar({
 
             setTimeout(async () => {
                 await supabase
-                    .from("notifiche")
-                    .update({ deleted_at: new Date().toISOString() })
-                    .eq("id", notificaId);
-
-                await supabase
                     .from("notifiche_utenti")
                     .update({ deleted_at: new Date().toISOString() })
                     .eq("id", notificaUtenteId);
             }, 10000);
         }
     };
+
 
     return (
         <div
@@ -82,27 +78,30 @@ export default function NotificheSidebar({
                     <ul className="divide-y">
                         {notifiche.map((n) => (
                             <li key={n.id} className="py-3">
-                                <p
-                                    className={`text-sm ${n.letto ? "text-gray-600" : "font-semibold"
-                                        }`}
-                                >
+                                <p className={`text-sm ${n.letto ? "text-gray-600" : "font-semibold"}`}>
                                     {n.messaggio}
                                 </p>
+                                {(n.task_nome || n.progetto_nome || n.creatore_nome) && (
+                                    <div className="text-xs text-gray-500 mt-1 pl-1 space-y-1">
+                                        {n.task_nome && <div>📝 Task: <span className="font-medium">{n.task_nome}</span></div>}
+                                        {n.progetto_nome && <div>📁 Progetto: <span className="font-medium">{n.progetto_nome}</span></div>}
+                                        {n.creatore_nome && <div>👤 Azione di: <span className="font-medium">{n.creatore_nome}</span></div>}
+                                    </div>
+                                )}
                                 <div className="flex justify-between items-center mt-1">
                                     <p className="text-xs text-gray-400">
                                         {new Date(n.data_creazione).toLocaleString()}
                                     </p>
                                     {n.letto ? (
-                                        <span className="text-green-600 text-xs ml-2">
-                                            ✅ Letta
-                                        </span>
+                                        <span className="text-green-600 text-xs ml-2">✅ Letta</span>
                                     ) : (
                                         <button
-                                            onClick={() => segnaComeLetta(n.id, n.notifica_id)}
+                                            onClick={() => segnaComeLetta(n.id)}
                                             className="text-sm text-blue-600 hover:underline ml-2"
                                         >
                                             Segna come letta
                                         </button>
+
                                     )}
                                 </div>
                             </li>

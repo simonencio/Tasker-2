@@ -9,9 +9,7 @@ export async function inviaEmailNotifica({
 }) {
     const response = await fetch("https://kieyhhmxinmdsnfdglrm.supabase.co/functions/v1/sendEmail", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: to, subject, body }),
     });
 
