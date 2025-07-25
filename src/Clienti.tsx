@@ -1,7 +1,6 @@
+
 import { useState } from 'react';
 import { supabase } from './supporto/supabaseClient';
-
-
 
 
 // type da poter spostare in un eventuale file entities
@@ -17,18 +16,23 @@ export type Cliente = {
   deleted_at?: string | null
 }
 
+type Props = {
+  onClose: () => void;
+};
 
 
-export default function AggiungiCliente() {
+
+export default function AggiungiCliente({ onClose }: Props) {
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
   const [telefono, setTelefono] = useState('')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [note, setNote] = useState('')
 
+  const [loading, setLoading] = useState(false);
   const [errore, setErrore] = useState('')
   const [successo, setSuccesso] = useState(false)
-  
+
 
 
 
@@ -36,6 +40,7 @@ export default function AggiungiCliente() {
     e.preventDefault()
     setErrore('')
     setSuccesso(false)
+    setLoading(true);
 
     if (!nome.trim()) {
       setErrore('il campo è obbligatorio')
@@ -51,6 +56,8 @@ export default function AggiungiCliente() {
         note,
       },
     ])
+
+    setLoading(false);
 
     if (error) {
       setErrore(`Errore nell'inserimento: ${error.message}`)
@@ -68,49 +75,80 @@ export default function AggiungiCliente() {
 
 
   return (
-    <div className="max-w-xl mx-auto p-4 bg-white shadow rounded">
-      <h2 className="text-xl font-bold mb-4">Nuovo Cliente</h2>
+    <div className="fixed bottom-4 left-4 bg-white border border-gray-300 rounded-xl shadow-lg p-4 w-[350px] z-50">
+      <h3 className="text-lg font-semibold mb-2">Nuovo Cliente</h3>
       {errore && <p className="text-red-500 mb-2">{errore}</p>}
       {successo && <p className="text-green-600 mb-2">Cliente inserito con successo!</p>}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          type="text"
-          placeholder="Nome *"
-          value={nome}
-          onChange={(e) => setNome(e.target.value)}
-          className="w-full border p-2 rounded"
-          required
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full border p-2 rounded"
-        />
-        <input
-          type="text"
-          placeholder="Telefono"
-          value={telefono}
-          onChange={(e) => setTelefono(e.target.value)}
-          className="w-full border p-2 rounded"
-        />
-        <input
-          type="text"
-          placeholder="Avatar URL"
-          value={avatarUrl}
-          onChange={(e) => setAvatarUrl(e.target.value)}
-          className="w-full border p-2 rounded"
-        />
-        <textarea
-          placeholder="Note"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          className="w-full border p-2 rounded"
-        />
-        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-          Salva Cliente
-        </button>
+      <form onSubmit={handleSubmit} className="space-y-3 text-sm ">
+        <div className="h-[300px]">
+
+          <div>
+            <label className="block mb-1 font-medium">Nome *</label>
+            <input
+              type="text"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              className="w-full border p-2 rounded"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 font-medium">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full border p-2 rounded"
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 font-medium">Telefono</label>
+            <input
+              type="text"
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              className="w-full border p-2 rounded"
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 font-medium">Avatar</label>
+            <input
+              type="text"
+              value={avatarUrl}
+              onChange={(e) => setAvatarUrl(e.target.value)}
+              className="w-full border p-2 rounded"
+            />
+          </div>
+
+          <div>
+            <label className="block mb-1 font-medium">Note</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className="w-full border p-1 rounded"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-between pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-600 hover:text-black text-sm"
+          >
+            Annulla
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
+          >
+            {loading ? "Salvataggio..." : "Crea"}
+          </button>
+        </div>
       </form>
     </div>
   )

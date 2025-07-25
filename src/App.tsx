@@ -15,7 +15,6 @@ import LoginForm from "./LoginForm";
 import Home from "./Home";
 import AppLayout from "./Layout/AppLayout";
 import Profilo from "./Profilo/Profilo";
-
 import AggiungiCliente from "./Clienti";
 // import ProjectMemberAssignment from "./ProjectMembersAssigner";
 
@@ -83,14 +82,7 @@ export default function App() {
                         </AppLayout>
                     }
                 />
-                <Route
-                    path="/clienti"
-                    element={
-                        <AppLayout loggedIn={loggedIn}>
-                            <AggiungiCliente />
-                        </AppLayout>
-                    }
-                />
+        
 
             </Routes>
 
