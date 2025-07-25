@@ -7,16 +7,14 @@ import {
 } from "react-router-dom";
 import RegisterForm from "./RegisterForm";
 import ConfirmEmailWelcome from "./ConfirmEmailWelcome";
-// import NotificheManualSender from "./Notifiche/NotificheManualSender";
-// import NotificationPreferencesSelector from "./Notifiche/NotificationPreferencesSelector";
+
 import { supabase } from "./supporto/supabaseClient";
 import "./App.css";
 import LoginForm from "./LoginForm";
 import Home from "./Home";
 import AppLayout from "./Layout/AppLayout";
 import Profilo from "./Profilo/Profilo";
-// import AggiungiCliente from "./Creazione/Clienti";
-// import ProjectMemberAssignment from "./ProjectMembersAssigner";
+
 
 export default function App() {
     const [loggedIn, setLoggedIn] = useState(false);
@@ -58,22 +56,7 @@ export default function App() {
                         </AppLayout>
                     }
                 />
-                {/* <Route
-                    path="/notifiche-manuali"
-                    element={
-                        <AppLayout loggedIn={loggedIn}>
-                            <NotificheManualSender />
-                        </AppLayout>
-                    }
-                /> */}
-                {/* <Route
-                    path="/preferenze-notifiche"
-                    element={
-                        <AppLayout loggedIn={loggedIn}>
-                            <NotificationPreferencesSelector />
-                        </AppLayout>
-                    }
-                /> */}
+
                 <Route
                     path="/profilo"
                     element={
@@ -86,12 +69,7 @@ export default function App() {
 
             </Routes>
 
-            {/* ✅ Mostra il componente di assegnazione membri al progetto
-            {loggedIn && userId && (
-                <div className="fixed bottom-4 right-4 bg-white p-4 rounded shadow-lg border">
-                    <ProjectMemberAssignment creatore_id={userId} />
-                </div>
-            )} */}
+         
 
         </Router>
     );
