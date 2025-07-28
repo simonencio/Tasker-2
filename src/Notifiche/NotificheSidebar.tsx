@@ -38,32 +38,26 @@ export default function NotificheSidebar({ open, onClose }: { open: boolean; onC
         markAsViewed().then(loadNotifiche);
     }, [open, userId]);
 
-    const segnaComeLetta = async (notificaUtenteId: string) => {
+    const eliminaNotifica = async (notificaUtenteId: string) => {
         const now = new Date().toISOString();
 
-        const { error } = await supabase
+        // Rimuove subito dalla UI
+        setNotifiche((prev) => prev.filter((n) => n.id !== notificaUtenteId));
+
+        // Aggiorna come letta e soft-delete nel DB
+        await supabase
             .from("notifiche_utenti")
-            .update({ letto: true, letto_al: now })
+            .update({
+                letto: true,
+                letto_al: now,
+                deleted_at: now,
+            })
             .eq("id", notificaUtenteId);
-
-        if (!error) {
-            setNotifiche((prev) =>
-                prev.map((n) => (n.id === notificaUtenteId ? { ...n, letto: true } : n))
-            );
-
-            setTimeout(async () => {
-                await supabase
-                    .from("notifiche_utenti")
-                    .update({ deleted_at: new Date().toISOString() })
-                    .eq("id", notificaUtenteId);
-            }, 10000);
-        }
     };
 
     return (
         <div
-            className={`fixed top-0 right-0 h-full w-80 bg-white shadow-xl border-l z-50 transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"
-                }`}
+            className={`fixed top-0 right-0 h-full w-80 bg-white shadow-xl border-l z-50 transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"}`}
         >
             <div className="p-4 border-b flex justify-between items-center bg-gray-100">
                 <h2 className="text-lg font-semibold">🔔 Notifiche</h2>
@@ -109,16 +103,12 @@ export default function NotificheSidebar({ open, onClose }: { open: boolean; onC
                                     <p className="text-xs text-gray-400">
                                         {new Date(n.data_creazione).toLocaleString()}
                                     </p>
-                                    {n.letto ? (
-                                        <span className="text-green-600 text-xs ml-2">✅ Letta</span>
-                                    ) : (
-                                        <button
-                                            onClick={() => segnaComeLetta(n.id)}
-                                            className="text-sm text-blue-600 hover:underline ml-2"
-                                        >
-                                            Segna come letta
-                                        </button>
-                                    )}
+                                    <button
+                                        onClick={() => eliminaNotifica(n.id)}
+                                        className="text-xs text-red-600 border border-red-300 px-2 py-1 rounded hover:bg-red-100 ml-2"
+                                    >
+                                        Elimina
+                                    </button>
                                 </div>
                             </li>
                         ))}

@@ -100,7 +100,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose:
                     </div>
 
                     {mostraDropdown && (
-                      <ul className="ml-6 mt-1 text-sm space-y-1"> 
+                      <ul className="ml-6 mt-1 text-sm space-y-1">
                         {progetti.map((proj) => (
                           <li key={proj.id}>
                             <NavLink
