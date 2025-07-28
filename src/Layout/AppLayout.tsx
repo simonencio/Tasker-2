@@ -23,7 +23,7 @@ export default function AppLayout({
                 <main
                     className={`
                         flex-1 transition-all duration-300
-                        ${sidebarOpen ? 'ml-60' : 'ml-0'} pt-14
+                        ${sidebarOpen ? 'ml-60' : 'ml-0'} 
                     `}
                 >
                     {children}

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supporto/supabaseClient'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faPen } from '@fortawesome/free-solid-svg-icons'
+
+import { useNavigate } from 'react-router-dom'
+
 
 
 export type Progetto = {
@@ -26,6 +27,8 @@ export type Progetto = {
 export default function ListaProgetti() {
     const [progetti, setProgetti] = useState<Progetto[]>([])
     const [loading, setLoading] = useState(true)
+
+    const navigate = useNavigate()
 
     useEffect(() => {
         const caricaProgetti = async () => {
@@ -70,14 +73,9 @@ export default function ListaProgetti() {
                         <div
                             key={proj.id}
                             className="relative bg-white shadow-md rounded-lg p-4 hover:shadow-lg transition-all"
+                            onClick={() => navigate(`/progetti/${proj.id}` , { state: { fromProgeti: true } })} //link pagina detaglioProgetto
                         >
-                            <button
-                                onClick={() => console.log('Modifica progetto:', proj.id)} // poi lo colleghi al modal/modifica
-                                className="absolute top-2 right-2 text-gray-500 hover:text-blue-600"
-                                aria-label="Modifica"
-                            >
-                                <FontAwesomeIcon icon={faPen} />
-                            </button>
+
                             <h2 className="text-lg font-bold text-gray-800">{proj.nome}</h2>
 
                             {proj.cliente?.nome && (
