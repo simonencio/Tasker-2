@@ -8,6 +8,10 @@ import MiniTaskCreatorModal from "../Creazione/MiniTaskCreatorModal";
 import AggiungiCliente from "../Creazione/Clienti";
 import MiniProjectCreatorModal from "../Creazione/MiniProjectCreatorModal";
 import NotificheSidebar from "../Notifiche/NotificheSidebar";
+import {
+    richiediPermessoNotificheBrowser,
+    mostraNotificaBrowser,
+} from "../Notifiche/notificheBrowserUtils";
 
 type HeaderProps = {
     onToggleSidebar: () => void;
@@ -36,12 +40,17 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
     useEffect(() => {
         const getUser = async () => {
             const { data: { user } } = await supabase.auth.getUser();
-            if (user) setUserId(user.id);
+            if (user) {
+                setUserId(user.id);
+                richiediPermessoNotificheBrowser();
+            }
         };
         getUser();
 
         const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-            setUserId(session?.user?.id || null);
+            const id = session?.user?.id || null;
+            setUserId(id);
+            if (id) richiediPermessoNotificheBrowser();
         });
 
         return () => {
@@ -49,26 +58,26 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
         };
     }, []);
 
-    // Recupero iniziale delle notifiche non lette
-    useEffect(() => {
+    const aggiornaContatoreNotifiche = async () => {
         if (!userId) return;
-        const fetchNonViste = async () => {
-            const { count } = await supabase
-                .from("notifiche_utenti")
-                .select("*", { count: "exact", head: true })
-                .eq("utente_id", userId)
-                .is("visualizzato", false);
-            setNonViste(count || 0);
-        };
-        fetchNonViste();
+        const { count } = await supabase
+            .from("notifiche_utenti")
+            .select("*", { count: "exact", head: true })
+            .eq("utente_id", userId)
+            .is("visualizzato", false)
+            .is("deleted_at", null);
+        setNonViste(count || 0);
+    };
+
+    useEffect(() => {
+        if (userId) aggiornaContatoreNotifiche();
     }, [userId]);
 
-    // Realtime listener su notifiche_utenti
     useEffect(() => {
         if (!userId) return;
 
         const channel = supabase
-            .channel(`notifiche_changes_${userId}`)
+            .channel(`realtime_notifiche_${userId}`)
             .on(
                 "postgres_changes",
                 {
@@ -77,13 +86,12 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                     table: "notifiche_utenti",
                     filter: `utente_id=eq.${userId}`,
                 },
-                async () => {
-                    const { count } = await supabase
-                        .from("notifiche_utenti")
-                        .select("*", { count: "exact", head: true })
-                        .eq("utente_id", userId)
-                        .is("visualizzato", false);
-                    setNonViste(count || 0);
+                () => {
+                    aggiornaContatoreNotifiche();
+                    mostraNotificaBrowser("🔔 Nuova notifica Kalimero", {
+                        body: "Hai ricevuto una nuova notifica.",
+                        icon: "/kalimero_logo.png",
+                    });
                 }
             )
             .subscribe();
@@ -130,7 +138,6 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                 <div className="flex items-center gap-4">
                     {loggedIn && (
                         <>
-                            {/* Bottone Crea */}
                             <div className="relative" ref={createRef}>
                                 <button
                                     className="w-10 h-10 flex items-center justify-center text-gray-600 hover:text-green-600 transition"
@@ -173,7 +180,6 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                                 )}
                             </div>
 
-                            {/* Campanella Notifiche */}
                             <div className="w-10 h-10 flex items-center justify-center relative">
                                 <button
                                     onClick={() => setNotificheOpen(true)}
@@ -182,17 +188,15 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                                 >
                                     <FontAwesomeIcon icon={faBell} />
                                     {nonViste > 0 && (
-                                        <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[11px] w-5 h-5 flex items-center justify-center rounded-full font-bold shadow-md">
+                                        <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[11px] w-5 h-5 flex items-center justify-center rounded-full font-bold shadow-md transition-all duration-300 ease-out">
                                             {nonViste}
                                         </span>
                                     )}
                                 </button>
                             </div>
-
                         </>
                     )}
 
-                    {/* Bottone Account */}
                     <div className="relative" ref={dropdownRef}>
                         <button
                             className="w-10 h-10 flex items-center justify-center text-gray-600 hover:text-blue-600 transition"
@@ -254,7 +258,15 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
             {showTaskModal && <MiniTaskCreatorModal onClose={() => setShowTaskModal(false)} />}
             {showClientModal && <AggiungiCliente onClose={() => setShowClientModal(false)} />}
             {showProjectModal && <MiniProjectCreatorModal onClose={() => setShowProjectModal(false)} />}
-            {notificheOpen && <NotificheSidebar open={notificheOpen} onClose={() => setNotificheOpen(false)} />}
+            {notificheOpen && (
+                <NotificheSidebar
+                    open={notificheOpen}
+                    onClose={() => {
+                        setNotificheOpen(false);
+                        aggiornaContatoreNotifiche();
+                    }}
+                />
+            )}
         </>
     );
 }
