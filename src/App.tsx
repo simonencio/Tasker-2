@@ -16,6 +16,7 @@ import AppLayout from "./Layout/AppLayout";
 import Profilo from "./Profilo/Profilo";
 import Progetti from "./Progetto";
 import Task from "./Task";
+import DettaglioProgetto from './GestioneProgetti/DettaglioProgetto'
 
 
 export default function App() {
@@ -105,6 +106,16 @@ export default function App() {
                         </AppLayout>
                     }
                 />
+
+                <Route
+                    path="/progetti/:id"
+                    element={
+                        <AppLayout loggedIn={loggedIn}>
+                            <DettaglioProgetto />
+                        </AppLayout>
+                    }
+                />
+
             </Routes>
         </Router>
 

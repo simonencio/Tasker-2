@@ -1,10 +1,10 @@
 // Sidebar.tsx
 import { NavLink } from 'react-router-dom'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faChevronDown, faPlus } from '@fortawesome/free-solid-svg-icons'
+import { faPlus } from '@fortawesome/free-solid-svg-icons'
 import MiniProjectCreatorModal from "../Creazione/MiniProjectCreatorModal";
 import { supabase } from '../supporto/supabaseClient';
 
@@ -15,38 +15,11 @@ const navItems = [
   { to: '/home', label: 'Home' },
   { to: '/progetti', label: 'Progetti' },
   { to: '/task ', label: 'Task' },
-
 ]
 
 export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
 
-  const [mostraDropdown, setMostraDropdown] = useState(false)
   const [mostraModalCrea, setMostraModalCrea] = useState(false)
-
-  //gestione della lista progetti
-  const [progetti, setProgetti] = useState<{ id: string; nome: string }[]>([])
-  const [loadingProgetti, setLoadingProgetti] = useState(false)
-
-
-  useEffect(() => {
-    const caricaProgetti = async () => {
-      setLoadingProgetti(true)
-      const { data, error } = await supabase
-        .from('progetti')
-        .select('id, nome')
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-
-      if (!error && data) {
-        setProgetti(data)
-      }
-      setLoadingProgetti(false)
-    }
-
-    if (mostraDropdown) caricaProgetti()
-  }, [mostraDropdown])
-
-
 
   return (
     <aside
@@ -68,17 +41,6 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose:
                 return (
                   <div key={to} className="relative">
                     <div className="flex items-center justify-between gap-2 w-full px-2 py-1.5 rounded hover:bg-gray-200">
-                      <button
-                        onClick={() => setMostraDropdown(prev => !prev)}
-                        className="text-gray-600 hover:text-black"
-                        title="Mostra elenco progetti"
-                      >
-                        <FontAwesomeIcon
-                          icon={faChevronDown}
-                          className={`transition-transform duration-200 ${mostraDropdown ? 'rotate-0' : '-rotate-90'}`}
-                        />
-
-                      </button>
 
                       <NavLink
                         to={to}
@@ -98,23 +60,6 @@ export default function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose:
                         <FontAwesomeIcon icon={faPlus} />
                       </button>
                     </div>
-
-                    {mostraDropdown && (
-                      <ul className="ml-6 mt-1 text-sm space-y-1">
-                        {progetti.map((proj) => (
-                          <li key={proj.id}>
-                            <NavLink
-                              to={`/progetti/${proj.id}`}
-                              onClick={onClose}
-                              className="block px-2 py-1 hover:bg-gray-200 rounded text-gray-800"
-                            >
-                              {proj.nome}
-                            </NavLink>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-
                   </div>
                 )
               }
