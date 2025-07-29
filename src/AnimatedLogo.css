@@ -1,0 +1,210 @@
+/* Wrapper principale */
+.logo-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  padding: 0 20px;
+  box-sizing: border-box;
+  background: transparent;
+}
+
+/* SVG scalabile */
+.logo-svg {
+  width: 100%;
+  max-width: 650px;
+  height: auto;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Stile lettere */
+.logo-path {
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: #fff;
+  opacity: 0;
+  transform-origin: center bottom;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Animazioni */
+.logo-fade-wave {
+  animation: fadeWaveIn 0.8s ease forwards;
+}
+
+.from-left { animation-name: fadeWaveInFromLeft; }
+.from-right { animation-name: fadeWaveInFromRight; }
+.from-top { animation-name: fadeWaveInFromTop; }
+.from-bottom { animation-name: fadeWaveInFromBottom; }
+
+@keyframes fadeWaveInFromLeft {
+  0% { opacity: 0; transform: translateX(-100px) translateY(15px); }
+  50% { opacity: 1; transform: translateX(20px) translateY(-5px); }
+  100% { opacity: 1; transform: translateX(0) translateY(0); }
+}
+@keyframes fadeWaveInFromRight {
+  0% { opacity: 0; transform: translateX(100px) translateY(15px); }
+  50% { opacity: 1; transform: translateX(-20px) translateY(-5px); }
+  100% { opacity: 1; transform: translateX(0) translateY(0); }
+}
+@keyframes fadeWaveInFromTop {
+  0% { opacity: 0; transform: translateY(-100px) translateX(10px); }
+  50% { opacity: 1; transform: translateY(20px) translateX(-5px); }
+  100% { opacity: 1; transform: translateY(0) translateX(0); }
+}
+@keyframes fadeWaveInFromBottom {
+  0% { opacity: 0; transform: translateY(100px) translateX(10px); }
+  50% { opacity: 1; transform: translateY(-20px) translateX(-5px); }
+  100% { opacity: 1; transform: translateY(0) translateX(0); }
+}
+
+/* Fade out */
+.logo-wrapper.fade-out {
+  animation: fadeOut 0.5s ease forwards;
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Spinner posizionato sotto la scritta con top variabile */
+.spinner-container {
+  position: absolute;
+  left: 50%;
+  top: calc(100% - 400px); /* default desktop grande */
+  transform: translateX(-50%);
+  opacity: 0;
+  animation: fadeInSpinner 0.5s forwards;
+  z-index: 5;
+  pointer-events: none;
+}
+
+@keyframes fadeInSpinner {
+  to { opacity: 1; }
+}
+
+/* Dimensioni spinner base */
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid #ccc;
+  border-top-color: #333;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* -------- MEDIA QUERIES -------- */
+
+/* Ultra widescreen (>=2560px) */
+@media (min-width: 2560px) {
+  .logo-svg {
+    max-width: 900px;
+  }
+  .spinner-container {
+    top: calc(100% - 450px);
+  }
+  .spinner {
+    width: 60px;
+    height: 60px;
+    border-width: 6px;
+  }
+}
+
+/* Desktop grande (1440px - 2559px) */
+@media (min-width: 1440px) and (max-width: 2560px) {
+  .logo-svg {
+    max-width: 800px;
+  }
+  .spinner-container {
+    top: calc(100% - 500px);
+  }
+  .spinner {
+    width: 55px;
+    height: 55px;
+    border-width: 5.5px;
+  }
+}
+
+/* Desktop normale (1024px - 1440px) */
+@media (min-width: 1024px) and (max-width: 1440px) {
+  .logo-svg {
+    max-width: 600px;
+  }
+  .spinner-container {
+    top: calc(100% - 350px);
+  }
+  .spinner {
+    width: 50px;
+    height: 50px;
+    border-width: 5px;
+  }
+}
+
+/* Tablet (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .logo-svg {
+    max-width: 550px;
+  }
+  .spinner-container {
+    top: calc(100% - 350px);
+  }
+  .spinner {
+    width: 45px;
+    height: 45px;
+    border-width: 4.5px;
+  }
+}
+
+/* Phablet / Smartphone grande (426px - 767px) */
+@media (min-width: 426px) and (max-width: 768px) {
+  .logo-svg {
+    max-width: 400px;
+  }
+  .spinner-container {
+    top: calc(100% - 400px);
+  }
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border-width: 4px;
+  }
+}
+
+/* Smartphone piccoli (375px - 425px) */
+@media (min-width: 375px) and (max-width: 425px) {
+  .logo-svg {
+    max-width: 300px;
+  }
+  .spinner-container {
+    top: calc(100% - 400px);
+  }
+  .spinner {
+    width: 35px;
+    height: 35px;
+    border-width: 3.5px;
+  }
+}
+
+/* Smartphone molto piccoli (<375px) */
+@media (max-width: 375px) {
+  .logo-svg {
+    max-width: 260px;
+  }
+  .spinner-container {
+    top: calc(100% - 400px);
+  }
+  .spinner {
+    width: 30px;
+    height: 30px;
+    border-width: 3px;
+  }
+}

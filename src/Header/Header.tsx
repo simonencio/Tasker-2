@@ -156,31 +156,31 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
 
     return (
         <>
-            <header className="bg-theme text-theme w-full shadow-md z-50 relative px-6 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-4">
+            <header className="bg-theme text-theme w-full shadow-md z-50 relative px-2 sm:px-4 lg:px-6 py-2 sm:py-3 flex flex-wrap items-center justify-between">
+                <div className="flex items-center gap-2 sm:gap-4 max-w-full overflow-hidden">
                     {loggedIn && (
-                        <button onClick={onToggleSidebar} className="w-10 h-10 flex items-center justify-center">
-                            <FontAwesomeIcon icon={faBars} className="text-2xl icon-color" />
+                        <button onClick={onToggleSidebar} className="w-8 max-[400px]:w-9 sm:w-10 xl:w-12 2xl:w-14 h-8 max-[400px]:h-9 sm:h-10 xl:h-12 2xl:h-14 flex items-center justify-center">
+                            <FontAwesomeIcon icon={faBars} className="text-base max-[400px]:text-lg sm:text-xl md:text-2xl xl:text-3xl 2xl:text-4xl icon-color" />
                         </button>
                     )}
-                    <Link to={loggedIn ? "/home" : "/login"} className="text-xl font-bold tracking-wide">
+                    <Link to={loggedIn ? "/home" : "/login"} className="text-base sm:text-lg md:text-xl font-bold tracking-wide">
                         <img
-                            className="h-8"
+                            className="h-6 max-[400px]:h-7 sm:h-8 md:h-9 xl:h-10 2xl:h-12"
                             src={currentTheme === "dark" ? "/kalimero_logo2.png" : "/kalimero_logo.png"}
                             alt="Logo"
                         />
                     </Link>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 sm:gap-3 md:gap-4 mt-2 sm:mt-0">
                     {loggedIn && (
                         <>
                             <div className="relative" ref={createRef}>
-                                <button onClick={() => setCreateOpen(p => !p)} className="w-10 h-10 flex items-center justify-center">
-                                    <FontAwesomeIcon icon={faPlus} className="text-2xl text-green-500" />
+                                <button onClick={() => setCreateOpen(p => !p)} className="w-8 max-[400px]:w-9 sm:w-10 xl:w-12 2xl:w-14 h-8 max-[400px]:h-9 sm:h-10 xl:h-12 2xl:h-14 flex items-center justify-center">
+                                    <FontAwesomeIcon icon={faPlus} className="text-base max-[400px]:text-lg sm:text-xl md:text-2xl xl:text-3xl 2xl:text-4xl text-green-500" />
                                 </button>
                                 {createOpen && (
-                                    <div className="absolute right-0 mt-2 w-40 dropdown-panel z-50">
+                                    <div className="absolute right-0 mt-2 w-36 sm:w-40 dropdown-panel z-50">
                                         {["Attività", "Progetto", "Clienti"].map((label, i) => (
                                             <button
                                                 key={label}
@@ -197,13 +197,12 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                                 )}
                             </div>
 
-                            {/* 🌓 Icona cambio tema tra + e notifiche */}
                             <div className="relative" ref={themeRef}>
-                                <button onClick={() => setThemeDropdown(p => !p)} className="w-10 h-10 flex items-center justify-center">
-                                    <FontAwesomeIcon icon={faMoon} className="text-2xl text-sky-500" />
+                                <button onClick={() => setThemeDropdown(p => !p)} className="w-8 max-[400px]:w-9 sm:w-10 xl:w-12 2xl:w-14 h-8 max-[400px]:h-9 sm:h-10 xl:h-12 2xl:h-14 flex items-center justify-center">
+                                    <FontAwesomeIcon icon={faMoon} className="text-base max-[400px]:text-lg sm:text-xl md:text-2xl xl:text-3xl 2xl:text-4xl text-sky-500" />
                                 </button>
                                 {themeDropdown && (
-                                    <div className="absolute right-0 mt-5 w-40 dropdown-panel z-50">
+                                    <div className="absolute right-0 mt-5 w-36 sm:w-40 dropdown-panel z-50">
                                         {[{ icon: faSun, label: "Chiaro", theme: "light", color: "text-yellow-400" },
                                         { icon: faMoon, label: "Scuro", theme: "dark", color: "text-sky-500" },
                                         { icon: faDesktop, label: "Sistema", theme: "system", color: "text-gray-500 dark:text-gray-300" }
@@ -213,15 +212,15 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                                                 onClick={() => { applyTheme(theme); setThemeDropdown(false); }}
                                                 className="dropdown-button flex items-center gap-2"
                                             >
-                                                <FontAwesomeIcon icon={icon} className={`text-base ${color}`} /> {label}
+                                                <FontAwesomeIcon icon={icon} className={`text-sm sm:text-base md:text-lg ${color}`} /> {label}
                                             </button>
                                         ))}
                                     </div>
                                 )}
                             </div>
 
-                            <button onClick={() => setNotificheOpen(true)} className="relative w-10 h-10 flex items-center justify-center">
-                                <FontAwesomeIcon icon={faBell} className="text-2xl text-yellow-500" />
+                            <button onClick={() => setNotificheOpen(true)} className="relative w-8 max-[400px]:w-9 sm:w-10 xl:w-12 2xl:w-14 h-8 max-[400px]:h-9 sm:h-10 xl:h-12 2xl:h-14 flex items-center justify-center">
+                                <FontAwesomeIcon icon={faBell} className="text-base max-[400px]:text-lg sm:text-xl md:text-2xl xl:text-3xl 2xl:text-4xl text-yellow-500" />
                                 {nonViste > 0 && (
                                     <span className="notification-badge">{nonViste}</span>
                                 )}
@@ -229,14 +228,13 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                         </>
                     )}
 
-                    {/* 🌓 Icona tema per utenti non loggati */}
                     {!loggedIn && (
                         <div className="relative" ref={themeRef}>
-                            <button onClick={() => setThemeDropdown(p => !p)} className="w-10 h-10 flex items-center justify-center">
-                                <FontAwesomeIcon icon={faMoon} className="text-2xl text-sky-500" />
+                            <button onClick={() => setThemeDropdown(p => !p)} className="w-8 max-[400px]:w-9 sm:w-10 xl:w-12 2xl:w-14 h-8 max-[400px]:h-9 sm:h-10 xl:h-12 2xl:h-14 flex items-center justify-center">
+                                <FontAwesomeIcon icon={faMoon} className="text-base max-[400px]:text-lg sm:text-xl md:text-2xl xl:text-3xl 2xl:text-4xl text-sky-500" />
                             </button>
                             {themeDropdown && (
-                                <div className="absolute right-0 mt-5 w-40 dropdown-panel z-50">
+                                <div className="absolute right-0 mt-5 w-36 sm:w-40 dropdown-panel z-50">
                                     {[{ icon: faSun, label: "Chiaro", theme: "light", color: "text-yellow-400" },
                                     { icon: faMoon, label: "Scuro", theme: "dark", color: "text-sky-500" },
                                     { icon: faDesktop, label: "Sistema", theme: "system", color: "text-gray-500 dark:text-gray-300" }
@@ -246,7 +244,7 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                                             onClick={() => { applyTheme(theme); setThemeDropdown(false); }}
                                             className="dropdown-button flex items-center gap-2"
                                         >
-                                            <FontAwesomeIcon icon={icon} className={`text-base ${color}`} /> {label}
+                                            <FontAwesomeIcon icon={icon} className={`text-sm sm:text-base md:text-lg ${color}`} /> {label}
                                         </button>
                                     ))}
                                 </div>
@@ -255,11 +253,11 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                     )}
 
                     <div className="relative" ref={dropdownRef}>
-                        <button onClick={() => setOpen(p => !p)} className="w-10 h-10 flex items-center justify-center">
-                            <FontAwesomeIcon icon={faUserCircle} className="text-2xl text-purple-500" />
+                        <button onClick={() => setOpen(p => !p)} className="w-8 max-[400px]:w-9 sm:w-10 xl:w-12 2xl:w-14 h-8 max-[400px]:h-9 sm:h-10 xl:h-12 2xl:h-14 flex items-center justify-center">
+                            <FontAwesomeIcon icon={faUserCircle} className="text-base max-[400px]:text-lg sm:text-xl md:text-2xl xl:text-3xl 2xl:text-4xl text-purple-500" />
                         </button>
                         {open && (
-                            <div className="absolute right-0 mt-2 w-48 dropdown-panel z-50">
+                            <div className="absolute right-0 mt-2 w-44 sm:w-48 dropdown-panel z-50">
                                 {loggedIn ? (
                                     <>
                                         <button onClick={() => { navigate("/profilo"); setOpen(false); }} className="dropdown-button">Gestione account</button>
@@ -288,4 +286,5 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
             )}
         </>
     );
+
 }
