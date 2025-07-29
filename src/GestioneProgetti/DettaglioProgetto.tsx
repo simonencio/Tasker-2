@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supporto/supabaseClient'
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faArrowLeft } from '@fortawesome/free-solid-svg-icons'
+import { faArrowLeft, faPen } from '@fortawesome/free-solid-svg-icons'
 
 type ProgettoDettaglio = {
     nome: string
@@ -15,7 +15,7 @@ type ProgettoDettaglio = {
     priorita?: { nome: string } | null
 }
 
-type Task = {
+export type Task = {
     id: string
     nome: string
     note?: string | null
@@ -23,7 +23,7 @@ type Task = {
     tempo_stimato?: string | null
     stati?: { nome: string } | null
     priorita?: { nome: string } | null
-    utenti_task?: { utente?: { nome: string } }[] // lista di assegnazioni
+    utenti_task?: { utente?: { id: string; nome: string } }[] // lista di assegnazioni
 }
 
 
@@ -37,6 +37,10 @@ export default function DettaglioProgetto() {
     const [taskList, setTaskList] = useState<Task[]>([])
 
     const [loading, setLoading] = useState(true)
+
+    //Gestione cambio tabella Task
+    const [soloMieTask, setSoloMieTask] = useState(false)
+    const [utenteLoggatoId, setUtenteLoggatoId] = useState<string | null>(null)
 
     useEffect(() => {
         const fetchProgetto = async () => {
@@ -70,7 +74,7 @@ export default function DettaglioProgetto() {
                     stati (nome),
                     priorita (nome),
                     utenti_task:utenti_task (
-                        utente:utenti (nome)
+                        utente:utenti (id, nome)
                     )
                     )
                 `)
@@ -94,6 +98,17 @@ export default function DettaglioProgetto() {
 
 
     }, [id])
+
+    //Utente Loggato
+    useEffect(() => {
+        const fetchUtente = async () => {
+            const { data: session } = await supabase.auth.getSession()
+            setUtenteLoggatoId(session?.session?.user.id || null)
+        }
+
+        fetchUtente()
+    }, [])
+
 
 
 
@@ -124,21 +139,21 @@ export default function DettaglioProgetto() {
                     >
                         Dashboard
                     </NavLink>
+
+                    <button
+                        onClick={() => setSoloMieTask(prev => !prev)}
+                        className={`hover:text-blue-600 ${soloMieTask ? 'text-blue-700 font-semibold' : 'text-gray-700'}`}
+                    >
+                        {soloMieTask ? 'Tutte le Task' : 'Le mie Task'}
+                    </button>
+
                     <NavLink
-                        to={`/progetti/${id}/task`}
+                        to={`/progetti/${id}/calendario`}
                         className={({ isActive }) =>
                             `hover:text-blue-600 ${isActive ? 'text-blue-700 font-semibold' : 'text-gray-700'}`
                         }
                     >
-                        Le mie Task
-                    </NavLink>
-                    <NavLink
-                        to={`/progetti/${id}/modifica`}
-                        className={({ isActive }) =>
-                            `hover:text-blue-600 ${isActive ? 'text-blue-700 font-semibold' : 'text-gray-700'}`
-                        }
-                    >
-                        Modifica
+                        Calendario
                     </NavLink>
                 </div>
             </div>
@@ -196,9 +211,15 @@ export default function DettaglioProgetto() {
                         </div>
 
                         {/* righe task */}
-                        {taskList.map((task) => (
-                            <TaskRow key={task.id} task={task} />
-                        ))}
+                        {taskList
+                            .filter(task => {
+                                if (!soloMieTask) return true
+                                return task.utenti_task?.some(ut => ut.utente?.id === utenteLoggatoId)
+                            })
+                            .map((task) => (
+                                <TaskRow key={task.id} task={task} soloMieTask={soloMieTask} />
+                            ))
+                        }
                     </div>
                 </div>
 
@@ -209,7 +230,7 @@ export default function DettaglioProgetto() {
 
 // Tabella Task
 
-function TaskRow({ task }: { task: Task }) {
+function TaskRow({ task, soloMieTask }: { task: Task; soloMieTask: boolean }) {
     const [aperta, setAperta] = useState(false)
 
     return (
@@ -228,6 +249,15 @@ function TaskRow({ task }: { task: Task }) {
                 >
                     {aperta ? '−' : '+'}
                 </button>
+                {soloMieTask && (
+                    <button
+                        className="text-gray-600 hover:text-blue-600 text-sm w-6 h-6 flex items-center justify-center rounded hover:bg-blue-100"
+                        title="Modifica task"
+                        onClick={() => console.log("Vai alla modifica della task", task.id)}
+                    >
+                        <FontAwesomeIcon icon={faPen} />
+                    </button>
+                )}
             </div>
 
             {aperta && (
