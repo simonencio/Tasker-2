@@ -1,17 +1,34 @@
-// src/components/Header.tsx
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUserCircle, faBars, faPlus, faBell } from "@fortawesome/free-solid-svg-icons";
+import {
+    faUserCircle,
+    faBars,
+    faPlus,
+    faBell,
+    faMoon,
+    faSun,
+    faDesktop,
+} from "@fortawesome/free-solid-svg-icons";
 import { supabase } from "../supporto/supabaseClient";
 import MiniTaskCreatorModal from "../Creazione/MiniTaskCreatorModal";
-import AggiungiCliente from "../Creazione/Clienti";
 import MiniProjectCreatorModal from "../Creazione/MiniProjectCreatorModal";
 import NotificheSidebar from "../Notifiche/NotificheSidebar";
 import {
     richiediPermessoNotificheBrowser,
     mostraNotificaBrowser,
 } from "../Notifiche/notificheBrowserUtils";
+import MiniClientCreatorModal from "../Creazione/MiniClientCreatorModal";
+
+type NotificaUtenteRecord = {
+    notifica_id: string;
+    utente_id: string;
+    visualizzato: boolean;
+    visualizzato_al: string | null;
+    letto: boolean;
+    inviato: boolean;
+    deleted_at: string | null;
+};
 
 type HeaderProps = {
     onToggleSidebar: () => void;
@@ -27,9 +44,41 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
     const [notificheOpen, setNotificheOpen] = useState(false);
     const [nonViste, setNonViste] = useState(0);
     const [userId, setUserId] = useState<string | null>(null);
+    const [themeDropdown, setThemeDropdown] = useState(false);
+    const [currentTheme, setCurrentTheme] = useState<string>("light");
+
     const dropdownRef = useRef<HTMLDivElement>(null);
     const createRef = useRef<HTMLDivElement>(null);
+    const themeRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
+
+    const applyTheme = (theme: string) => {
+        let resolved = theme;
+        localStorage.setItem("theme", theme);
+        if (theme === "dark") document.documentElement.classList.add("dark");
+        else if (theme === "light") document.documentElement.classList.remove("dark");
+        else {
+            const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+            document.documentElement.classList.toggle("dark", prefersDark);
+            resolved = prefersDark ? "dark" : "light";
+        }
+        setCurrentTheme(resolved);
+    };
+
+    useEffect(() => {
+        const storedTheme = localStorage.getItem("theme") || "system";
+        applyTheme(storedTheme);
+    }, []);
+
+    useEffect(() => {
+        const mq = window.matchMedia("(prefers-color-scheme: dark)");
+        const handler = () => {
+            const theme = localStorage.getItem("theme") || "system";
+            if (theme === "system") applyTheme("system");
+        };
+        mq.addEventListener("change", handler);
+        return () => mq.removeEventListener("change", handler);
+    }, []);
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
@@ -69,46 +118,37 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
         setNonViste(count || 0);
     };
 
-    useEffect(() => {
-        if (userId) aggiornaContatoreNotifiche();
-    }, [userId]);
+    useEffect(() => { if (userId) aggiornaContatoreNotifiche(); }, [userId]);
 
     useEffect(() => {
         if (!userId) return;
-
-        const channel = supabase
-            .channel(`realtime_notifiche_${userId}`)
-            .on(
-                "postgres_changes",
-                {
-                    event: "*",
-                    schema: "public",
-                    table: "notifiche_utenti",
-                    filter: `utente_id=eq.${userId}`,
-                },
-                () => {
-                    aggiornaContatoreNotifiche();
-                    mostraNotificaBrowser("🔔 Nuova notifica Kalimero", {
-                        body: "Hai ricevuto una nuova notifica.",
-                        icon: "/kalimero_logo.png",
-                    });
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        const channel = supabase.channel(`realtime_notifiche_${userId}`)
+            .on("postgres_changes", {
+                event: "INSERT",
+                schema: "public",
+                table: "notifiche_utenti",
+                filter: `utente_id=eq.${userId}`,
+            }, async (payload) => {
+                aggiornaContatoreNotifiche();
+                const nuovaNotifica = payload.new as NotificaUtenteRecord;
+                const { data, error } = await supabase
+                    .from("notifiche")
+                    .select("messaggio")
+                    .eq("id", nuovaNotifica.notifica_id)
+                    .single();
+                if (!error && data) mostraNotificaBrowser("🔔 Notifica Kalimero", {
+                    body: data.messaggio,
+                    icon: "/kalimero_logo.png",
+                });
+            }).subscribe();
+        return () => { supabase.removeChannel(channel); };
     }, [userId]);
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-                setOpen(false);
-            }
-            if (createRef.current && !createRef.current.contains(e.target as Node)) {
-                setCreateOpen(false);
-            }
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setOpen(false);
+            if (createRef.current && !createRef.current.contains(e.target as Node)) setCreateOpen(false);
+            if (themeRef.current && !themeRef.current.contains(e.target as Node)) setThemeDropdown(false);
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -116,136 +156,93 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
 
     return (
         <>
-            <header className="w-full bg-white shadow-md z-50 relative px-6 py-3 flex items-center justify-between">
+            <header className="bg-theme text-theme w-full shadow-md z-50 relative px-6 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     {loggedIn && (
-                        <button
-                            onClick={onToggleSidebar}
-                            className="w-10 h-10 flex items-center justify-center text-gray-600 hover:text-black"
-                            title="Apri Menu"
-                        >
-                            <FontAwesomeIcon icon={faBars} className="text-2xl" />
+                        <button onClick={onToggleSidebar} className="w-10 h-10 flex items-center justify-center">
+                            <FontAwesomeIcon icon={faBars} className="text-2xl icon-color" />
                         </button>
                     )}
-
-                    <div className="text-xl font-bold text-gray-800 tracking-wide">
-                        <Link to={loggedIn ? "/home" : "/login"}>
-                            <img className="h-8" src="../public/kalimero_logo.png" alt="Kalimero Logo" />
-                        </Link>
-                    </div>
+                    <Link to={loggedIn ? "/home" : "/login"} className="text-xl font-bold tracking-wide">
+                        <img
+                            className="h-8"
+                            src={currentTheme === "dark" ? "/kalimero_logo2.png" : "/kalimero_logo.png"}
+                            alt="Logo"
+                        />
+                    </Link>
                 </div>
 
                 <div className="flex items-center gap-4">
                     {loggedIn && (
                         <>
                             <div className="relative" ref={createRef}>
-                                <button
-                                    className="w-10 h-10 flex items-center justify-center text-gray-600 hover:text-green-600 transition"
-                                    title="Crea"
-                                    onClick={() => setCreateOpen((prev) => !prev)}
-                                >
-                                    <FontAwesomeIcon icon={faPlus} className="text-2xl" />
+                                <button onClick={() => setCreateOpen(p => !p)} className="w-10 h-10 flex items-center justify-center">
+                                    <FontAwesomeIcon icon={faPlus} className="text-2xl text-green-500" />
                                 </button>
-
                                 {createOpen && (
-                                    <div className="absolute right-0 mt-2 w-40 bg-white border rounded-lg shadow-lg p-2 z-50">
-                                        <button
-                                            onClick={() => {
-                                                setCreateOpen(false);
-                                                setShowTaskModal(true);
-                                            }}
-                                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                        >
-                                            Attività
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setCreateOpen(false);
-                                                setShowProjectModal(true);
-                                            }}
-                                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                        >
-                                            Progetto
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setCreateOpen(false);
-                                                setShowClientModal(true);
-                                            }}
-                                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                        >
-                                            Clienti
-                                        </button>
+                                    <div className="absolute right-0 mt-2 w-40 dropdown-panel z-50">
+                                        {["Attività", "Progetto", "Clienti"].map((label, i) => (
+                                            <button
+                                                key={label}
+                                                onClick={() => {
+                                                    setCreateOpen(false);
+                                                    [setShowTaskModal, setShowProjectModal, setShowClientModal][i](true);
+                                                }}
+                                                className="dropdown-button"
+                                            >
+                                                {label}
+                                            </button>
+                                        ))}
                                     </div>
                                 )}
                             </div>
 
-                            <div className="w-10 h-10 flex items-center justify-center relative">
-                                <button
-                                    onClick={() => setNotificheOpen(true)}
-                                    className="text-gray-600 hover:text-yellow-600 transition text-2xl relative"
-                                    title="Notifiche"
-                                >
-                                    <FontAwesomeIcon icon={faBell} />
-                                    {nonViste > 0 && (
-                                        <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[11px] w-5 h-5 flex items-center justify-center rounded-full font-bold shadow-md transition-all duration-300 ease-out">
-                                            {nonViste}
-                                        </span>
-                                    )}
+                            <div className="relative" ref={themeRef}>
+                                <button onClick={() => setThemeDropdown(p => !p)} className="w-10 h-10 flex items-center justify-center">
+                                    <FontAwesomeIcon icon={faMoon} className="text-2xl text-sky-500" />
                                 </button>
+                                {themeDropdown && (
+                                    <div className="absolute right-0 mt-5 w-40 dropdown-panel z-50">
+                                        {[{ icon: faSun, label: "Chiaro", theme: "light", color: "text-yellow-400" },
+                                        { icon: faMoon, label: "Scuro", theme: "dark", color: "text-sky-500" },
+                                        { icon: faDesktop, label: "Sistema", theme: "system", color: "text-gray-500 dark:text-gray-300" }
+                                        ].map(({ icon, label, theme, color }) => (
+                                            <button
+                                                key={label}
+                                                onClick={() => { applyTheme(theme); setThemeDropdown(false); }}
+                                                className="dropdown-button flex items-center gap-2"
+                                            >
+                                                <FontAwesomeIcon icon={icon} className={`text-base ${color}`} /> {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
+
+                            <button onClick={() => setNotificheOpen(true)} className="relative w-10 h-10 flex items-center justify-center">
+                                <FontAwesomeIcon icon={faBell} className="text-2xl text-yellow-500" />
+                                {nonViste > 0 && (
+                                    <span className="notification-badge">{nonViste}</span>
+                                )}
+                            </button>
                         </>
                     )}
 
                     <div className="relative" ref={dropdownRef}>
-                        <button
-                            className="w-10 h-10 flex items-center justify-center text-gray-600 hover:text-blue-600 transition"
-                            title="Gestione Account"
-                            onClick={() => setOpen((prev) => !prev)}
-                        >
-                            <FontAwesomeIcon icon={faUserCircle} className="text-2xl" />
+                        <button onClick={() => setOpen(p => !p)} className="w-10 h-10 flex items-center justify-center">
+                            <FontAwesomeIcon icon={faUserCircle} className="text-2xl text-purple-500" />
                         </button>
-
                         {open && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white border rounded-lg shadow-lg p-2 z-50">
+                            <div className="absolute right-0 mt-2 w-48 dropdown-panel z-50">
                                 {loggedIn ? (
                                     <>
-                                        <button
-                                            onClick={() => {
-                                                navigate("/profilo");
-                                                setOpen(false);
-                                            }}
-                                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                        >
-                                            Gestione account
-                                        </button>
-                                        <button
-                                            onClick={handleLogout}
-                                            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded"
-                                        >
-                                            Logout
-                                        </button>
+                                        <button onClick={() => { navigate("/profilo"); setOpen(false); }} className="dropdown-button">Gestione account</button>
+                                        <button onClick={handleLogout} className="dropdown-button">Logout</button>
                                     </>
                                 ) : (
                                     <>
-                                        <button
-                                            onClick={() => {
-                                                navigate("/register");
-                                                setOpen(false);
-                                            }}
-                                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
-                                        >
-                                            Registrati
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                navigate("/login");
-                                                setOpen(false);
-                                            }}
-                                            className="block w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded"
-                                        >
-                                            Login
-                                        </button>
+                                        <button onClick={() => { navigate("/register"); setOpen(false); }} className="dropdown-button">Registrati</button>
+                                        <button onClick={() => { navigate("/login"); setOpen(false); }} className="dropdown-button">Login</button>
                                     </>
                                 )}
                             </div>
@@ -254,17 +251,13 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                 </div>
             </header>
 
-            {/* Modali */}
-            {showTaskModal && <MiniTaskCreatorModal onClose={() => setShowTaskModal(false)} />}
-            {showClientModal && <AggiungiCliente onClose={() => setShowClientModal(false)} />}
-            {showProjectModal && <MiniProjectCreatorModal onClose={() => setShowProjectModal(false)} />}
+            {showProjectModal && <MiniProjectCreatorModal onClose={() => setShowProjectModal(false)} offsetIndex={0} />}
+            {showTaskModal && <MiniTaskCreatorModal onClose={() => setShowTaskModal(false)} offsetIndex={showProjectModal ? 1 : 0} />}
+            {showClientModal && <MiniClientCreatorModal onClose={() => setShowClientModal(false)} offsetIndex={(showProjectModal ? 1 : 0) + (showTaskModal ? 1 : 0)} />}
             {notificheOpen && (
                 <NotificheSidebar
                     open={notificheOpen}
-                    onClose={() => {
-                        setNotificheOpen(false);
-                        aggiornaContatoreNotifiche();
-                    }}
+                    onClose={() => { setNotificheOpen(false); aggiornaContatoreNotifiche(); }}
                 />
             )}
         </>

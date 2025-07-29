@@ -1,7 +1,14 @@
-// src/Notifiche/NotificheSidebar.tsx
 import { useEffect, useState } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import { getNotificheUtente, type Notifica } from "./notificheUtils";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+    faTasks,
+    faDiagramProject,
+    faUserTie,
+    faBell,
+    faXmark,
+} from "@fortawesome/free-solid-svg-icons";
 
 export default function NotificheSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
     const [notifiche, setNotifiche] = useState<Notifica[]>([]);
@@ -40,11 +47,8 @@ export default function NotificheSidebar({ open, onClose }: { open: boolean; onC
 
     const eliminaNotifica = async (notificaUtenteId: string) => {
         const now = new Date().toISOString();
-
-        // Rimuove subito dalla UI
         setNotifiche((prev) => prev.filter((n) => n.id !== notificaUtenteId));
 
-        // Aggiorna come letta e soft-delete nel DB
         await supabase
             .from("notifiche_utenti")
             .update({
@@ -57,55 +61,66 @@ export default function NotificheSidebar({ open, onClose }: { open: boolean; onC
 
     return (
         <div
-            className={`fixed top-0 right-0 h-full w-80 bg-white shadow-xl border-l z-50 transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"}`}
+            className={`fixed top-0 right-0 h-full w-[22rem] z-50 transition-transform duration-300 border-l border-gray-300 dark:border-gray-700 bg-theme shadow-xl ${open ? "translate-x-0" : "translate-x-full"}`}
         >
-            <div className="p-4 border-b flex justify-between items-center bg-gray-100">
-                <h2 className="text-lg font-semibold">🔔 Notifiche</h2>
-                <button onClick={onClose} className="text-red-500 font-bold text-xl">
-                    ×
+            {/* Header */}
+            <div className="p-5 border-b border-gray-300 dark:border-gray-600 flex justify-between items-center bg-theme">
+                <h2 className="text-xl font-bold text-theme flex items-center gap-2">
+                    <FontAwesomeIcon icon={faBell} className="text-yellow-500 text-xl" />
+                    Notifiche
+                </h2>
+                <button onClick={onClose} className="text-2xl text-red-500 hover:opacity-70 transition">
+                    <FontAwesomeIcon icon={faXmark} />
                 </button>
             </div>
-            <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
+
+            {/* Contenuto */}
+            <div className="p-5 overflow-y-auto hide-scrollbar h-[calc(100%-72px)] bg-theme text-theme">
                 {loading ? (
-                    <p className="text-gray-500">Caricamento notifiche...</p>
+                    <p className="text-base opacity-70">Caricamento notifiche...</p>
                 ) : notifiche.length === 0 ? (
-                    <p className="text-gray-400">Nessuna notifica disponibile</p>
+                    <p className="text-base opacity-60">Nessuna notifica disponibile</p>
                 ) : (
-                    <ul className="divide-y">
+                    <ul className="space-y-5">
                         {notifiche.map((n) => (
-                            <li key={n.id} className="py-3">
-                                <p className={`text-sm ${n.letto ? "text-gray-600" : "font-semibold"}`}>
+                            <li
+                                key={n.id}
+                                className={`rounded-lg popup-panel p-4 transition border border-gray-200 dark:border-gray-700 ${n.letto ? "opacity-60" : "shadow-md"}`}
+                            >
+                                <p className={`text-base ${n.letto ? "" : "font-semibold"}`}>
                                     {n.messaggio}
                                 </p>
+
                                 {(n.task_nome || n.progetto_nome || n.creatore_nome) && (
-                                    <div className="text-xs text-gray-500 mt-1 pl-1 space-y-1">
+                                    <div className="text-sm mt-3 space-y-2">
                                         {n.task_nome && (
-                                            <div>
-                                                📝 Task:{" "}
-                                                <span className="font-medium">{n.task_nome}</span>
+                                            <div className="flex items-center gap-2">
+                                                <FontAwesomeIcon icon={faTasks} className="text-purple-500 text-lg" />
+                                                <span><span className="font-medium">Task:</span> {n.task_nome}</span>
                                             </div>
                                         )}
                                         {n.progetto_nome && (
-                                            <div>
-                                                📁 Progetto:{" "}
-                                                <span className="font-medium">{n.progetto_nome}</span>
+                                            <div className="flex items-center gap-2">
+                                                <FontAwesomeIcon icon={faDiagramProject} className="text-blue-500 text-lg" />
+                                                <span><span className="font-medium">Progetto:</span> {n.progetto_nome}</span>
                                             </div>
                                         )}
                                         {n.creatore_nome && (
-                                            <div>
-                                                👤 Azione di:{" "}
-                                                <span className="font-medium">{n.creatore_nome}</span>
+                                            <div className="flex items-center gap-2">
+                                                <FontAwesomeIcon icon={faUserTie} className="text-green-500 text-lg" />
+                                                <span><span className="font-medium">Azione di:</span> {n.creatore_nome}</span>
                                             </div>
                                         )}
                                     </div>
                                 )}
-                                <div className="flex justify-between items-center mt-1">
-                                    <p className="text-xs text-gray-400">
+
+                                <div className="flex justify-between items-center mt-4">
+                                    <p className="text-xs opacity-50">
                                         {new Date(n.data_creazione).toLocaleString()}
                                     </p>
                                     <button
                                         onClick={() => eliminaNotifica(n.id)}
-                                        className="text-xs text-red-600 border border-red-300 px-2 py-1 rounded hover:bg-red-100 ml-2"
+                                        className="text-xs px-2.5 py-1 rounded border border-red-400 text-red-500 hover:bg-red-500 hover:text-white transition"
                                     >
                                         Elimina
                                     </button>
