@@ -29,18 +29,18 @@ export default function Home() {
         fetchUser();
     }, [navigate]);
 
-    
+
 
     if (loading) return <div className="p-6">Caricamento...</div>;
 
     return (
-        
-            <div className="p-6 max-w-4xl mx-auto space-y-8">
-                <div className="text-center space-y-1">
-                    <p className="text-sm text-gray-500">{oggiStr}</p>
-                    <h1 className="text-3xl font-bold">Buongiorno, {email} 👋</h1>
-                </div>
+
+        <div className="p-6 max-w-4xl mx-auto space-y-8">
+            <div className="text-center space-y-1">
+                <p className="text-sm ">{oggiStr}</p>
+                <h1 className="text-3xl font-bold">Buongiorno, {email} 👋</h1>
             </div>
-        
+        </div>
+
     );
 }

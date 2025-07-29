@@ -14,7 +14,7 @@ export default function AppLayout({
     const [sidebarOpen, setSidebarOpen] = useState(false)
 
     return (
-        <div className="min-h-screen flex flex-col bg-gray-100">
+        <div className="min-h-screen flex flex-col">
             <Header onToggleSidebar={() => setSidebarOpen(prev => !prev)} loggedIn={loggedIn} />
 
             <div className="flex flex-1 relative">

@@ -2,9 +2,9 @@ import NotificationPreferencesSelector from "../Notifiche/NotificationPreference
 
 export default function Profilo() {
     return (
-        <div className="min-h-screen bg-gray-100 py-8 px-4">
+        <div className="min-h-screen bg-theme py-8 px-4">
             <div className="max-w-4xl mx-auto space-y-8">
-                <h1 className="text-3xl font-bold text-gray-800">Il tuo Profilo</h1>
+                <h1 className="text-3xl font-bold text-theme">Il tuo Profilo</h1>
 
                 {/* Sezione notifiche */}
                 <section>

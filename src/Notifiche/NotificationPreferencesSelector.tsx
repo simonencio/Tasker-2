@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supporto/supabaseClient";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCheck } from "@fortawesome/free-solid-svg-icons";
 
 type NotificaTipo = {
     id: number;
@@ -13,14 +15,12 @@ export default function NotificationPreferencesSelector() {
     const [utenteId, setUtenteId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // Recupera utente loggato
     useEffect(() => {
         supabase.auth.getUser().then(({ data: { user } }) => {
             if (user) setUtenteId(user.id);
         });
     }, []);
 
-    // Carica tipi + preferenze
     useEffect(() => {
         if (!utenteId) return;
 
@@ -38,7 +38,7 @@ export default function NotificationPreferencesSelector() {
                 .eq("utente_id", utenteId);
 
             const mappaPreferenze: Record<number, boolean> = {};
-            preferenzeUtente?.forEach(p => {
+            preferenzeUtente?.forEach((p) => {
                 mappaPreferenze[p.tipo_id] = p.invia_email;
             });
 
@@ -51,9 +51,9 @@ export default function NotificationPreferencesSelector() {
     }, [utenteId]);
 
     const handleToggle = (tipoId: number) => {
-        setPreferenze(prev => ({
+        setPreferenze((prev) => ({
             ...prev,
-            [tipoId]: !prev[tipoId]
+            [tipoId]: !prev[tipoId],
         }));
     };
 
@@ -64,18 +64,18 @@ export default function NotificationPreferencesSelector() {
             const tipoId = tipo.id;
             const invia = preferenze[tipoId] ?? false;
 
-            // Verifica se esiste già una preferenza per questo utente e tipo
             const { data: existing, error } = await supabase
                 .from("notifiche_preferenze")
                 .select("id")
                 .eq("utente_id", utenteId)
                 .eq("tipo_id", tipoId)
                 .maybeSingle();
+
             if (error) {
                 console.error(`Errore durante il recupero preferenza tipo ${tipoId}:`, error.message);
             }
+
             if (existing?.id) {
-                // Fai UPDATE
                 await supabase
                     .from("notifiche_preferenze")
                     .update({
@@ -84,7 +84,6 @@ export default function NotificationPreferencesSelector() {
                     })
                     .eq("id", existing.id);
             } else {
-                // Fai INSERT
                 await supabase
                     .from("notifiche_preferenze")
                     .insert({
@@ -100,28 +99,31 @@ export default function NotificationPreferencesSelector() {
         alert("Preferenze salvate ✅");
     };
 
-    if (loading) return <p>Caricamento preferenze...</p>;
-    if (!utenteId) return <p>Effettua l’accesso per gestire le preferenze.</p>;
+    if (loading) return <p className="text-theme">Caricamento preferenze...</p>;
+    if (!utenteId) return <p className="text-theme">Effettua l’accesso per gestire le preferenze.</p>;
 
     return (
-        <div className="p-4 max-w-xl mx-auto bg-white rounded-xl shadow space-y-4">
-            <h2 className="text-xl font-semibold">Preferenze Notifiche Email</h2>
+        <div className="modal-container max-w-xl mx-auto rounded-xl shadow space-y-4 p-4">
+            <h2 className="text-xl font-semibold text-theme">Preferenze Notifiche Email</h2>
             <ul className="space-y-2">
-                {tipi.map(tipo => (
-                    <li key={tipo.id} className="flex items-center justify-between">
+                {tipi.map((tipo) => (
+                    <li key={tipo.id} className="flex items-center justify-between text-theme">
                         <span>{tipo.descrizione}</span>
-                        <input
-                            type="checkbox"
-                            checked={preferenze[tipo.id] ?? false}
-                            onChange={() => handleToggle(tipo.id)}
-                            className="w-5 h-5"
-                        />
+                        <label className="checkbox-theme-wrapper">
+                            <input
+                                type="checkbox"
+                                checked={preferenze[tipo.id] ?? false}
+                                onChange={() => handleToggle(tipo.id)}
+                                className="checkbox-theme"
+                            />
+                            <FontAwesomeIcon icon={faCheck} className="checkbox-icon" />
+                        </label>
                     </li>
                 ))}
             </ul>
             <button
                 onClick={handleSalva}
-                className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                className="mt-4 px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
             >
                 Salva Preferenze
             </button>

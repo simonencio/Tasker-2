@@ -1,5 +1,33 @@
 @import "tailwindcss";
-/* Nasconde la scrollbar */
+
+/* 🌙 Modalità chiara e scura via classi Tailwind */
+:root {
+  color-scheme: light dark;
+}
+
+/* 🌓 Colori personalizzati per il tema */
+:root {
+  --color-background-light: #f9fafb; /* Grigio chiaro */
+  --color-background-dark: #1f2937; /* Grigio scuro */
+  --color-text-light: #1f2937; /* Grigio scuro */
+  --color-text-dark: #e5e7eb; /* Grigio chiaro */
+  --color-icon-light: #4b5563; /* Grigio medio */
+  --color-icon-dark: #d1d5db; /* Grigio chiaro */
+}
+
+/* 🌓 Stili per il tema chiaro */
+html {
+  background-color: var(--color-background-light);
+  color: var(--color-text-light);
+}
+
+/* 🌓 Stili per il tema scuro */
+html.dark {
+  background-color: var(--color-background-dark);
+  color: var(--color-text-dark);
+}
+
+/* ✅ Scrollbar invisibile */
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -8,3 +36,159 @@
   scrollbar-width: none;
 }
 
+/* ✅ Colore delle icone */
+.icon-color {
+  color: var(--color-icon-light);
+}
+
+html.dark .icon-color {
+  color: var(--color-icon-dark);
+}
+
+/* ✅ Classi riutilizzabili per il tema */
+.bg-theme {
+  background-color: var(--color-background-light);
+}
+
+html.dark .bg-theme {
+  background-color: var(--color-background-dark);
+}
+
+.text-theme {
+  color: var(--color-text-light);
+}
+
+html.dark .text-theme {
+  color: var(--color-text-dark);
+}
+
+.modal-container {
+  background-color: var(--color-background-light);
+  color: var(--color-text-light);
+  border: 1px solid #ccc;
+}
+
+html.dark .modal-container {
+  background-color: #2c3542;
+  color: var(--color-text-dark);
+  border-color: #444;
+}
+
+.popup-panel {
+  background-color: var(--color-background-light);
+  color: var(--color-text-light);
+  border: 1px solid #ccc;
+}
+
+html.dark .popup-panel {
+  background-color: #374151;
+  color: var(--color-text-dark);
+  border-color: #555;
+}
+
+.input-style {
+  background-color: white;
+  color: black;
+}
+
+html.dark .input-style {
+  background-color: #1f2937;
+  color: #f5f5f5;
+}
+
+
+/* 📦 Dropdown e pulsanti migliorati */
+.dropdown-panel {
+  background-color: var(--color-background-light);
+  color: var(--color-text-light);
+  border: 1px solid #ccc;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+html.dark .dropdown-panel {
+  background-color: #2d3748;
+  color: var(--color-text-dark);
+  border-color: #444;
+}
+
+.dropdown-button {
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  border-radius: 0.375rem;
+  transition: background 0.2s;
+}
+
+.dropdown-button:hover {
+  background-color: rgba(0,0,0,0.05);
+}
+
+html.dark .dropdown-button:hover {
+  background-color: rgba(255,255,255,0.05);
+}
+
+/* 🔔 Badge notifica */
+.notification-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  font-size: 0.75rem;
+  font-weight: bold;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: red;
+  color: white;
+  line-height: 1;
+}
+
+/* 🆕 Checkbox elegante con FontAwesome */
+.checkbox-theme-wrapper {
+  position: relative;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  border: 2px solid var(--color-icon-light);
+  background-color: var(--color-background-light);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+html.dark .checkbox-theme-wrapper {
+  border-color: var(--color-icon-dark);
+  background-color: var(--color-background-dark);
+}
+
+.checkbox-theme-wrapper:hover {
+  filter: brightness(1.05);
+}
+
+.checkbox-theme {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+  pointer-events: none;
+}
+
+.checkbox-icon {
+  font-size: 0.85rem;
+  color: var(--color-icon-light);
+  display: none;
+}
+
+html.dark .checkbox-icon {
+  color: var(--color-icon-dark);
+}
+
+.checkbox-theme:checked + .checkbox-icon {
+  display: block;
+}
