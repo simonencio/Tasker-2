@@ -15,10 +15,11 @@ import AppLayout from "./Layout/AppLayout";
 import Profilo from "./Profilo/Profilo";
 import Progetti from "./Progetto";
 import Task from "./Task";
-import DettaglioProgetto from './GestioneProgetti/DettaglioProgetto';
+import DettaglioProgetto from "./GestioneProgetti/DettaglioProgetto";
 import CalendarioProgetto from "./GestioneProgetti/CalendarioProgetto";
-import AnimatedLogo from "./AnimatedLogo"; // ✅ importa l’animazione
 import BachecaProgetto from "./GestioneProgetti/BachecaProgetto";
+import AnimatedLogo from "./AnimatedLogo"; // ✅ animazione iniziale
+
 export default function App() {
     const [loggedIn, setLoggedIn] = useState(false);
     const [, setUserId] = useState<string | null>(null);
@@ -76,7 +77,6 @@ export default function App() {
                         </AppLayout>
                     }
                 />
-
                 <Route
                     path="/home"
                     element={

@@ -16,6 +16,7 @@ type ProgettoDettaglio = {
 }
 
 export type Task = {
+    stato_id: number
     id: string
     nome: string
     note?: string | null
@@ -154,6 +155,15 @@ export default function DettaglioProgetto() {
                         }
                     >
                         Calendario
+                    </NavLink>
+
+                    <NavLink
+                        to={`/progetti/${id}/bacheca`}
+                        className={({ isActive }) =>
+                            `hover:text-blue-600 ${isActive ? 'text-blue-700 font-semibold' : 'text-gray-700'}`
+                        }
+                    >
+                        Bacheca
                     </NavLink>
                 </div>
             </div>
