@@ -192,3 +192,107 @@ html.dark .checkbox-icon {
 .checkbox-theme:checked + .checkbox-icon {
   display: block;
 }
+
+/* ✅ Hover adattivo per elementi sidebar */
+.hover-bg-theme {
+  transition: background-color 0.2s ease;
+}
+
+.hover-bg-theme:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+html.dark .hover-bg-theme:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+
+.form-heading {
+  font-size: 1.5rem;
+  font-weight: bold;
+  text-align: center;
+  color: var(--color-text-light);
+}
+html.dark .form-heading {
+  color: var(--color-text-dark);
+}
+
+input:-webkit-autofill {
+  box-shadow: 0 0 0px 1000px white inset !important;
+  -webkit-box-shadow: 0 0 0px 1000px white inset !important;
+  -webkit-text-fill-color: #111 !important;
+}
+input:-webkit-autofill {
+  box-shadow: 0 0 0px 1000px white inset !important;
+  -webkit-text-fill-color: #111 !important;
+}
+html.dark input:-webkit-autofill {
+  box-shadow: 0 0 0px 1000px #1f2937 inset !important;
+  -webkit-text-fill-color: #f5f5f5 !important;
+}
+
+
+/* ✅ Toggle elegante e visibile su entrambi i temi */
+.toggle-theme {
+  width: 3.5rem;
+  height: 1.75rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  padding: 0.25rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  background-color: var(--color-background-light);
+  border: 2px solid rgba(0, 0, 0, 0.1); /* ✅ bordo soft */
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+html.dark .toggle-theme {
+  background-color: var(--color-background-dark);
+  border: 2px solid rgba(255, 255, 255, 0.15); /* ✅ bordo chiaro semi */
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.05);
+}
+
+/* ✅ Stato attivo con colori blu */
+.toggle-theme.active {
+  background-color: #2563eb;     /* blu-600 */
+  border-color: #1e40af;         /* blu-700 */
+}
+
+html.dark .toggle-theme.active {
+  background-color: #3b82f6;     /* tonalità visibile in dark */
+  border-color: #60a5fa;
+}
+
+/* ✅ Pallino interno */
+.toggle-thumb {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  background-color: white;
+  transition: transform 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-thumb.dark {
+  background-color: #f9fafb;
+}
+
+.toggle-thumb.translate {
+  transform: translateX(1.75rem);
+}
+
+.card-theme {
+  background-color: white;
+  color: var(--color-text-light);
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #ddd;
+}
+
+html.dark .card-theme {
+  background-color: #2c3542;
+  color: var(--color-text-dark);
+  box-shadow: none;
+  border: 1px solid #444;
+}

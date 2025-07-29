@@ -197,6 +197,7 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                                 )}
                             </div>
 
+                            {/* 🌓 Icona cambio tema tra + e notifiche */}
                             <div className="relative" ref={themeRef}>
                                 <button onClick={() => setThemeDropdown(p => !p)} className="w-10 h-10 flex items-center justify-center">
                                     <FontAwesomeIcon icon={faMoon} className="text-2xl text-sky-500" />
@@ -226,6 +227,31 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                                 )}
                             </button>
                         </>
+                    )}
+
+                    {/* 🌓 Icona tema per utenti non loggati */}
+                    {!loggedIn && (
+                        <div className="relative" ref={themeRef}>
+                            <button onClick={() => setThemeDropdown(p => !p)} className="w-10 h-10 flex items-center justify-center">
+                                <FontAwesomeIcon icon={faMoon} className="text-2xl text-sky-500" />
+                            </button>
+                            {themeDropdown && (
+                                <div className="absolute right-0 mt-5 w-40 dropdown-panel z-50">
+                                    {[{ icon: faSun, label: "Chiaro", theme: "light", color: "text-yellow-400" },
+                                    { icon: faMoon, label: "Scuro", theme: "dark", color: "text-sky-500" },
+                                    { icon: faDesktop, label: "Sistema", theme: "system", color: "text-gray-500 dark:text-gray-300" }
+                                    ].map(({ icon, label, theme, color }) => (
+                                        <button
+                                            key={label}
+                                            onClick={() => { applyTheme(theme); setThemeDropdown(false); }}
+                                            className="dropdown-button flex items-center gap-2"
+                                        >
+                                            <FontAwesomeIcon icon={icon} className={`text-base ${color}`} /> {label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     )}
 
                     <div className="relative" ref={dropdownRef}>
