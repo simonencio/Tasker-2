@@ -18,6 +18,7 @@ import Progetti from "./Progetto";
 import Task from "./Task";
 import DettaglioProgetto from './GestioneProgetti/DettaglioProgetto'
 import CalendarioProgetto from "./GestioneProgetti/CalendarioProgetto";
+import BachecaProgetto from "./GestioneProgetti/BachecaProgetto";
 
 
 export default function App() {
@@ -122,6 +123,15 @@ export default function App() {
                     element={
                         <AppLayout loggedIn={loggedIn}>
                             <CalendarioProgetto />
+                        </AppLayout>
+                    }
+                />
+
+                <Route
+                    path="/progetti/:id/bacheca"
+                    element={
+                        <AppLayout loggedIn={loggedIn}>
+                            <BachecaProgetto />
                         </AppLayout>
                     }
                 />
