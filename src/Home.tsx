@@ -31,7 +31,7 @@ export default function Home() {
 
 
 
-    if (loading) return <div className="p-6">Caricamento...</div>;
+    if (loading) return <div className="p-6"></div>;
 
     return (
 

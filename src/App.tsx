@@ -7,7 +7,6 @@ import {
 } from "react-router-dom";
 import RegisterForm from "./RegisterForm";
 import ConfirmEmailWelcome from "./ConfirmEmailWelcome";
-
 import { supabase } from "./supporto/supabaseClient";
 import "./App.css";
 import LoginForm from "./LoginForm";
@@ -16,13 +15,14 @@ import AppLayout from "./Layout/AppLayout";
 import Profilo from "./Profilo/Profilo";
 import Progetti from "./Progetto";
 import Task from "./Task";
-import DettaglioProgetto from './GestioneProgetti/DettaglioProgetto'
+import DettaglioProgetto from './GestioneProgetti/DettaglioProgetto';
 import CalendarioProgetto from "./GestioneProgetti/CalendarioProgetto";
-
-
+import AnimatedLogo from "./AnimatedLogo"; // ✅ importa l’animazione
+import BachecaProgetto from "./GestioneProgetti/BachecaProgetto";
 export default function App() {
     const [loggedIn, setLoggedIn] = useState(false);
     const [, setUserId] = useState<string | null>(null);
+    const [showAnimatedLogo, setShowAnimatedLogo] = useState(true); // ✅ animazione iniziale
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -42,6 +42,10 @@ export default function App() {
             listener.subscription.unsubscribe();
         };
     }, []);
+
+    if (showAnimatedLogo) {
+        return <AnimatedLogo onFinish={() => setShowAnimatedLogo(false)} />;
+    }
 
     return (
         <Router>
@@ -89,7 +93,6 @@ export default function App() {
                         </AppLayout>
                     }
                 />
-
                 <Route
                     path="/task"
                     element={
@@ -98,7 +101,6 @@ export default function App() {
                         </AppLayout>
                     }
                 />
-
                 <Route
                     path="/profilo"
                     element={
@@ -107,7 +109,6 @@ export default function App() {
                         </AppLayout>
                     }
                 />
-
                 <Route
                     path="/progetti/:id"
                     element={
@@ -116,7 +117,6 @@ export default function App() {
                         </AppLayout>
                     }
                 />
-
                 <Route
                     path="/progetti/:id/calendario"
                     element={
@@ -125,10 +125,15 @@ export default function App() {
                         </AppLayout>
                     }
                 />
-
-
+                <Route
+                    path="/progetti/:id/bacheca"
+                    element={
+                        <AppLayout loggedIn={loggedIn}>
+                            <BachecaProgetto />
+                        </AppLayout>
+                    }
+                />
             </Routes>
         </Router>
-
     );
 }
