@@ -1,15 +1,19 @@
 import { useState } from "react";
-import { supabase } from "./supporto/supabaseClient";
 import { useNavigate, Link } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
-
-
+import { supabase } from "./supporto/supabaseClient";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+    faEnvelope,
+    faLock,
+    faLockOpen,
+    faEye,
+    faEyeSlash,
+} from "@fortawesome/free-solid-svg-icons";
 
 export default function LoginForm() {
-
-    const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const navigate = useNavigate();
@@ -31,53 +35,76 @@ export default function LoginForm() {
     };
 
     return (
-        <form onSubmit={handleLogin} className="max-w-sm mx-auto mt-8 p-6 bg-white shadow-md rounded-xl space-y-4">
-            <h2 className="text-xl font-semibold">Login</h2>
+        <div className="max-w-lg mx-auto mt-12">
+            <form
+                onSubmit={handleLogin}
+                className="modal-container shadow-xl rounded-2xl p-8 space-y-6"
+            >
+                <h2 className="text-2xl font-bold text-theme text-center">Accedi al tuo account</h2>
 
-            <input
+                {/* Email */}
+                <div className="relative">
+                    <FontAwesomeIcon
+                        icon={faEnvelope}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 icon-color"
+                    />
+                    <input
+                        name="email"
+                        type="email"
+                        placeholder="Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        autoComplete="off"
+                        className="input-style bg-white text-black pl-10 pr-4 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+                    />
+                </div>
 
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Email"
-                    required
-                    className="w-full border p-2 rounded "
-                />
+                {/* Password */}
+                <div className="relative">
+                    <FontAwesomeIcon
+                        icon={showPassword ? faLockOpen : faLock}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 icon-color"
+                    />
+                    <input
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        autoComplete="current-password"
+                        className="input-style bg-white text-black pl-10 pr-12 py-2 w-full rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 icon-color hover-bg-theme p-1 rounded transition"
+                    >
+                        <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
+                    </button>
+                </div>
 
-            <div className="relative">
+                {/* Errore */}
+                {error && <p className="text-red-600 text-sm text-center">{error}</p>}
 
-                <input
-                    name="password"
-                    value={password}
-                    type={showPassword ? "text" : "password"}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Password"
-                    required
-                    className="w-full border p-2 rounded"
-                />
+                {/* Submit */}
                 <button
-                    type="button"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-blue-600"
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg tracking-wide transition disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {loading ? "Accesso in corso..." : "Login"}
                 </button>
 
-            </div>
-
-            <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded disabled:opacity-50"
-            >
-                {loading ? "Caricamento..." : "Login"}
-            </button>
-
-
-            {error && <p className="text-red-600">{error}</p>}
-            <p className="text-center">
-                Non hai un account? <Link className="text-blue-600 underline" to="/register">Registrati</Link>
-            </p>
-        </form>
+                {/* Link registrazione */}
+                <p className="text-center text-theme">
+                    Non hai un account?{" "}
+                    <Link className="text-blue-600 hover:underline" to="/register">
+                        Registrati
+                    </Link>
+                </p>
+            </form>
+        </div>
     );
 }

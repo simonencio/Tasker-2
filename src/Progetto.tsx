@@ -1,116 +1,202 @@
-import { useState, useEffect } from 'react'
-import { supabase } from './supporto/supabaseClient'
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "./supporto/supabaseClient";
 
-import { useNavigate } from 'react-router-dom'
-
-
-
+// Tipi derivati dalle tabelle reali
 export type Progetto = {
-    id: string
-    nome: string
-    note?: string | null
-    consegna?: string | null
-    tempo_stimato?: string | null
-    created_at: string
-    modified_at: string
-    cliente?: {
-        nome: string
-    } | null
-    stato?: {
-        nome: string
-    } | null
-    priorita?: {
-        nome: string
-    } | null
-}
+    id: string;
+    cliente_id: string | null;
+    nome: string;
+    note: string | null;
+    stato_id: number | null;
+    priorita_id: number | null;
+    consegna: string | null;
+    tempo_stimato: string | null;
+    created_at: string;
+    modified_at: string;
+    deleted_at: string | null;
+
+    cliente: {
+        id: string;
+        nome: string;
+        email: string | null;
+        telefono: string | null;
+        avatar_url: string | null;
+        note: string | null;
+    } | null;
+
+    stato: {
+        id: number;
+        nome: string;
+        colore: string | null;
+    } | null;
+
+    priorita: {
+        id: number;
+        nome: string;
+    } | null;
+};
 
 export default function ListaProgetti() {
-    const [progetti, setProgetti] = useState<Progetto[]>([])
-    const [loading, setLoading] = useState(true)
+    const [progetti, setProgetti] = useState<Progetto[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [soloMiei, setSoloMiei] = useState(false);
+    const [utenteId, setUtenteId] = useState<string | null>(null);
+    const navigate = useNavigate();
 
-    const navigate = useNavigate()
+    // Ottieni ID utente loggato
+    useEffect(() => {
+        supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user) setUtenteId(user.id);
+        });
+    }, []);
 
+    // Carica progetti
     useEffect(() => {
         const caricaProgetti = async () => {
-            const { data, error } = await supabase
-                .from('progetti')
-                .select(`
-                    id, nome, note, consegna, tempo_stimato, created_at, modified_at,
-                    clienti (nome),
-                    stati (nome),
-                    priorita (nome)
-                `)
-                .is('deleted_at', null)
-                .order('created_at', { ascending: false })
-            if (error) {
-                console.error('Errore nel caricamento:', error)
-            } else if (data) {
-                const progettiPuliti = data.map((item) => ({
-                    ...item,
-                    cliente: item.clienti?.[0] ?? null,
-                    stato: item.stati?.[0] ?? null,
-                    priorita: item.priorita?.[0] ?? null,
-                }))
-                setProgetti(progettiPuliti)
+            setLoading(true);
+            let progettiIds: string[] = [];
+
+            // Filtro "solo miei"
+            if (soloMiei && utenteId) {
+                const { data: relazioni, error: errRel } = await supabase
+                    .from("utenti_progetti")
+                    .select("progetto_id")
+                    .eq("utente_id", utenteId);
+
+                if (errRel) {
+                    console.error("Errore filtro progetti:", errRel);
+                    setLoading(false);
+                    return;
+                }
+
+                progettiIds = relazioni?.map((r) => r.progetto_id) ?? [];
+                if (progettiIds.length === 0) {
+                    setProgetti([]);
+                    setLoading(false);
+                    return;
+                }
             }
 
-            setLoading(false)
-        }
+            // Query completa
+            const query = supabase
+                .from("progetti")
+                .select(`
+          id, cliente_id, nome, note, stato_id, priorita_id, consegna, tempo_stimato,
+          created_at, modified_at, deleted_at,
+          cliente:cliente_id (
+            id, nome, email, telefono, avatar_url, note
+          ),
+          stato:stato_id (
+            id, nome, colore
+          ),
+          priorita:priorita_id (
+            id, nome
+          )
+        `)
+                .is("deleted_at", null)
+                .order("created_at", { ascending: false });
 
-        caricaProgetti()
-    }, [])
+            if (soloMiei && progettiIds.length > 0) {
+                query.in("id", progettiIds);
+            }
 
+            const { data, error } = await query;
+
+            if (error) {
+                console.error("Errore caricamento progetti:", error);
+            } else {
+                // 💥 Corretto: gestisce array restituiti da Supabase come oggetto singolo
+                const progettiPuliti: Progetto[] = data.map((item: any) => ({
+                    ...item,
+                    cliente: Array.isArray(item.cliente) ? item.cliente[0] ?? null : item.cliente ?? null,
+                    stato: Array.isArray(item.stato) ? item.stato[0] ?? null : item.stato ?? null,
+                    priorita: Array.isArray(item.priorita) ? item.priorita[0] ?? null : item.priorita ?? null,
+                }));
+                setProgetti(progettiPuliti);
+            }
+
+            setLoading(false);
+        };
+
+        if (utenteId) caricaProgetti();
+    }, [soloMiei, utenteId]);
 
     return (
         <div className="p-6">
-            <h1 className="text-2xl font-bold mb-4">Progetti</h1>
+            <div className="flex justify-between items-center mb-6 relative">
+                <h1 className="text-3xl font-bold text-center w-full tracking-wide mt-4 mb-4 text-theme">
+                    📁 Progetti
+                </h1>
+                <div className="absolute right-0 flex items-center gap-3">
+                    <span className="text-lg font-semibold text-theme">👤 Miei</span>
+                    <div
+                        onClick={() => setSoloMiei((v) => !v)}
+                        className={`toggle-theme ${soloMiei ? "active" : ""}`}
+                        title={soloMiei ? "Mostra tutti i progetti" : "Mostra solo assegnati a me"}
+                    >
+                        <div
+                            className={`toggle-thumb ${soloMiei ? "translate" : ""} ${document.documentElement.classList.contains("dark") ? "dark" : ""
+                                }`}
+                        ></div>
+                    </div>
+                </div>
+            </div>
 
             {loading ? (
-                <p>Caricamento...</p>
+                <p className="text-center text-theme text-lg">Caricamento...</p>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
                     {progetti.map((proj) => (
                         <div
                             key={proj.id}
-                            className="relative bg-white shadow-md rounded-lg p-4 hover:shadow-lg transition-all"
-                            onClick={() => navigate(`/progetti/${proj.id}` , { state: { fromProgeti: true } })} //link pagina detaglioProgetto
+                            onClick={() => navigate(`/progetti/${proj.id}`)}
+                            className="cursor-pointer card-theme transition-all p-5 hover-bg-theme"
                         >
-
-                            <h2 className="text-lg font-bold text-gray-800">{proj.nome}</h2>
+                            <h2 className="text-xl font-semibold text-theme mb-1">{proj.nome}</h2>
 
                             {proj.cliente?.nome && (
-                                <p className="text-sm text-gray-600">Cliente: {proj.cliente.nome}</p>
+                                <p className="text-sm text-theme mb-1">
+                                    👤 Cliente: <span className="font-medium">{proj.cliente.nome}</span>
+                                </p>
                             )}
 
                             {proj.consegna && (
-                                <p className="text-sm text-gray-600">Consegna: {proj.consegna}</p>
+                                <p className="text-sm text-theme mb-1">
+                                    📅 Consegna: <span className="font-medium">{proj.consegna}</span>
+                                </p>
                             )}
 
-                            <div className="flex gap-2 mt-2 text-sm">
+                            {proj.tempo_stimato && (
+                                <p className="text-sm text-theme mb-1">
+                                    ⏱️ Tempo stimato:{" "}
+                                    <span className="font-medium">{proj.tempo_stimato}</span>
+                                </p>
+                            )}
+
+                            <div className="flex flex-wrap gap-2 mt-2 text-sm">
                                 {proj.stato && (
                                     <span
-                                        className="px-2 py-1 rounded-full text-white bg-gray-500"
+                                        className="px-3 py-1 rounded-full text-white text-xs font-medium"
+                                        style={{ backgroundColor: proj.stato.colore || "#3b82f6" }}
                                     >
                                         {proj.stato.nome}
                                     </span>
                                 )}
                                 {proj.priorita && (
-                                    <span
-                                        className="px-2 py-1 rounded-full text-white bg-gray-400"
-                                    >
+                                    <span className="px-3 py-1 rounded-full text-white bg-green-500 text-xs font-medium">
                                         {proj.priorita.nome}
                                     </span>
                                 )}
                             </div>
 
                             {proj.note && (
-                                <p className="text-xs text-gray-500 mt-3 italic">{proj.note}</p>
+                                <p className="text-xs text-theme mt-3 italic line-clamp-3">{proj.note}</p>
                             )}
                         </div>
                     ))}
                 </div>
             )}
         </div>
-    )
+    );
 }
-

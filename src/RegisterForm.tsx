@@ -1,26 +1,49 @@
-import { useState } from "react";
-import { supabase } from "./supporto/supabaseClient";
-import { Link } from 'react-router-dom'
-import { Eye, EyeOff } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase, AVATAR_BASE_URL } from "./supporto/supabaseClient";
+import { Link } from "react-router-dom";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+    faUser,
+    faEnvelope,
+    faLock,
+    faLockOpen,
+    faImage,
+    faEye,
+    faEyeSlash,
+} from "@fortawesome/free-solid-svg-icons";
 
 export default function RegisterForm() {
     const [form, setForm] = useState({
-        email: '',
-        confermaEmail: '',
-        password: '',
-        confermaPassword: '',
-        nome: '',
-        cognome: '',
-        avatar: ''
+        email: "",
+        confermaEmail: "",
+        password: "",
+        confermaPassword: "",
+        nome: "",
+        cognome: "",
+        avatar: "",
     });
 
+    const [avatars, setAvatars] = useState<string[]>([]);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
+    useEffect(() => {
+        const fetchAvatars = async () => {
+            const { data } = await supabase.storage.from("avatars").list("", { limit: 100 });
+            if (data) {
+                const filtered = data
+                    .filter((f) =>
+                        f.name && f.metadata && /\.(png|jpe?g|webp|gif)$/i.test(f.name)
+                    )
+                    .map((f) => f.name);
+                setAvatars(filtered);
+            }
+        };
+        fetchAvatars();
+    }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setForm({ ...form, [e.target.name]: e.target.value });
@@ -52,13 +75,12 @@ export default function RegisterForm() {
                     data: {
                         nome: form.nome,
                         cognome: form.cognome,
-                        avatar: form.avatar
+                        avatar: form.avatar || null,
                     },
                 },
             });
 
             if (signUpError || !signUpData.user) throw signUpError || new Error("Registrazione fallita.");
-
             const userId = signUpData.user.id;
 
             const { error: insertUserError } = await supabase.from("utenti").insert({
@@ -66,35 +88,11 @@ export default function RegisterForm() {
                 email: form.email,
                 nome: form.nome,
                 cognome: form.cognome,
+                avatar: form.avatar || null,
                 ruolo: 1,
             });
+
             if (insertUserError) throw insertUserError;
-
-            const { data: tipo, error: tipoErr } = await supabase
-                .from("notifiche_tipi")
-                .select("id")
-                .eq("codice", "UTENTE_REGISTRATO")
-                .single();
-
-            if (!tipoErr && tipo?.id) {
-                const { data: notificaData, error: notificaError } = await supabase
-                    .from("notifiche")
-                    .insert({
-                        tipo_id: tipo.id,
-                        messaggio: `🎉 Benvenuto ${form.nome} in Tasker`,
-                        destinatari_tutti: false,
-                        creatore_id: null,
-                    })
-                    .select("id")
-                    .single();
-
-                if (!notificaError && notificaData?.id) {
-                    await supabase.from("notifiche_utenti").insert({
-                        notifica_id: notificaData.id,
-                        utente_id: userId,
-                    });
-                }
-            }
 
             setSuccess(true);
         } catch (err: any) {
@@ -106,8 +104,8 @@ export default function RegisterForm() {
 
     if (success) {
         return (
-            <div className="max-w-md mx-auto mt-10 p-6 border rounded-lg shadow bg-green-50 text-center">
-                <p className="text-green-700 text-lg font-semibold">
+            <div className="max-w-md mx-auto mt-12 p-8 modal-container text-center rounded-2xl shadow-lg">
+                <p className="text-theme text-xl font-semibold">
                     ✅ Registrazione completata! Controlla la tua email per confermare.
                 </p>
             </div>
@@ -115,62 +113,122 @@ export default function RegisterForm() {
     }
 
     return (
-        <div className="max-w-md mx-auto mt-20 space-y-4">
-            <h1 className="text-2xl font-bold">Registrati</h1>
-            <form onSubmit={handleRegister} className="space-y-4">
-                <input name="nome" placeholder="Nome" value={form.nome} onChange={handleChange} className="w-full p-2 border rounded" />
-                <input name="cognome" placeholder="Cognome" value={form.cognome} onChange={handleChange} className="w-full p-2 border rounded" />
-                <input name="email" type="email" placeholder="Email" value={form.email} onChange={handleChange} className="w-full p-2 border rounded" />
-                <input name="confermaEmail" type="email" placeholder="Conferma Email" value={form.confermaEmail} onChange={handleChange} className="w-full p-2 border rounded" />
+        <div className="max-w-lg mx-auto mt-12">
+            <form onSubmit={handleRegister} className="modal-container shadow-xl rounded-2xl p-8 space-y-6">
+                <h2 className="text-2xl font-bold text-theme text-center">Crea il tuo account</h2>
 
-                <div className="relative">
-                    <input
-                        name="password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Password"
-                        value={form.password}
-                        onChange={handleChange}
-                        className="w-full p-2 border rounded"
-                    />
-                    <button
-                        type="button"
-                        onClick={() => setShowPassword((prev) => !prev)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-blue-600"
-                    >
-                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+                {/* Nome e Cognome */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {["nome", "cognome"].map((field) => (
+                        <div key={field} className="relative">
+                            <FontAwesomeIcon icon={faUser} className="absolute left-3 top-1/2 -translate-y-1/2 icon-color" />
+                            <input
+                                name={field}
+                                placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+                                value={form[field as keyof typeof form]}
+                                onChange={handleChange}
+                                required
+                                autoComplete="off"
+                                className="input-style pl-10 pr-4 py-2 w-full rounded-lg border border-gray-300 bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+                            />
+                        </div>
+                    ))}
                 </div>
 
-                <div className="relative">
-                    <input
-                        name="confermaPassword"
-                        type={showConfirmPassword ? "text" : "password"}
-                        placeholder="Conferma Password"
-                        value={form.confermaPassword}
-                        onChange={handleChange}
-                        className="w-full p-2 border rounded"
-                    />
-                    <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword((prev) => !prev)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-blue-600"
-                    >
-                        {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+                {/* Email */}
+                {["email", "confermaEmail"].map((field) => (
+                    <div key={field} className="relative">
+                        <FontAwesomeIcon icon={faEnvelope} className="absolute left-3 top-1/2 -translate-y-1/2 icon-color" />
+                        <input
+                            name={field}
+                            type="email"
+                            placeholder={field === "email" ? "Email" : "Conferma Email"}
+                            value={form[field as keyof typeof form]}
+                            onChange={handleChange}
+                            required
+                            autoComplete="off"
+                            className="input-style pl-10 pr-4 py-2 w-full rounded-lg border border-gray-300 bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+                        />
+                    </div>
+                ))}
+
+                {/* Password */}
+                {[
+                    { field: "password", show: showPassword, setShow: setShowPassword },
+                    { field: "confermaPassword", show: showConfirmPassword, setShow: setShowConfirmPassword },
+                ].map(({ field, show, setShow }) => (
+                    <div key={field} className="relative">
+                        <FontAwesomeIcon
+                            icon={show ? faLockOpen : faLock}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 icon-color"
+                        />
+                        <input
+                            name={field}
+                            type={show ? "text" : "password"}
+                            placeholder={field === "password" ? "Password" : "Conferma Password"}
+                            value={form[field as keyof typeof form]}
+                            onChange={handleChange}
+                            required
+                            autoComplete="new-password"
+                            className="input-style pl-10 pr-12 py-2 w-full rounded-lg border border-gray-300 bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShow(!show)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 icon-color hover-bg-theme p-1 rounded transition"
+                        >
+                            <FontAwesomeIcon icon={show ? faEyeSlash : faEye} />
+                        </button>
+                    </div>
+                ))}
+
+                {/* Avatar Picker */}
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-theme flex items-center gap-2">
+                        <FontAwesomeIcon icon={faImage} className="icon-color" />
+                        Seleziona un avatar (opzionale):
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                        <div
+                            onClick={() => setForm((f) => ({ ...f, avatar: "" }))}
+                            className={`w-12 h-12 rounded-full cursor-pointer flex items-center justify-center text-sm font-bold bg-gray-100 hover:bg-blue-100 transition ${form.avatar === "" ? "ring-2 ring-blue-500" : "opacity-70 hover:opacity-100"
+                                }`}
+                        >
+                            N/A
+                        </div>
+                        {avatars.map((file) => {
+                            const url = `${AVATAR_BASE_URL}${file}`;
+                            return (
+                                <img
+                                    key={file}
+                                    src={url}
+                                    alt={file}
+                                    onClick={() => setForm((f) => ({ ...f, avatar: url }))}
+                                    className={`w-12 h-12 rounded-full object-cover cursor-pointer transition ${form.avatar === url ? "ring-2 ring-blue-500" : "opacity-70 hover:opacity-100"
+                                        }`}
+                                />
+                            );
+                        })}
+                    </div>
                 </div>
 
-                <input name="avatar" placeholder="URL Avatar (opzionale)" value={form.avatar} onChange={handleChange} className="w-full p-2 border rounded" />
+                {error && <p className="text-red-600 text-sm text-center">{error}</p>}
 
-                {error && <p className="text-red-600 text-sm">{error}</p>}
-
-                <button type="submit" disabled={loading} className="bg-blue-600 text-white px-4 py-2 rounded w-full">
+                <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg tracking-wide transition disabled:opacity-60 disabled:cursor-not-allowed"
+                >
                     {loading ? "Registrazione in corso..." : "Registrati"}
                 </button>
-            </form>
 
-            <p className="text-center">
-                Hai già un account? <Link className="text-blue-600 underline" to="/">Accedi</Link>
-            </p>
+                <p className="text-center text-theme">
+                    Hai già un account?{" "}
+                    <Link className="text-blue-600 hover:underline" to="/">
+                        Accedi
+                    </Link>
+                </p>
+            </form>
         </div>
     );
 }
