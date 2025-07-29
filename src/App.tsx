@@ -17,6 +17,7 @@ import Profilo from "./Profilo/Profilo";
 import Progetti from "./Progetto";
 import Task from "./Task";
 import DettaglioProgetto from './GestioneProgetti/DettaglioProgetto'
+import CalendarioProgetto from "./GestioneProgetti/CalendarioProgetto";
 
 
 export default function App() {
@@ -115,6 +116,16 @@ export default function App() {
                         </AppLayout>
                     }
                 />
+
+                <Route
+                    path="/progetti/:id/calendario"
+                    element={
+                        <AppLayout loggedIn={loggedIn}>
+                            <CalendarioProgetto />
+                        </AppLayout>
+                    }
+                />
+
 
             </Routes>
         </Router>
