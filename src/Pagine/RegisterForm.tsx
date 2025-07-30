@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase, AVATAR_BASE_URL } from "./supporto/supabaseClient";
+import { supabase, AVATAR_BASE_URL } from "../supporto/supabaseClient";
 import { Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {

@@ -141,12 +141,19 @@ export default function DettaglioProgetto() {
                         Dashboard
                     </NavLink>
 
-                    <button
-                        onClick={() => setSoloMieTask(prev => !prev)}
-                        className={`hover:text-blue-600 ${soloMieTask ? 'text-blue-700 font-semibold' : 'text-gray-700'}`}
-                    >
-                        {soloMieTask ? 'Tutte le Task' : 'Le mie Task'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <span className="text-theme font-medium text-sm">👤 Mie</span>
+                        <div
+                            onClick={() => setSoloMieTask((v) => !v)}
+                            className={`toggle-theme ${soloMieTask ? "active" : ""}`}
+                        >
+                            <div
+                                className={`toggle-thumb ${soloMieTask ? "translate" : ""} ${document.documentElement.classList.contains("dark") ? "dark" : ""
+                                    }`}
+                            ></div>
+                        </div>
+                    </div>
+
 
                     <NavLink
                         to={`/progetti/${id}/calendario`}

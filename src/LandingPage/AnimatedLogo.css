@@ -1,0 +1,188 @@
+/* ---------- BASE STYLE ---------- */
+
+.logo-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100dvh; /* ✅ supporta iPhone notch */
+  height: 100svh; /* ✅ alternative fallback */
+  height: 100vh;  /* ✅ fallback per vecchi browser */
+  padding: 0 20px;
+  box-sizing: border-box;
+  background: transparent;
+  overflow: hidden; /* ✅ previene scroll */
+}
+
+.logo-svg {
+  width: 100%;
+  max-width: 90vw;
+  height: auto;
+  max-height: 24vh;
+  user-select: none;
+  pointer-events: none;
+  display: block;
+  overflow: visible;
+}
+
+.logo-path {
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: #fff;
+  opacity: 0;
+  transform-origin: center;
+  user-select: none;
+  pointer-events: none;
+}
+
+.logo-fade-wave {
+  animation: fadeWaveIn 1.6s ease-out forwards;
+}
+
+.from-left { animation-name: fadeWaveInFromLeft; }
+.from-right { animation-name: fadeWaveInFromRight; }
+.from-top { animation-name: fadeWaveInFromTop; }
+.from-bottom { animation-name: fadeWaveInFromBottom; }
+
+@keyframes fadeWaveInFromLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-150px) translateY(40px) rotate(-40deg) scale(0.8);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(20px) translateY(-10px) rotate(5deg) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateY(0) rotate(0deg) scale(1);
+  }
+}
+
+@keyframes fadeWaveInFromRight {
+  0% {
+    opacity: 0;
+    transform: translateX(150px) translateY(40px) rotate(40deg) scale(0.8);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(-20px) translateY(-10px) rotate(-5deg) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateY(0) rotate(0deg) scale(1);
+  }
+}
+
+@keyframes fadeWaveInFromTop {
+  0% {
+    opacity: 0;
+    transform: translateY(-150px) translateX(30px) rotate(25deg) scale(0.8);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(20px) translateX(-10px) rotate(-5deg) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) translateX(0) rotate(0deg) scale(1);
+  }
+}
+
+@keyframes fadeWaveInFromBottom {
+  0% {
+    opacity: 0;
+    transform: translateY(150px) translateX(30px) rotate(-25deg) scale(0.8);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-20px) translateX(-10px) rotate(5deg) scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) translateX(0) rotate(0deg) scale(1);
+  }
+}
+
+.logo-wrapper.fade-out {
+  animation: fadeOut 0.5s ease forwards;
+  pointer-events: none;
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* ---------- SPINNER ---------- */
+
+.spinner-container {
+  position: fixed;
+  bottom: 5vh;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  animation: fadeInSpinner 0.5s forwards;
+  pointer-events: none;
+  z-index: 10;
+}
+
+@keyframes fadeInSpinner {
+  to { opacity: 1; }
+}
+
+.spinner-container.fade-out {
+  animation: fadeOut 0.5s ease forwards;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 5px solid #ccc;
+  border-top-color: #333;
+  border-radius: 9999px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- MEDIA QUERIES ---------- */
+
+@media (max-width: 360px) {
+  .logo-svg { max-height: 26vh; }
+  .spinner { width: 28px; height: 28px; border-width: 3px; }
+}
+
+@media (min-width: 361px) and (max-width: 480px) {
+  .logo-svg { max-height: 24vh; }
+  .spinner { width: 32px; height: 32px; border-width: 3.5px; }
+}
+
+@media (min-width: 481px) and (max-width: 767px) {
+  .logo-svg { max-height: 22vh; }
+  .spinner { width: 36px; height: 36px; border-width: 4px; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .logo-svg { max-height: 14vh; }
+  .spinner { width: 40px; height: 40px; border-width: 4.5px; }
+}
+
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .logo-svg { max-height: 17vh; }
+  .spinner { width: 45px; height: 45px; border-width: 5px; }
+}
+
+@media (min-width: 1440px) and (max-width: 1919px) {
+  .logo-svg { max-height: 16vh; }
+  .spinner { width: 48px; height: 48px; border-width: 5px; }
+}
+
+@media (min-width: 1920px) {
+  .logo-svg { max-height: 14vh; }
+  .spinner { width: 52px; height: 52px; border-width: 5.5px; }
+}

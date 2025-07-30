@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "./supporto/supabaseClient";
+import { supabase } from "../supporto/supabaseClient";
 
 
 export default function Home() {
