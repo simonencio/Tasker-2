@@ -7,10 +7,14 @@ import {
     faDiagramProject,
     faUserTie,
     faBell,
-    faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 
-export default function NotificheSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+type Props = {
+    open: boolean;
+    onClose: () => void;
+};
+
+export default function NotificheSidebar({ open }: Props) {
     const [notifiche, setNotifiche] = useState<Notifica[]>([]);
     const [loading, setLoading] = useState(true);
     const [userId, setUserId] = useState<string | null>(null);
@@ -45,6 +49,32 @@ export default function NotificheSidebar({ open, onClose }: { open: boolean; onC
         markAsViewed().then(loadNotifiche);
     }, [open, userId]);
 
+    // 🔄 Realtime aggiornamento mentre la sidebar è aperta
+    useEffect(() => {
+        if (!open || !userId) return;
+
+        const channel = supabase
+            .channel(`realtime_sidebar_notifiche_${userId}`)
+            .on(
+                "postgres_changes",
+                {
+                    event: "INSERT",
+                    schema: "public",
+                    table: "notifiche_utenti",
+                    filter: `utente_id=eq.${userId}`,
+                },
+                async () => {
+                    const data = await getNotificheUtente(userId);
+                    setNotifiche(data);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [open, userId]);
+
     const eliminaNotifica = async (notificaUtenteId: string) => {
         const now = new Date().toISOString();
         setNotifiche((prev) => prev.filter((n) => n.id !== notificaUtenteId));
@@ -60,18 +90,16 @@ export default function NotificheSidebar({ open, onClose }: { open: boolean; onC
     };
 
     return (
-        <div
-            className={`fixed top-0 right-0 h-full w-[22rem] z-50 transition-transform duration-300 border-l border-gray-300 dark:border-gray-700 bg-theme shadow-xl ${open ? "translate-x-0" : "translate-x-full"}`}
+        <aside
+            className={`absolute top-0 right-0 h-full w-64 sidebar-theme text-theme transition-transform duration-300 z-40 ${open ? "translate-x-0 notifiche-shadow-open" : "translate-x-full"
+                }`}
         >
             {/* Header */}
-            <div className="p-5 border-b border-gray-300 dark:border-gray-600 flex justify-between items-center bg-theme">
+            <div className="p-5 flex items-center bg-theme">
                 <h2 className="text-xl font-bold text-theme flex items-center gap-2">
                     <FontAwesomeIcon icon={faBell} className="text-yellow-500 text-xl" />
                     Notifiche
                 </h2>
-                <button onClick={onClose} className="text-2xl text-red-500 hover:opacity-70 transition">
-                    <FontAwesomeIcon icon={faXmark} />
-                </button>
             </div>
 
             {/* Contenuto */}
@@ -85,11 +113,10 @@ export default function NotificheSidebar({ open, onClose }: { open: boolean; onC
                         {notifiche.map((n) => (
                             <li
                                 key={n.id}
-                                className={`rounded-lg popup-panel p-4 transition border border-gray-200 dark:border-gray-700 ${n.letto ? "opacity-60" : "shadow-md"}`}
+                                className={`rounded-lg popup-panel p-4 transition border border-gray-200 dark:border-gray-700 ${n.letto ? "opacity-60" : "shadow-md"
+                                    }`}
                             >
-                                <p className={`text-base ${n.letto ? "" : "font-semibold"}`}>
-                                    {n.messaggio}
-                                </p>
+                                <p className={`text-base ${n.letto ? "" : "font-semibold"}`}>{n.messaggio}</p>
 
                                 {(n.task_nome || n.progetto_nome || n.creatore_nome) && (
                                     <div className="text-sm mt-3 space-y-2">
@@ -115,9 +142,7 @@ export default function NotificheSidebar({ open, onClose }: { open: boolean; onC
                                 )}
 
                                 <div className="flex justify-between items-center mt-4">
-                                    <p className="text-xs opacity-50">
-                                        {new Date(n.data_creazione).toLocaleString()}
-                                    </p>
+                                    <p className="text-xs opacity-50">{new Date(n.data_creazione).toLocaleString()}</p>
                                     <button
                                         onClick={() => eliminaNotifica(n.id)}
                                         className="text-xs px-2.5 py-1 rounded border border-red-400 text-red-500 hover:bg-red-500 hover:text-white transition"
@@ -130,6 +155,6 @@ export default function NotificheSidebar({ open, onClose }: { open: boolean; onC
                     </ul>
                 )}
             </div>
-        </div>
+        </aside>
     );
 }

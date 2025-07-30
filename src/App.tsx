@@ -5,25 +5,39 @@ import {
     Route,
     Navigate,
 } from "react-router-dom";
-import RegisterForm from "./RegisterForm";
-import ConfirmEmailWelcome from "./ConfirmEmailWelcome";
 import { supabase } from "./supporto/supabaseClient";
 import "./App.css";
-import LoginForm from "./LoginForm";
-import Home from "./Home";
-import AppLayout from "./Layout/AppLayout";
+
+import RegisterForm from "./Pagine/RegisterForm";
+import ConfirmEmailWelcome from "./ConfirmEmailWelcome";
+import LoginForm from "./Pagine/LoginForm";
+import Home from "./Pagine/Home";
 import Profilo from "./Profilo/Profilo";
-import Progetti from "./Progetto";
-import Task from "./Task";
+import ListaProgetti from "./Liste/ListaProgetti";
+import ListaTask from "./Liste/ListaTask";
 import DettaglioProgetto from "./GestioneProgetti/DettaglioProgetto";
 import CalendarioProgetto from "./GestioneProgetti/CalendarioProgetto";
 import BachecaProgetto from "./GestioneProgetti/BachecaProgetto";
-import AnimatedLogo from "./AnimatedLogo"; // ✅ animazione iniziale
+import ListaClienti from "./Liste/ListaClienti";
+
+import Header from "./Header/Header";
+import Sidebar from "./Sidebar/Sidebar";
+import NotificheSidebar from "./Notifiche/NotificheSidebar";
+import MiniProjectCreatorModal from "./Creazione/MiniProjectCreatorModal";
+import AnimatedLogo from "./LandingPage/AnimatedLogo"; // ✅ Importa l'animazione
+import MiniTaskCreatorModal from "./Creazione/MiniTaskCreatorModal";
+import MiniClientCreatorModal from "./Creazione/MiniClientCreatorModal";
 
 export default function App() {
     const [loggedIn, setLoggedIn] = useState(false);
     const [, setUserId] = useState<string | null>(null);
-    const [showAnimatedLogo, setShowAnimatedLogo] = useState(true); // ✅ animazione iniziale
+    const [showProjectModal, setShowProjectModal] = useState(false);
+    const [showTaskModal, setShowTaskModal] = useState(false);
+    const [showClientModal, setShowClientModal] = useState(false);
+
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [notificheOpen, setNotificheOpen] = useState(false);
+    const [showAnimation, setShowAnimation] = useState(true); // ✅ Stato per animazione
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -44,96 +58,94 @@ export default function App() {
         };
     }, []);
 
-    if (showAnimatedLogo) {
-        return <AnimatedLogo onFinish={() => setShowAnimatedLogo(false)} />;
-    }
+    // ✅ Mostra l’animazione iniziale se attiva
+    if (showAnimation) return <AnimatedLogo onFinish={() => setShowAnimation(false)} />;
 
     return (
         <Router>
-            <Routes>
-                <Route path="/" element={<Navigate to={loggedIn ? "/home" : "/login"} replace />} />
+            <header>
+                <Header
+                    loggedIn={loggedIn}
+                    onToggleSidebar={() => setSidebarOpen((p) => !p)}
+                    onApriNotifiche={() => setNotificheOpen(prev => !prev)}
+                    notificheSidebarAperta={notificheOpen}
+                />
+            </header>
 
-                <Route
-                    path="/login"
-                    element={
-                        <AppLayout loggedIn={loggedIn}>
-                            <LoginForm />
-                        </AppLayout>
-                    }
+            <main className="relative h-[calc(100vh-3.5rem)] bg-theme text-theme overflow-hidden">
+                <div className="relative h-full flex">
+                    <Sidebar
+                        isOpen={sidebarOpen}
+                        onClose={() => setSidebarOpen(false)}
+                        onApriProjectModal={() => setShowProjectModal(true)}
+                        onApriTaskModal={() => setShowTaskModal(true)}
+                        onApriClientModal={() => setShowClientModal(true)} // ✅ nuovo
+                    />
+                    <div className={`flex-1 transition-all ${sidebarOpen ? "ml-64" : ""} ${notificheOpen ? "mr-64" : ""}`}>
+                        <div className="px-6 py-6 h-full overflow-auto hide-scrollbar">
+                            <Routes>
+                                <Route path="/" element={<Navigate to={loggedIn ? "/home" : "/login"} replace />} />
+                                <Route path="/login" element={<LoginForm />} />
+                                <Route path="/register" element={<RegisterForm />} />
+                                <Route path="/confirm-email" element={<ConfirmEmailWelcome />} />
+                                <Route path="/home" element={<Home />} />
+                                <Route
+                                    path="/progetti"
+                                    element={
+                                        <ListaProgetti
+                                            sidebarSinistraAperta={sidebarOpen}
+                                            notificheSidebarAperta={notificheOpen}
+                                        />
+                                    }
+                                />
+                                <Route
+                                    path="/task"
+                                    element={
+                                        <ListaTask
+                                            sidebarSinistraAperta={sidebarOpen}
+                                            notificheSidebarAperta={notificheOpen}
+                                        />
+                                    }
+                                />
+                                <Route
+                                    path="/clienti"
+                                    element={
+                                        <ListaClienti
+                                            sidebarSinistraAperta={sidebarOpen}
+                                            notificheSidebarAperta={notificheOpen}
+                                        />
+                                    }
+                                />
+
+                                <Route path="/profilo" element={<Profilo />} />
+                                <Route path="/progetti/:id" element={<DettaglioProgetto />} />
+                                <Route path="/progetti/:id/calendario" element={<CalendarioProgetto />} />
+                                <Route path="/progetti/:id/bacheca" element={<BachecaProgetto />} />
+                            </Routes>
+                        </div>
+                    </div>
+                    <NotificheSidebar open={notificheOpen} onClose={() => setNotificheOpen(false)} />
+                </div>
+            </main>
+
+            {showProjectModal && (
+                <MiniProjectCreatorModal
+                    onClose={() => setShowProjectModal(false)}
+                    offsetIndex={0}
                 />
-                <Route
-                    path="/register"
-                    element={
-                        <AppLayout loggedIn={loggedIn}>
-                            <RegisterForm />
-                        </AppLayout>
-                    }
+            )}
+            {showTaskModal && (
+                <MiniTaskCreatorModal
+                    onClose={() => setShowTaskModal(false)}
+                    offsetIndex={0}
                 />
-                <Route
-                    path="/confirm-email"
-                    element={
-                        <AppLayout loggedIn={loggedIn}>
-                            <ConfirmEmailWelcome />
-                        </AppLayout>
-                    }
+            )}
+            {showClientModal && (
+                <MiniClientCreatorModal
+                    onClose={() => setShowClientModal(false)}
+                    offsetIndex={0}
                 />
-                <Route
-                    path="/home"
-                    element={
-                        <AppLayout loggedIn={loggedIn}>
-                            <Home />
-                        </AppLayout>
-                    }
-                />
-                <Route
-                    path="/progetti"
-                    element={
-                        <AppLayout loggedIn={loggedIn}>
-                            <Progetti />
-                        </AppLayout>
-                    }
-                />
-                <Route
-                    path="/task"
-                    element={
-                        <AppLayout loggedIn={loggedIn}>
-                            <Task />
-                        </AppLayout>
-                    }
-                />
-                <Route
-                    path="/profilo"
-                    element={
-                        <AppLayout loggedIn={loggedIn}>
-                            <Profilo />
-                        </AppLayout>
-                    }
-                />
-                <Route
-                    path="/progetti/:id"
-                    element={
-                        <AppLayout loggedIn={loggedIn}>
-                            <DettaglioProgetto />
-                        </AppLayout>
-                    }
-                />
-                <Route
-                    path="/progetti/:id/calendario"
-                    element={
-                        <AppLayout loggedIn={loggedIn}>
-                            <CalendarioProgetto />
-                        </AppLayout>
-                    }
-                />
-                <Route
-                    path="/progetti/:id/bacheca"
-                    element={
-                        <AppLayout loggedIn={loggedIn}>
-                            <BachecaProgetto />
-                        </AppLayout>
-                    }
-                />
-            </Routes>
+            )}
         </Router>
     );
 }

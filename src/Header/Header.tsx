@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
     faUserCircle,
@@ -13,12 +13,11 @@ import {
 import { supabase } from "../supporto/supabaseClient";
 import MiniTaskCreatorModal from "../Creazione/MiniTaskCreatorModal";
 import MiniProjectCreatorModal from "../Creazione/MiniProjectCreatorModal";
-import NotificheSidebar from "../Notifiche/NotificheSidebar";
+import MiniClientCreatorModal from "../Creazione/MiniClientCreatorModal";
 import {
     richiediPermessoNotificheBrowser,
     mostraNotificaBrowser,
 } from "../Notifiche/notificheBrowserUtils";
-import MiniClientCreatorModal from "../Creazione/MiniClientCreatorModal";
 
 type NotificaUtenteRecord = {
     notifica_id: string;
@@ -31,21 +30,27 @@ type NotificaUtenteRecord = {
 };
 
 type HeaderProps = {
-    onToggleSidebar: () => void;
     loggedIn: boolean;
+    onToggleSidebar: () => void;
+    onApriNotifiche: () => void;
+    notificheSidebarAperta: boolean;
 };
 
-export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
+export default function Header({
+    loggedIn,
+    onToggleSidebar,
+    onApriNotifiche,
+    notificheSidebarAperta,
+}: HeaderProps) {
     const [open, setOpen] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
     const [showTaskModal, setShowTaskModal] = useState(false);
     const [showClientModal, setShowClientModal] = useState(false);
     const [showProjectModal, setShowProjectModal] = useState(false);
-    const [notificheOpen, setNotificheOpen] = useState(false);
     const [nonViste, setNonViste] = useState(0);
     const [userId, setUserId] = useState<string | null>(null);
     const [themeDropdown, setThemeDropdown] = useState(false);
-    const [currentTheme, setCurrentTheme] = useState<string>("light");
+    const [, setCurrentTheme] = useState("light");
 
     const dropdownRef = useRef<HTMLDivElement>(null);
     const createRef = useRef<HTMLDivElement>(null);
@@ -102,9 +107,7 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
             if (id) richiediPermessoNotificheBrowser();
         });
 
-        return () => {
-            authListener.subscription.unsubscribe();
-        };
+        return () => authListener.subscription.unsubscribe();
     }, []);
 
     const aggiornaContatoreNotifiche = async () => {
@@ -121,6 +124,21 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
     useEffect(() => { if (userId) aggiornaContatoreNotifiche(); }, [userId]);
 
     useEffect(() => {
+        if (notificheSidebarAperta && userId) {
+            setNonViste(0);
+            supabase
+                .from("notifiche_utenti")
+                .update({
+                    visualizzato: true,
+                    visualizzato_al: new Date().toISOString(),
+                })
+                .eq("utente_id", userId)
+                .is("visualizzato", false)
+                .is("deleted_at", null);
+        }
+    }, [notificheSidebarAperta, userId]);
+
+    useEffect(() => {
         if (!userId) return;
         const channel = supabase.channel(`realtime_notifiche_${userId}`)
             .on("postgres_changes", {
@@ -129,20 +147,37 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                 table: "notifiche_utenti",
                 filter: `utente_id=eq.${userId}`,
             }, async (payload) => {
-                aggiornaContatoreNotifiche();
                 const nuovaNotifica = payload.new as NotificaUtenteRecord;
-                const { data, error } = await supabase
+
+                if (notificheSidebarAperta) {
+                    await supabase
+                        .from("notifiche_utenti")
+                        .update({
+                            visualizzato: true,
+                            visualizzato_al: new Date().toISOString(),
+                        })
+                        .eq("notifica_id", nuovaNotifica.notifica_id)
+                        .eq("utente_id", userId);
+                } else {
+                    aggiornaContatoreNotifiche();
+                }
+
+                const { data } = await supabase
                     .from("notifiche")
                     .select("messaggio")
                     .eq("id", nuovaNotifica.notifica_id)
                     .single();
-                if (!error && data) mostraNotificaBrowser("🔔 Notifica Kalimero", {
-                    body: data.messaggio,
-                    icon: "/kalimero_logo.png",
-                });
+
+                if (data) {
+                    mostraNotificaBrowser("🔔 Notifica Kalimero", {
+                        body: data.messaggio,
+                        icon: "/kalimero_logo.png",
+                    });
+                }
             }).subscribe();
+
         return () => { supabase.removeChannel(channel); };
-    }, [userId]);
+    }, [userId, notificheSidebarAperta]);
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -154,31 +189,30 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    const headerCls = `sticky top-0 z-50 px-4 py-3 flex justify-between items-center shadow-md bg-theme text-theme transition-colors duration-300`;
+    const btnCls = `cursor-pointer px-3 py-2 rounded text-[#c22e35] transition-transform duration-300`;
+    const iconCls = `hover:scale-125 hover:shadow-xl transition-transform duration-300 ease-in-out`;
+
     return (
         <>
-            <header className="bg-theme text-theme w-full shadow-md z-50 relative px-2 sm:px-4 lg:px-6 py-2 sm:py-3 flex flex-wrap items-center justify-between">
-                <div className="flex items-center gap-2 sm:gap-4 max-w-full overflow-hidden">
+            <div className={headerCls}>
+                <div className="flex items-center gap-3">
                     {loggedIn && (
-                        <button onClick={onToggleSidebar} className="w-8 max-[400px]:w-9 sm:w-10 xl:w-12 2xl:w-14 h-8 max-[400px]:h-9 sm:h-10 xl:h-12 2xl:h-14 flex items-center justify-center">
-                            <FontAwesomeIcon icon={faBars} className="text-base max-[400px]:text-lg sm:text-xl md:text-2xl xl:text-3xl 2xl:text-4xl icon-color" />
-                        </button>
+                        <span onClick={onToggleSidebar} className={btnCls} role="button" tabIndex={0} aria-label="Apri Menu">
+                            <FontAwesomeIcon icon={faBars} size="lg" className={iconCls} />
+                        </span>
                     )}
-                    <Link to={loggedIn ? "/home" : "/login"} className="text-base sm:text-lg md:text-xl font-bold tracking-wide">
-                        <img
-                            className="h-6 max-[400px]:h-7 sm:h-8 md:h-9 xl:h-10 2xl:h-12"
-                            src={currentTheme === "dark" ? "/kalimero_logo2.png" : "/kalimero_logo.png"}
-                            alt="Logo"
-                        />
-                    </Link>
+
                 </div>
 
-                <div className="flex items-center gap-2 sm:gap-3 md:gap-4 mt-2 sm:mt-0">
+                <div className="flex items-center gap-2">
                     {loggedIn && (
                         <>
-                            <div className="relative" ref={createRef}>
-                                <button onClick={() => setCreateOpen(p => !p)} className="w-8 max-[400px]:w-9 sm:w-10 xl:w-12 2xl:w-14 h-8 max-[400px]:h-9 sm:h-10 xl:h-12 2xl:h-14 flex items-center justify-center">
-                                    <FontAwesomeIcon icon={faPlus} className="text-base max-[400px]:text-lg sm:text-xl md:text-2xl xl:text-3xl 2xl:text-4xl text-green-500" />
-                                </button>
+                            {/* CREA */}
+                            <div ref={createRef} className="relative">
+                                <span onClick={() => setCreateOpen(p => !p)} className={btnCls} role="button" tabIndex={0} aria-label="Crea">
+                                    <FontAwesomeIcon icon={faPlus} size="lg" className={`${iconCls} text-green-500`} />
+                                </span>
                                 {createOpen && (
                                     <div className="absolute right-0 mt-2 w-36 sm:w-40 dropdown-panel z-50">
                                         {["Attività", "Progetto", "Clienti"].map((label, i) => (
@@ -197,65 +231,52 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                                 )}
                             </div>
 
-                            <div className="relative" ref={themeRef}>
-                                <button onClick={() => setThemeDropdown(p => !p)} className="w-8 max-[400px]:w-9 sm:w-10 xl:w-12 2xl:w-14 h-8 max-[400px]:h-9 sm:h-10 xl:h-12 2xl:h-14 flex items-center justify-center">
-                                    <FontAwesomeIcon icon={faMoon} className="text-base max-[400px]:text-lg sm:text-xl md:text-2xl xl:text-3xl 2xl:text-4xl text-sky-500" />
-                                </button>
+                            {/* TEMA */}
+                            <div ref={themeRef} className="relative">
+                                <span onClick={() => setThemeDropdown(p => !p)} className={btnCls} role="button" tabIndex={0} aria-label="Tema">
+                                    <FontAwesomeIcon icon={faMoon} size="lg" className={`${iconCls} text-sky-500`} />
+                                </span>
                                 {themeDropdown && (
-                                    <div className="absolute right-0 mt-5 w-36 sm:w-40 dropdown-panel z-50">
+                                    <div className="absolute right-0 mt-2 w-40 dropdown-panel z-50">
                                         {[{ icon: faSun, label: "Chiaro", theme: "light", color: "text-yellow-400" },
                                         { icon: faMoon, label: "Scuro", theme: "dark", color: "text-sky-500" },
-                                        { icon: faDesktop, label: "Sistema", theme: "system", color: "text-gray-500 dark:text-gray-300" }
-                                        ].map(({ icon, label, theme, color }) => (
-                                            <button
-                                                key={label}
-                                                onClick={() => { applyTheme(theme); setThemeDropdown(false); }}
-                                                className="dropdown-button flex items-center gap-2"
-                                            >
-                                                <FontAwesomeIcon icon={icon} className={`text-sm sm:text-base md:text-lg ${color}`} /> {label}
-                                            </button>
-                                        ))}
+                                        { icon: faDesktop, label: "Sistema", theme: "system", color: "text-gray-500 dark:text-gray-300" }]
+                                            .map(({ icon, label, theme, color }) => (
+                                                <button
+                                                    key={label}
+                                                    onClick={() => { applyTheme(theme); setThemeDropdown(false); }}
+                                                    className="dropdown-button flex items-center gap-2"
+                                                >
+                                                    <FontAwesomeIcon icon={icon} size="lg" className={`${iconCls} ${color}`} />
+                                                    {label}
+                                                </button>
+                                            ))}
                                     </div>
                                 )}
                             </div>
 
-                            <button onClick={() => setNotificheOpen(true)} className="relative w-8 max-[400px]:w-9 sm:w-10 xl:w-12 2xl:w-14 h-8 max-[400px]:h-9 sm:h-10 xl:h-12 2xl:h-14 flex items-center justify-center">
-                                <FontAwesomeIcon icon={faBell} className="text-base max-[400px]:text-lg sm:text-xl md:text-2xl xl:text-3xl 2xl:text-4xl text-yellow-500" />
-                                {nonViste > 0 && (
+                            {/* NOTIFICHE */}
+                            <span
+                                onClick={() => onApriNotifiche()}
+                                className={`${btnCls} relative`}
+                                role="button"
+                                tabIndex={0}
+                                aria-label="Notifiche"
+                            >
+
+                                <FontAwesomeIcon icon={faBell} size="lg" className={`${iconCls} text-yellow-500`} />
+                                {nonViste > 0 && !notificheSidebarAperta && (
                                     <span className="notification-badge">{nonViste}</span>
                                 )}
-                            </button>
+                            </span>
                         </>
                     )}
 
-                    {!loggedIn && (
-                        <div className="relative" ref={themeRef}>
-                            <button onClick={() => setThemeDropdown(p => !p)} className="w-8 max-[400px]:w-9 sm:w-10 xl:w-12 2xl:w-14 h-8 max-[400px]:h-9 sm:h-10 xl:h-12 2xl:h-14 flex items-center justify-center">
-                                <FontAwesomeIcon icon={faMoon} className="text-base max-[400px]:text-lg sm:text-xl md:text-2xl xl:text-3xl 2xl:text-4xl text-sky-500" />
-                            </button>
-                            {themeDropdown && (
-                                <div className="absolute right-0 mt-5 w-36 sm:w-40 dropdown-panel z-50">
-                                    {[{ icon: faSun, label: "Chiaro", theme: "light", color: "text-yellow-400" },
-                                    { icon: faMoon, label: "Scuro", theme: "dark", color: "text-sky-500" },
-                                    { icon: faDesktop, label: "Sistema", theme: "system", color: "text-gray-500 dark:text-gray-300" }
-                                    ].map(({ icon, label, theme, color }) => (
-                                        <button
-                                            key={label}
-                                            onClick={() => { applyTheme(theme); setThemeDropdown(false); }}
-                                            className="dropdown-button flex items-center gap-2"
-                                        >
-                                            <FontAwesomeIcon icon={icon} className={`text-sm sm:text-base md:text-lg ${color}`} /> {label}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    <div className="relative" ref={dropdownRef}>
-                        <button onClick={() => setOpen(p => !p)} className="w-8 max-[400px]:w-9 sm:w-10 xl:w-12 2xl:w-14 h-8 max-[400px]:h-9 sm:h-10 xl:h-12 2xl:h-14 flex items-center justify-center">
-                            <FontAwesomeIcon icon={faUserCircle} className="text-base max-[400px]:text-lg sm:text-xl md:text-2xl xl:text-3xl 2xl:text-4xl text-purple-500" />
-                        </button>
+                    {/* UTENTE */}
+                    <div ref={dropdownRef} className="relative">
+                        <span onClick={() => setOpen(p => !p)} className={btnCls} role="button" tabIndex={0} aria-label="Utente">
+                            <FontAwesomeIcon icon={faUserCircle} size="lg" className={`${iconCls} text-purple-500`} />
+                        </span>
                         {open && (
                             <div className="absolute right-0 mt-2 w-44 sm:w-48 dropdown-panel z-50">
                                 {loggedIn ? (
@@ -273,18 +294,12 @@ export default function Header({ loggedIn, onToggleSidebar }: HeaderProps) {
                         )}
                     </div>
                 </div>
-            </header>
+            </div>
 
+            {/* MODALI */}
             {showProjectModal && <MiniProjectCreatorModal onClose={() => setShowProjectModal(false)} offsetIndex={0} />}
             {showTaskModal && <MiniTaskCreatorModal onClose={() => setShowTaskModal(false)} offsetIndex={showProjectModal ? 1 : 0} />}
             {showClientModal && <MiniClientCreatorModal onClose={() => setShowClientModal(false)} offsetIndex={(showProjectModal ? 1 : 0) + (showTaskModal ? 1 : 0)} />}
-            {notificheOpen && (
-                <NotificheSidebar
-                    open={notificheOpen}
-                    onClose={() => { setNotificheOpen(false); aggiornaContatoreNotifiche(); }}
-                />
-            )}
         </>
     );
-
 }
