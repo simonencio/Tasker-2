@@ -199,7 +199,7 @@ export default function Header({
                 <div className="flex items-center gap-3">
                     {loggedIn && (
                         <span onClick={onToggleSidebar} className={btnCls} role="button" tabIndex={0} aria-label="Apri Menu">
-                            <FontAwesomeIcon icon={faBars} size="lg" className={iconCls} />
+                            <FontAwesomeIcon icon={faBars} size="xl" className={iconCls} />
                         </span>
                     )}
 
@@ -211,7 +211,7 @@ export default function Header({
                             {/* CREA */}
                             <div ref={createRef} className="relative">
                                 <span onClick={() => setCreateOpen(p => !p)} className={btnCls} role="button" tabIndex={0} aria-label="Crea">
-                                    <FontAwesomeIcon icon={faPlus} size="lg" className={`${iconCls} text-green-500`} />
+                                    <FontAwesomeIcon icon={faPlus} size="xl" className={`${iconCls} text-green-500`} />
                                 </span>
                                 {createOpen && (
                                     <div className="absolute right-0 mt-2 w-36 sm:w-40 dropdown-panel z-50">
@@ -234,7 +234,7 @@ export default function Header({
                             {/* TEMA */}
                             <div ref={themeRef} className="relative">
                                 <span onClick={() => setThemeDropdown(p => !p)} className={btnCls} role="button" tabIndex={0} aria-label="Tema">
-                                    <FontAwesomeIcon icon={faMoon} size="lg" className={`${iconCls} text-sky-500`} />
+                                    <FontAwesomeIcon icon={faMoon} size="xl" className={`${iconCls} text-sky-500`} />
                                 </span>
                                 {themeDropdown && (
                                     <div className="absolute right-0 mt-2 w-40 dropdown-panel z-50">
@@ -247,7 +247,7 @@ export default function Header({
                                                     onClick={() => { applyTheme(theme); setThemeDropdown(false); }}
                                                     className="dropdown-button flex items-center gap-2"
                                                 >
-                                                    <FontAwesomeIcon icon={icon} size="lg" className={`${iconCls} ${color}`} />
+                                                    <FontAwesomeIcon icon={icon} size="xl" className={`${iconCls} ${color}`} />
                                                     {label}
                                                 </button>
                                             ))}
@@ -264,7 +264,7 @@ export default function Header({
                                 aria-label="Notifiche"
                             >
 
-                                <FontAwesomeIcon icon={faBell} size="lg" className={`${iconCls} text-yellow-500`} />
+                                <FontAwesomeIcon icon={faBell} size="xl" className={`${iconCls} text-yellow-500`} />
                                 {nonViste > 0 && !notificheSidebarAperta && (
                                     <span className="notification-badge">{nonViste}</span>
                                 )}
@@ -275,7 +275,7 @@ export default function Header({
                     {/* UTENTE */}
                     <div ref={dropdownRef} className="relative">
                         <span onClick={() => setOpen(p => !p)} className={btnCls} role="button" tabIndex={0} aria-label="Utente">
-                            <FontAwesomeIcon icon={faUserCircle} size="lg" className={`${iconCls} text-purple-500`} />
+                            <FontAwesomeIcon icon={faUserCircle} size="xl" className={`${iconCls} text-purple-500`} />
                         </span>
                         {open && (
                             <div className="absolute right-0 mt-2 w-44 sm:w-48 dropdown-panel z-50">

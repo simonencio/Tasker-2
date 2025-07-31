@@ -72,7 +72,7 @@ export default function App() {
                 />
             </header>
 
-            <main className="relative h-[calc(100vh-3.5rem)] bg-theme text-theme overflow-hidden">
+            <main className="relative h-[calc(100vh-4rem)] bg-theme text-theme overflow-hidden">
                 <div className="relative h-full flex">
                     <Sidebar
                         isOpen={sidebarOpen}
