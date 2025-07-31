@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
     BrowserRouter as Router,
     Routes,
     Route,
     Navigate,
     useLocation,
+    useParams,
 } from "react-router-dom";
 import { supabase } from "./supporto/supabaseClient";
 import "./App.css";
@@ -20,28 +21,49 @@ import DettaglioProgetto from "./GestioneProgetti/DettaglioProgetto";
 import CalendarioProgetto from "./GestioneProgetti/CalendarioProgetto";
 import BachecaProgetto from "./GestioneProgetti/BachecaProgetto";
 import ListaClienti from "./Liste/ListaClienti";
-import AnimatedLogo from "./LandingPage/AnimatedLogo"; // ✅ Importa l'animazione
+import ListaUtenti from "./Liste/ListaUtenti";
+import ResetPassword from "./Pagine/ResetPassword"; // assicurati che il path sia corretto
+
+// import AnimatedLogo from "./LandingPage/AnimatedLogo";
 import Header from "./Header/Header";
 import Sidebar from "./Sidebar/Sidebar";
 import NotificheSidebar from "./Notifiche/NotificheSidebar";
 import MiniProjectCreatorModal from "./Creazione/MiniProjectCreatorModal";
 import MiniTaskCreatorModal from "./Creazione/MiniTaskCreatorModal";
 import MiniClientCreatorModal from "./Creazione/MiniClientCreatorModal";
+import MiniUserCreatorModal from "./Creazione/MiniUserCreatorModal"; // nuovo
+
+function ResetPasswordWrapper() {
+    const { userId } = useParams<{ userId: string }>();
+    if (!userId) {
+        return <div className="p-6">User ID mancante nella rotta.</div>;
+    }
+    return <ResetPassword userId={userId} />;
+}
+
+type ModalType = "project" | "task" | "client" | "user";
 
 function AppContent() {
     const [loggedIn, setLoggedIn] = useState(false);
     const [, setUserId] = useState<string | null>(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [notificheOpen, setNotificheOpen] = useState(false);
-    const [activeModals, setActiveModals] = useState<("project" | "task" | "client")[]>([]);
+    const [activeModals, setActiveModals] = useState<ModalType[]>([]);
     const location = useLocation();
-    const [showAnimation, setShowAnimation] = useState(true); // ✅ Stato per animazione
-    const publicRoutes = ["/login", "/register", "/confirm-email"];
-    const isPublic = publicRoutes.includes(location.pathname);
+
+    const publicRoutes = ["/login", "/register", "/confirm-email", "/reset-password/"];
+    const isPublic = (() => {
+        if (location.pathname.startsWith("/reset-password/")) return true;
+        return publicRoutes.includes(location.pathname);
+    })();
+
+    const [windowWidth, setWindowWidth] = useState<number>(window.innerWidth);
 
     useEffect(() => {
         const checkAuth = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
             setLoggedIn(!!user);
             setUserId(user?.id ?? null);
         };
@@ -59,38 +81,61 @@ function AppContent() {
         };
     }, []);
 
+    useEffect(() => {
+        const handleResize = () => {
+            setWindowWidth(window.innerWidth);
+        };
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    const getMaxModals = useCallback(() => {
+        if (windowWidth <= 768) return 1;
+        if (windowWidth <= 1024) return 2;
+        return 3;
+    }, [windowWidth]);
+
+    useEffect(() => {
+        const max = getMaxModals();
+        if (activeModals.length > max) {
+            setActiveModals((prev) => prev.slice(prev.length - max));
+        }
+    }, [windowWidth, activeModals, getMaxModals]);
+
     const toggleSidebar = () => {
-        setSidebarOpen(prev => {
+        setSidebarOpen((prev) => {
             if (!prev) setNotificheOpen(false);
             return !prev;
         });
     };
 
     const toggleNotifiche = () => {
-        setNotificheOpen(prev => {
+        setNotificheOpen((prev) => {
             if (!prev) setSidebarOpen(false);
             return !prev;
         });
     };
 
-    const isMobile = () => window.innerWidth < 1025;
-
-    const openModal = (type: "project" | "task" | "client") => {
-        setActiveModals(prev => {
-            if (isMobile()) return [type];
+    const openModal = (type: ModalType) => {
+        setActiveModals((prev) => {
+            const max = getMaxModals();
             if (prev.includes(type)) return prev;
-            return [...prev, type];
+            const updated = [...prev, type];
+            if (updated.length > max) {
+                return updated.slice(updated.length - max);
+            }
+            return updated;
         });
     };
 
-    const closeModal = (type: "project" | "task" | "client") => {
-        setActiveModals(prev => prev.filter(m => m !== type));
+    const closeModal = (type: ModalType) => {
+        setActiveModals((prev) => prev.filter((m) => m !== type));
     };
 
-    const getOffset = (type: "project" | "task" | "client") => {
+    const getOffset = (type: ModalType) => {
         return activeModals.indexOf(type);
     };
-    if (showAnimation) return <AnimatedLogo onFinish={() => setShowAnimation(false)} />;
+
     return (
         <>
             <header className="fixed top-0 left-0 right-0 z-50">
@@ -109,6 +154,7 @@ function AppContent() {
                         <Route path="/login" element={<LoginForm />} />
                         <Route path="/register" element={<RegisterForm />} />
                         <Route path="/confirm-email" element={<ConfirmEmailWelcome />} />
+                        <Route path="/reset-password/:userId" element={<ResetPasswordWrapper />} />
                     </Routes>
                 </main>
             ) : (
@@ -121,7 +167,9 @@ function AppContent() {
                                 onApriProjectModal={() => openModal("project")}
                                 onApriTaskModal={() => openModal("task")}
                                 onApriClientModal={() => openModal("client")}
+                                onApriUserModal={() => openModal("user")}
                             />
+
                         </div>
                     )}
 
@@ -139,6 +187,7 @@ function AppContent() {
                                 <Route path="/progetti" element={<ListaProgetti />} />
                                 <Route path="/task" element={<ListaTask />} />
                                 <Route path="/clienti" element={<ListaClienti />} />
+                                <Route path="/utenti" element={<ListaUtenti />} />
                                 <Route path="/profilo" element={<Profilo />} />
                                 <Route path="/progetti/:id" element={<DettaglioProgetto />} />
                                 <Route path="/progetti/:id/calendario" element={<CalendarioProgetto />} />
@@ -150,22 +199,16 @@ function AppContent() {
             )}
 
             {activeModals.includes("project") && (
-                <MiniProjectCreatorModal
-                    onClose={() => closeModal("project")}
-                    offsetIndex={getOffset("project")}
-                />
+                <MiniProjectCreatorModal onClose={() => closeModal("project")} offsetIndex={getOffset("project")} />
             )}
             {activeModals.includes("task") && (
-                <MiniTaskCreatorModal
-                    onClose={() => closeModal("task")}
-                    offsetIndex={getOffset("task")}
-                />
+                <MiniTaskCreatorModal onClose={() => closeModal("task")} offsetIndex={getOffset("task")} />
             )}
             {activeModals.includes("client") && (
-                <MiniClientCreatorModal
-                    onClose={() => closeModal("client")}
-                    offsetIndex={getOffset("client")}
-                />
+                <MiniClientCreatorModal onClose={() => closeModal("client")} offsetIndex={getOffset("client")} />
+            )}
+            {activeModals.includes("user") && (
+                <MiniUserCreatorModal onClose={() => closeModal("user")} offsetIndex={getOffset("user")} />
             )}
         </>
     );
