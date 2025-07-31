@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { supabase } from "../supporto/supabaseClient";
+
+import { isUtenteAdmin } from "../supporto/ruolo"; // ✅ Importa la funzione nuova
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
     faHome,
@@ -15,9 +16,8 @@ type SidebarProps = {
     onClose: () => void;
     onApriProjectModal: () => void;
     onApriTaskModal: () => void;
-    onApriClientModal: () => void; // ✅ aggiunta
+    onApriClientModal: () => void;
 };
-
 
 export default function Sidebar({
     isOpen,
@@ -47,17 +47,7 @@ export default function Sidebar({
     }, []);
 
     useEffect(() => {
-        const checkRuolo = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-            const { data, error } = await supabase
-                .from("utenti")
-                .select("ruolo")
-                .eq("id", user.id)
-                .single();
-            if (!error && data?.ruolo === 1) setIsAdmin(true);
-        };
-        checkRuolo();
+        isUtenteAdmin().then(setIsAdmin); // ✅ una sola chiamata, con caching
     }, []);
 
     return (
@@ -164,7 +154,7 @@ export default function Sidebar({
                                 onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    onApriClientModal(); // ✅ apre modale clienti
+                                    onApriClientModal();
                                 }}
                                 className="icon-color hover:text-red-400 transition"
                                 title="Nuovo cliente"
@@ -173,7 +163,6 @@ export default function Sidebar({
                             </button>
                         </NavLink>
                     )}
-
                 </div>
             </nav>
         </aside>

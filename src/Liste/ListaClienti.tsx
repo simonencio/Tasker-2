@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen, faFolderOpen } from "@fortawesome/free-solid-svg-icons";
+import { faPen, faFolderOpen, faEnvelope, faPhone } from "@fortawesome/free-solid-svg-icons";
 
 type Cliente = {
     id: string;
@@ -14,12 +14,7 @@ type Cliente = {
     progetti: { id: string; nome: string }[];
 };
 
-type Props = {
-    sidebarSinistraAperta: boolean;
-    notificheSidebarAperta: boolean;
-};
-
-export default function ListaClienti({ sidebarSinistraAperta, notificheSidebarAperta }: Props) {
+export default function ListaClienti() {
     const [clienti, setClienti] = useState<Cliente[]>([]);
     const [loading, setLoading] = useState(true);
     const [clienteAttivo, setClienteAttivo] = useState<Cliente | null>(null);
@@ -31,11 +26,9 @@ export default function ListaClienti({ sidebarSinistraAperta, notificheSidebarAp
             const { data, error } = await supabase
                 .from("clienti")
                 .select(`
-          id, nome, email, telefono, avatar_url, note, deleted_at,
-          progetti:progetti (
-            id, nome, deleted_at
-          )
-        `)
+                    id, nome, email, telefono, avatar_url, note, deleted_at,
+                    progetti:progetti ( id, nome, deleted_at )
+                `)
                 .order("created_at", { ascending: false });
 
             if (!error && data) {
@@ -54,85 +47,96 @@ export default function ListaClienti({ sidebarSinistraAperta, notificheSidebarAp
         caricaClienti();
     }, []);
 
-    const getGridCols = () => {
-        const count = Number(sidebarSinistraAperta) + Number(notificheSidebarAperta);
-        if (count === 2) return "xl:grid-cols-2";
-        if (count === 1) return "xl:grid-cols-3";
-        return "xl:grid-cols-4";
-    };
-
     return (
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
             <h1 className="text-2xl font-bold text-theme mb-6">📒 Lista Clienti</h1>
 
             {loading ? (
                 <p className="text-center text-theme text-lg">Caricamento...</p>
             ) : (
-                <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 ${getGridCols()}`}>
+                <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {clienti.map((cliente) => (
                         <div
                             key={cliente.id}
-                            className="relative card-theme p-5 hover-bg-theme transition-all cursor-pointer flex flex-col justify-between min-h-[16rem]"
                             onClick={() => navigate(`/clienti/${cliente.id}`)}
+                            className="cursor-pointer card-theme hover:bg-gray-50 dark:hover:bg-gray-700 transition-all p-5"
                         >
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    console.log("Modifica cliente:", cliente.id);
-                                }}
-                                className="absolute bottom-2 right-2 text-sm text-theme hover:text-blue-500"
-                            >
-                                <FontAwesomeIcon icon={faPen} />
-                            </button>
-
-                            <div>
-                                {cliente.avatar_url && (
-                                    <img
-                                        src={cliente.avatar_url}
-                                        alt="Avatar"
-                                        className="w-16 h-16 rounded-full object-cover mb-3"
-                                    />
-                                )}
-
-                                <h2 className="text-xl font-semibold text-theme mb-1">{cliente.nome}</h2>
-
-                                {cliente.email && (
-                                    <p className="text-sm text-theme mb-1">
-                                        📧 <span className="font-medium">{cliente.email}</span>
-                                    </p>
-                                )}
-
-                                {cliente.telefono && (
-                                    <p className="text-sm text-theme mb-1">
-                                        📞 <span className="font-medium">{cliente.telefono}</span>
-                                    </p>
-                                )}
-
-                                {cliente.note && (
-                                    <p className="text-xs text-theme mt-3 italic line-clamp-3">
-                                        {cliente.note}
-                                    </p>
-                                )}
-                            </div>
-
+                            {/* Badge integrato nel flusso */}
+                            {/* Badge integrato nel flusso */}
                             {cliente.progetti.length > 0 && (
+                                <div className="mb-3 flex justify-between items-center">
+                                    <div />
+                                    <div className="bg-blue-500 text-white text-xs font-semibold px-2 py-1 rounded shadow">
+                                        {cliente.progetti.length} progett{cliente.progetti.length > 1 ? "i" : "o"}
+                                    </div>
+                                </div>
+                            )}
+
+
+                            {/* Titolo */}
+                            <h2 className="text-xl font-semibold mb-1">{cliente.nome}</h2>
+
+                            {/* Avatar */}
+                            {cliente.avatar_url && (
+                                <img
+                                    src={cliente.avatar_url}
+                                    alt="Avatar"
+                                    className="w-16 h-16 rounded-full object-cover mb-3"
+                                />
+                            )}
+
+                            {/* Info */}
+                            {cliente.email && (
+                                <p className="text-sm mb-1">
+                                    <FontAwesomeIcon icon={faEnvelope} className="mr-1 icon-color" />
+                                    <span className="font-medium">{cliente.email}</span>
+                                </p>
+                            )}
+
+                            {cliente.telefono && (
+                                <p className="text-sm mb-1">
+                                    <FontAwesomeIcon icon={faPhone} className="mr-1 icon-color" />
+                                    <span className="font-medium">{cliente.telefono}</span>
+                                </p>
+                            )}
+
+                            {/* Note */}
+                            {cliente.note && (
+                                <p className="text-xs mt-3 italic line-clamp-3">{cliente.note}</p>
+                            )}
+
+                            {/* Azioni in basso */}
+                            <div className="mt-4 flex justify-between items-center">
+                                {cliente.progetti.length > 0 ? (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setClienteAttivo(cliente);
+                                        }}
+                                        className="flex items-center gap-2 text-sm icon-color hover:text-violet-500"
+                                    >
+                                        <FontAwesomeIcon icon={faFolderOpen} />
+                                        Mostra progetti
+                                    </button>
+                                ) : <span />}
+
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        setClienteAttivo(cliente);
+                                        console.log("Modifica cliente:", cliente.id);
                                     }}
-                                    className="mt-4 flex items-center gap-2 text-sm icon-color hover:text-violet-500"
+                                    className="text-sm text-theme hover:text-blue-500"
+                                    aria-label={`Modifica cliente ${cliente.nome}`}
                                 >
-                                    <FontAwesomeIcon icon={faFolderOpen} />
-                                    Mostra progetti
+                                    <FontAwesomeIcon icon={faPen} />
                                 </button>
-                            )}
+                            </div>
                         </div>
                     ))}
                 </div>
             )}
 
-            {/* ✅ MODALE PROGETTI */}
+            {/* MODALE PROGETTI */}
             {clienteAttivo && (
                 <div
                     className="absolute left-1/2 top-1/2 z-50 transform -translate-x-1/2 -translate-y-1/2 modal-container bg-theme text-theme shadow-lg rounded-xl p-6 w-[90%] max-w-md animate-scale-fade"
