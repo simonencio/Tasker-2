@@ -11,9 +11,6 @@ import {
     faDesktop,
 } from "@fortawesome/free-solid-svg-icons";
 import { supabase } from "../supporto/supabaseClient";
-import MiniTaskCreatorModal from "../Creazione/MiniTaskCreatorModal";
-import MiniProjectCreatorModal from "../Creazione/MiniProjectCreatorModal";
-import MiniClientCreatorModal from "../Creazione/MiniClientCreatorModal";
 import {
     richiediPermessoNotificheBrowser,
     mostraNotificaBrowser,
@@ -34,6 +31,7 @@ type HeaderProps = {
     onToggleSidebar: () => void;
     onApriNotifiche: () => void;
     notificheSidebarAperta: boolean;
+    onApriModale: (type: "project" | "task" | "client") => void;
 };
 
 export default function Header({
@@ -41,12 +39,10 @@ export default function Header({
     onToggleSidebar,
     onApriNotifiche,
     notificheSidebarAperta,
+    onApriModale,
 }: HeaderProps) {
     const [open, setOpen] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
-    const [showTaskModal, setShowTaskModal] = useState(false);
-    const [showClientModal, setShowClientModal] = useState(false);
-    const [showProjectModal, setShowProjectModal] = useState(false);
     const [nonViste, setNonViste] = useState(0);
     const [userId, setUserId] = useState<string | null>(null);
     const [themeDropdown, setThemeDropdown] = useState(false);
@@ -107,7 +103,9 @@ export default function Header({
             if (id) richiediPermessoNotificheBrowser();
         });
 
-        return () => authListener.subscription.unsubscribe();
+        return () => {
+            authListener?.subscription?.unsubscribe();
+        };
     }, []);
 
     const aggiornaContatoreNotifiche = async () => {
@@ -121,17 +119,16 @@ export default function Header({
         setNonViste(count || 0);
     };
 
-    useEffect(() => { if (userId) aggiornaContatoreNotifiche(); }, [userId]);
+    useEffect(() => {
+        if (userId) aggiornaContatoreNotifiche();
+    }, [userId]);
 
     useEffect(() => {
         if (notificheSidebarAperta && userId) {
             setNonViste(0);
             supabase
                 .from("notifiche_utenti")
-                .update({
-                    visualizzato: true,
-                    visualizzato_al: new Date().toISOString(),
-                })
+                .update({ visualizzato: true, visualizzato_al: new Date().toISOString() })
                 .eq("utente_id", userId)
                 .is("visualizzato", false)
                 .is("deleted_at", null);
@@ -140,6 +137,7 @@ export default function Header({
 
     useEffect(() => {
         if (!userId) return;
+
         const channel = supabase.channel(`realtime_notifiche_${userId}`)
             .on("postgres_changes", {
                 event: "INSERT",
@@ -158,9 +156,7 @@ export default function Header({
                         })
                         .eq("notifica_id", nuovaNotifica.notifica_id)
                         .eq("utente_id", userId);
-                } else {
-                    aggiornaContatoreNotifiche();
-                }
+                } else aggiornaContatoreNotifiche();
 
                 const { data } = await supabase
                     .from("notifiche")
@@ -176,7 +172,9 @@ export default function Header({
                 }
             }).subscribe();
 
-        return () => { supabase.removeChannel(channel); };
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [userId, notificheSidebarAperta]);
 
     useEffect(() => {
@@ -189,117 +187,88 @@ export default function Header({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const headerCls = `sticky top-0 z-50 px-4 py-3 flex justify-between items-center shadow-md bg-theme text-theme transition-colors duration-300`;
-    const btnCls = `cursor-pointer px-3 py-2 rounded text-[#c22e35] transition-transform duration-300`;
-    const iconCls = `hover:scale-125 hover:shadow-xl transition-transform duration-300 ease-in-out`;
-
     return (
-        <>
-            <div className={headerCls}>
-                <div className="flex items-center gap-3">
-                    {loggedIn && (
-                        <span onClick={onToggleSidebar} className={btnCls} role="button" tabIndex={0} aria-label="Apri Menu">
-                            <FontAwesomeIcon icon={faBars} size="xl" className={iconCls} />
-                        </span>
-                    )}
-
-                </div>
-
-                <div className="flex items-center gap-2">
-                    {loggedIn && (
-                        <>
-                            {/* CREA */}
-                            <div ref={createRef} className="relative">
-                                <span onClick={() => setCreateOpen(p => !p)} className={btnCls} role="button" tabIndex={0} aria-label="Crea">
-                                    <FontAwesomeIcon icon={faPlus} size="xl" className={`${iconCls} text-green-500`} />
-                                </span>
-                                {createOpen && (
-                                    <div className="absolute right-0 mt-2 w-36 sm:w-40 dropdown-panel z-50">
-                                        {["Attività", "Progetto", "Clienti"].map((label, i) => (
-                                            <button
-                                                key={label}
-                                                onClick={() => {
-                                                    setCreateOpen(false);
-                                                    [setShowTaskModal, setShowProjectModal, setShowClientModal][i](true);
-                                                }}
-                                                className="dropdown-button"
-                                            >
-                                                {label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* TEMA */}
-                            <div ref={themeRef} className="relative">
-                                <span onClick={() => setThemeDropdown(p => !p)} className={btnCls} role="button" tabIndex={0} aria-label="Tema">
-                                    <FontAwesomeIcon icon={faMoon} size="xl" className={`${iconCls} text-sky-500`} />
-                                </span>
-                                {themeDropdown && (
-                                    <div className="absolute right-0 mt-2 w-40 dropdown-panel z-50">
-                                        {[{ icon: faSun, label: "Chiaro", theme: "light", color: "text-yellow-400" },
-                                        { icon: faMoon, label: "Scuro", theme: "dark", color: "text-sky-500" },
-                                        { icon: faDesktop, label: "Sistema", theme: "system", color: "text-gray-500 dark:text-gray-300" }]
-                                            .map(({ icon, label, theme, color }) => (
-                                                <button
-                                                    key={label}
-                                                    onClick={() => { applyTheme(theme); setThemeDropdown(false); }}
-                                                    className="dropdown-button flex items-center gap-2"
-                                                >
-                                                    <FontAwesomeIcon icon={icon} size="xl" className={`${iconCls} ${color}`} />
-                                                    {label}
-                                                </button>
-                                            ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* NOTIFICHE */}
-                            <span
-                                onClick={() => onApriNotifiche()}
-                                className={`${btnCls} relative`}
-                                role="button"
-                                tabIndex={0}
-                                aria-label="Notifiche"
-                            >
-
-                                <FontAwesomeIcon icon={faBell} size="xl" className={`${iconCls} text-yellow-500`} />
-                                {nonViste > 0 && !notificheSidebarAperta && (
-                                    <span className="notification-badge">{nonViste}</span>
-                                )}
-                            </span>
-                        </>
-                    )}
-
-                    {/* UTENTE */}
-                    <div ref={dropdownRef} className="relative">
-                        <span onClick={() => setOpen(p => !p)} className={btnCls} role="button" tabIndex={0} aria-label="Utente">
-                            <FontAwesomeIcon icon={faUserCircle} size="xl" className={`${iconCls} text-purple-500`} />
-                        </span>
-                        {open && (
-                            <div className="absolute right-0 mt-2 w-44 sm:w-48 dropdown-panel z-50">
-                                {loggedIn ? (
-                                    <>
-                                        <button onClick={() => { navigate("/profilo"); setOpen(false); }} className="dropdown-button">Gestione account</button>
-                                        <button onClick={handleLogout} className="dropdown-button">Logout</button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <button onClick={() => { navigate("/register"); setOpen(false); }} className="dropdown-button">Registrati</button>
-                                        <button onClick={() => { navigate("/login"); setOpen(false); }} className="dropdown-button">Login</button>
-                                    </>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
+        <div className="min-h-16 px-4 py-3 flex justify-between items-center shadow-md bg-theme text-theme transition-colors duration-300">
+            <div className="flex items-center gap-3">
+                {loggedIn && (
+                    <span onClick={onToggleSidebar} className="cursor-pointer px-3 py-2 rounded">
+                        <FontAwesomeIcon icon={faBars} size="xl" className="text-[#c22e35] hover:scale-125 hover:shadow-xl transition-transform duration-300" />
+                    </span>
+                )}
             </div>
 
-            {/* MODALI */}
-            {showProjectModal && <MiniProjectCreatorModal onClose={() => setShowProjectModal(false)} offsetIndex={0} />}
-            {showTaskModal && <MiniTaskCreatorModal onClose={() => setShowTaskModal(false)} offsetIndex={showProjectModal ? 1 : 0} />}
-            {showClientModal && <MiniClientCreatorModal onClose={() => setShowClientModal(false)} offsetIndex={(showProjectModal ? 1 : 0) + (showTaskModal ? 1 : 0)} />}
-        </>
+            <div className="flex items-center gap-2">
+                {loggedIn && (
+                    <>
+                        <div ref={createRef} className="relative">
+                            <span onClick={() => setCreateOpen(p => !p)} className="cursor-pointer px-3 py-2 rounded">
+                                <FontAwesomeIcon icon={faPlus} size="xl" className="text-green-500 hover:scale-125 hover:shadow-xl transition-transform duration-300" />
+                            </span>
+                            {createOpen && (
+                                <div className="dropdown-panel absolute right-0 mt-2 w-36 sm:w-40 z-50">
+                                    <button onClick={() => { onApriModale("task"); setCreateOpen(false); }} className="dropdown-button">Attività</button>
+                                    <button onClick={() => { onApriModale("project"); setCreateOpen(false); }} className="dropdown-button">Progetto</button>
+                                    <button onClick={() => { onApriModale("client"); setCreateOpen(false); }} className="dropdown-button">Clienti</button>
+                                </div>
+                            )}
+                        </div>
+
+                        <div ref={themeRef} className="relative">
+                            <span onClick={() => setThemeDropdown(p => !p)} className="cursor-pointer px-3 py-2 rounded">
+                                <FontAwesomeIcon icon={faMoon} size="xl" className="text-sky-500 hover:scale-125 hover:shadow-xl transition-transform" />
+                            </span>
+                            {themeDropdown && (
+                                <div className="dropdown-panel absolute right-0 mt-2 w-30 z-50">
+                                    {[
+                                        { icon: faSun, label: "Chiaro", theme: "light", color: "text-yellow-400" },
+                                        { icon: faMoon, label: "Scuro", theme: "dark", color: "text-sky-500" },
+                                        { icon: faDesktop, label: "Sistema", theme: "system", color: "text-blue-700" }
+                                    ].map(({ icon, label, theme, color }) => (
+                                        <button
+                                            key={label}
+                                            onClick={() => { applyTheme(theme); setThemeDropdown(false); }}
+                                            className="dropdown-button flex items-center"
+                                        >
+                                            <span className={`w-6 shrink-0 text-center ${color}`}>
+                                                <FontAwesomeIcon icon={icon} size="lg" />
+                                            </span>
+                                            <span className="ml-2 text-left">{label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <span onClick={onApriNotifiche} className="cursor-pointer px-3 py-2 rounded relative">
+                            <FontAwesomeIcon icon={faBell} size="xl" className="text-yellow-500 hover:scale-125 hover:shadow-xl transition-transform" />
+                            {nonViste > 0 && !notificheSidebarAperta && (
+                                <span className="notification-badge">{nonViste}</span>
+                            )}
+                        </span>
+                    </>
+                )}
+
+                <div ref={dropdownRef} className="relative">
+                    <span onClick={() => setOpen(p => !p)} className="cursor-pointer px-3 py-2 rounded">
+                        <FontAwesomeIcon icon={faUserCircle} size="xl" className="text-purple-500 hover:scale-125 hover:shadow-xl transition-transform" />
+                    </span>
+                    {open && (
+                        <div className="dropdown-panel absolute right-0 mt-2 w-44 sm:w-48 z-50">
+                            {loggedIn ? (
+                                <>
+                                    <button onClick={() => { navigate("/profilo"); setOpen(false); }} className="dropdown-button">Gestione account</button>
+                                    <button onClick={handleLogout} className="dropdown-button">Logout</button>
+                                </>
+                            ) : (
+                                <>
+                                    <button onClick={() => { navigate("/register"); setOpen(false); }} className="dropdown-button">Registrati</button>
+                                    <button onClick={() => { navigate("/login"); setOpen(false); }} className="dropdown-button">Login</button>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
     );
 }
