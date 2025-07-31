@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 
-import { isUtenteAdmin } from "../supporto/ruolo"; // ✅ Importa la funzione nuova
+import { isUtenteAdmin } from "../supporto/ruolo"; // ✅ Funzione ruolo
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
     faHome,
@@ -9,6 +9,7 @@ import {
     faTasks,
     faPlus,
     faUserTie,
+    faUser, // ✅ icona per "Utenti"
 } from "@fortawesome/free-solid-svg-icons";
 
 type SidebarProps = {
@@ -17,6 +18,7 @@ type SidebarProps = {
     onApriProjectModal: () => void;
     onApriTaskModal: () => void;
     onApriClientModal: () => void;
+    onApriUserModal: () => void; // nuovo
 };
 
 export default function Sidebar({
@@ -25,6 +27,7 @@ export default function Sidebar({
     onApriProjectModal,
     onApriTaskModal,
     onApriClientModal,
+    onApriUserModal,
 }: SidebarProps) {
     const [theme, setTheme] = useState("light");
     const [isAdmin, setIsAdmin] = useState(false);
@@ -47,7 +50,13 @@ export default function Sidebar({
     }, []);
 
     useEffect(() => {
-        isUtenteAdmin().then(setIsAdmin); // ✅ una sola chiamata, con caching
+        let mounted = true;
+        isUtenteAdmin().then((res) => {
+            if (mounted) setIsAdmin(res);
+        });
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     return (
@@ -77,7 +86,8 @@ export default function Sidebar({
                         to="/home"
                         onClick={onClose}
                         className={({ isActive }) =>
-                            `hover-bg-theme flex items-center gap-2 ${isActive ? "active-link" : "px-4 py-2 rounded"}`
+                            `hover-bg-theme flex items-center gap-2 ${isActive ? "active-link" : "px-4 py-2 rounded"
+                            }`
                         }
                     >
                         <FontAwesomeIcon icon={faHome} className="icon-color" />
@@ -89,7 +99,8 @@ export default function Sidebar({
                         to="/progetti"
                         onClick={onClose}
                         className={({ isActive }) =>
-                            `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-2 rounded"}`
+                            `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-2 rounded"
+                            }`
                         }
                     >
                         <div className="flex items-center gap-2">
@@ -115,7 +126,8 @@ export default function Sidebar({
                         to="/task"
                         onClick={onClose}
                         className={({ isActive }) =>
-                            `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-2 rounded"}`
+                            `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-2 rounded"
+                            }`
                         }
                     >
                         <div className="flex items-center gap-2">
@@ -142,7 +154,8 @@ export default function Sidebar({
                             to="/clienti"
                             onClick={onClose}
                             className={({ isActive }) =>
-                                `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-2 rounded"}`
+                                `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-2 rounded"
+                                }`
                             }
                         >
                             <div className="flex items-center gap-2">
@@ -158,6 +171,35 @@ export default function Sidebar({
                                 }}
                                 className="icon-color hover:text-red-400 transition"
                                 title="Nuovo cliente"
+                            >
+                                <FontAwesomeIcon icon={faPlus} size="sm" />
+                            </button>
+                        </NavLink>
+                    )}
+
+                    {/* ✅ UTENTI - Solo admin con + per creare */}
+                    {isAdmin && (
+                        <NavLink
+                            to="/utenti"
+                            onClick={onClose}
+                            className={({ isActive }) =>
+                                `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-2 rounded"
+                                }`
+                            }
+                        >
+                            <div className="flex items-center gap-2">
+                                <FontAwesomeIcon icon={faUser} className="icon-color" />
+                                Utenti
+                            </div>
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onApriUserModal();
+                                }}
+                                className="icon-color hover:text-indigo-400 transition"
+                                title="Nuovo utente"
                             >
                                 <FontAwesomeIcon icon={faPlus} size="sm" />
                             </button>

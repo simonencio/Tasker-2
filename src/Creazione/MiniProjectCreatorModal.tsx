@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, type JSX } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import {
     faUserPlus, faBuilding, faFlag, faSignal, faCalendarDays, faClock, faXmark,
@@ -27,6 +27,14 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
     const [loading, setLoading] = useState(false);
     const [errore, setErrore] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const resize = () => setIsMobile(window.innerWidth <= 768);
+        resize();
+        window.addEventListener("resize", resize);
+        return () => window.removeEventListener("resize", resize);
+    }, []);
 
     useEffect(() => {
         Promise.all([
@@ -42,7 +50,7 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
         });
     }, []);
 
-    const resetForm = () => {
+    const reset = () => {
         setNome(""); setNote(""); setClienteId(null);
         setUtentiSelezionati([]); setStatoId("");
         setPrioritaId(""); setConsegna("");
@@ -52,7 +60,6 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrore(null); setSuccess(false); setLoading(true);
-
         if (!nome.trim()) {
             setErrore("Il nome del progetto è obbligatorio.");
             setLoading(false);
@@ -88,88 +95,102 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
         }
 
         setSuccess(true);
-        resetForm();
+        reset();
         setLoading(false);
-        setTimeout(() => {
-            setSuccess(false);
-            onClose();
-        }, 3000);
+        setTimeout(() => setSuccess(false), 3000);
     };
 
-    const renderPopupContent = () => {
-        if (!popupOpen) return null;
-        const base = "w-full border rounded px-2 py-1 input-style";
+    const baseInputClass = "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-white dark:bg-gray-700";
 
-        const popup = {
-            cliente: (
-                <select value={clienteId ?? ""} onChange={(e) => setClienteId(e.target.value || null)} className={base}>
-                    <option value="">-- nessuno --</option>
-                    {clienti.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                </select>
-            ),
-            utenti: (
-                <div className="space-y-1 max-h-[180px] overflow-y-auto hide-scrollbar">
-                    {utenti.map(u => {
-                        const selected = utentiSelezionati.some(s => s.id === u.id);
-                        return (
-                            <div key={u.id} onClick={() => setUtentiSelezionati(prev => selected ? prev.filter(s => s.id !== u.id) : [...prev, u])}
-                                className={`cursor-pointer px-2 py-1 rounded ${selected ? "bg-blue-100 font-semibold" : "hover:bg-theme"}`}>
-                                {u.nome} {u.cognome}
-                            </div>
-                        );
-                    })}
-                </div>
-            ),
-            stato: (
-                <select value={statoId} onChange={(e) => setStatoId(e.target.value)} className={base}>
-                    <option value="">-- seleziona --</option>
-                    {stati.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-                </select>
-            ),
-            priorita: (
-                <select value={prioritaId} onChange={(e) => setPrioritaId(e.target.value)} className={base}>
-                    <option value="">-- seleziona --</option>
-                    {priorita.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                </select>
-            ),
-            consegna: <input type="date" value={consegna} onChange={(e) => setConsegna(e.target.value)} className={base} />,
-            tempo: (
-                <div className="flex gap-2">
-                    <select value={ore} onChange={(e) => setOre(+e.target.value)} className="w-1/2 border rounded px-2 py-1 input-style">
-                        {[...Array(25).keys()].map(h => <option key={h} value={h}>{h}h</option>)}
-                    </select>
-                    <select value={minuti} onChange={(e) => setMinuti(+e.target.value)} className="w-1/2 border rounded px-2 py-1 input-style">
-                        {[0, 15, 30, 45].map(m => <option key={m} value={m}>{m}min</option>)}
-                    </select>
-                </div>
-            ),
-        };
+    const popupContent: Record<PopupType, JSX.Element> = {
+        cliente: (
+            <select value={clienteId ?? ""} onChange={(e) => setClienteId(e.target.value || null)} className={baseInputClass}>
+                <option value="">-- nessuno --</option>
+                {clienti.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+            </select>
+        ),
+        utenti: (
+            <div className="space-y-1 max-h-60 overflow-y-auto">
+                {utenti.map(u => {
+                    const selected = utentiSelezionati.some(s => s.id === u.id);
+                    return (
+                        <div
+                            key={u.id}
+                            onClick={() => setUtentiSelezionati(prev =>
+                                selected ? prev.filter(s => s.id !== u.id) : [...prev, u]
+                            )}
+                            className={`cursor-pointer px-2 py-1 rounded border ${selected ? "selected-panel font-semibold" : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"}`}
+                        >
+                            {u.nome} {u.cognome}
+                        </div>
 
-        return (
-            <div className="absolute bottom-10 left-0 rounded shadow-lg p-4 z-50 w-[300px] popup-panel">
-                <div className="flex justify-between items-center mb-2">
-                    <strong className="capitalize">{popupOpen}</strong>
-                    <FontAwesomeIcon icon={faXmark} className="cursor-pointer icon-color" onClick={() => setPopupOpen(null)} />
-                </div>
-                {popup[popupOpen]}
+                    );
+                })}
             </div>
-        );
+        ),
+        stato: (
+            <select value={statoId} onChange={(e) => setStatoId(e.target.value)} className={baseInputClass}>
+                <option value="">-- seleziona --</option>
+                {stati.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+            </select>
+        ),
+        priorita: (
+            <select value={prioritaId} onChange={(e) => setPrioritaId(e.target.value)} className={baseInputClass}>
+                <option value="">-- seleziona --</option>
+                {priorita.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            </select>
+        ),
+        consegna: (
+            <input type="date" value={consegna} onChange={(e) => setConsegna(e.target.value)} className={baseInputClass} />
+        ),
+        tempo: (
+            <div className="flex gap-2">
+                <select value={ore} onChange={(e) => setOre(+e.target.value)} className={`${baseInputClass} w-1/2`}>
+                    {[...Array(25).keys()].map(h => <option key={h} value={h}>{h}h</option>)}
+                </select>
+                <select value={minuti} onChange={(e) => setMinuti(+e.target.value)} className={`${baseInputClass} w-1/2`}>
+                    {[0, 15, 30, 45].map(m => <option key={m} value={m}>{m}min</option>)}
+                </select>
+            </div>
+        )
     };
 
     const popupButtons = [
-        { icon: faBuilding, popup: "cliente", color: "text-green-400", active: "text-green-600" },
-        { icon: faUserPlus, popup: "utenti", color: "text-blue-400", active: "text-blue-600" },
+        { icon: faBuilding, popup: "cliente", color: "text-cyan-400", active: "text-cyan-600" },
+        { icon: faUserPlus, popup: "utenti", color: "text-green-400", active: "text-green-600" },
         { icon: faFlag, popup: "stato", color: "text-red-400", active: "text-red-600" },
         { icon: faSignal, popup: "priorita", color: "text-yellow-400", active: "text-yellow-600" },
-        { icon: faCalendarDays, popup: "consegna", color: "text-indigo-400", active: "text-indigo-600" },
+        { icon: faCalendarDays, popup: "consegna", color: "text-blue-400", active: "text-blue-600" },
         { icon: faClock, popup: "tempo", color: "text-purple-400", active: "text-purple-600" },
     ] as const;
 
+    const computedLeft = offsetIndex
+        ? `min(calc(${offsetIndex} * 420px + 24px), calc(100% - 24px - 400px))`
+        : "24px";
+
     return (
-        <div className="fixed bottom-6 transition-all duration-300 w-[400px] rounded-xl shadow-xl p-5 modal-container"
-            style={{ left: `${offsetIndex * 420 + 24}px`, zIndex: 100 + offsetIndex }}>
+        <div
+            className="fixed bottom-6 z-50 rounded-xl shadow-xl p-5 bg-white dark:bg-gray-800 modal-container"
+            style={
+                isMobile
+                    ? {
+                        left: 0,
+                        right: 0,
+                        marginLeft: "auto",
+                        marginRight: "auto",
+                        width: "calc(100% - 32px)",
+                        maxWidth: "400px",
+                        zIndex: 100 + offsetIndex,
+                    }
+                    : {
+                        left: computedLeft,
+                        width: "400px",
+                        zIndex: 100 + offsetIndex,
+                    }
+            }
+        >
             <button onClick={onClose} className="absolute top-4 right-4 text-red-600 text-2xl" title="Chiudi">
-                <FontAwesomeIcon icon={faXmark} className="icon-color" />
+                <FontAwesomeIcon icon={faXmark} />
             </button>
 
             <h2 className="text-xl font-semibold mb-4 text-center text-theme">Crea Nuovo Progetto</h2>
@@ -177,32 +198,55 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
             <form onSubmit={handleSubmit} className="space-y-4 text-sm">
                 <div>
                     <label className="block mb-1 font-medium text-theme">Nome *</label>
-                    <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} required className="w-full border rounded px-3 py-2 input-style" />
+                    <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} required className={baseInputClass} />
                 </div>
 
                 <div>
                     <label className="block mb-1 font-medium text-theme">Note</label>
-                    <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} className="w-full border rounded px-3 py-2 resize-none input-style" />
+                    <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} className={`${baseInputClass} resize-none`} />
                 </div>
 
-                {renderPopupContent()}
-
-                <div className="relative h-4 mb-2">
-                    {errore && <div className="absolute w-full text-center text-red-600 text-sm">{errore}</div>}
-                    {success && <div className="absolute w-full text-center text-green-600 text-sm">✅ Progetto creato</div>}
-                </div>
-
-                <div className="flex justify-between items-center pt-4">
-                    <div className="flex gap-4 text-lg">
+                <div className="relative">
+                    <div className="flex gap-4 text-lg mb-2">
                         {popupButtons.map(({ icon, popup, color, active }) => (
-                            <button key={popup} type="button"
+                            <button
+                                key={popup}
+                                type="button"
                                 onClick={() => setPopupOpen(popupOpen === popup ? null : popup)}
-                                className={`${popupOpen === popup ? active : color}`}>
+                                className={`focus:outline-none ${popupOpen === popup ? active : color}`}
+                            >
                                 <FontAwesomeIcon icon={icon} />
                             </button>
                         ))}
                     </div>
-                    <button type="submit" disabled={loading} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+
+                    {popupOpen && (
+                        <div className="absolute bottom-full mb-2 border rounded p-4 bg-white dark:bg-gray-700 text-theme shadow-md max-h-60 overflow-auto z-50 left-0 w-full">
+
+                            <div className="flex justify-between items-center mb-2">
+                                <strong className="capitalize text-theme">{popupOpen}</strong>
+                                <button type="button" onClick={() => setPopupOpen(null)} className="text-sm">
+                                    <FontAwesomeIcon icon={faXmark} />
+                                </button>
+                            </div>
+                            {popupContent[popupOpen]}
+                        </div>
+                    )}
+                </div>
+
+                {(errore || success) && (
+                    <div className="text-center text-sm">
+                        {errore && <div className="text-red-600">{errore}</div>}
+                        {success && <div className="text-green-600">✅ Progetto creato</div>}
+                    </div>
+                )}
+
+                <div>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-60"
+                    >
                         {loading ? "Salvataggio..." : "Crea Progetto"}
                     </button>
                 </div>

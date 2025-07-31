@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, type JSX } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import {
-    faFlag, faSignal, faCalendarDays, faClock, faXmark,
-    faUserPlus, faBuilding
+    faFlag, faSignal, faCalendarDays, faClock,
+    faUserPlus, faBuilding, faXmark
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { inviaNotifica } from "../Notifiche/notificheUtils";
@@ -25,7 +25,7 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
     const [minuti, setMinuti] = useState(0);
     const [popupOpen, setPopupOpen] = useState<PopupType | null>(null);
     const [progettoId, setProgettoId] = useState("");
-    const [assegnatario, setAssegnatario] = useState<Utente | null>(null);
+    const [assegnatari, setAssegnatari] = useState<Utente[]>([]);
     const [mostraAvviso, setMostraAvviso] = useState(false);
     const [stati, setStati] = useState<Stato[]>([]);
     const [priorita, setPriorita] = useState<Priorita[]>([]);
@@ -36,6 +36,14 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
     const [loading, setLoading] = useState(false);
     const [errore, setErrore] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth <= 768);
+        handleResize();
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
 
     useEffect(() => {
         Promise.all([
@@ -53,88 +61,187 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
 
     useEffect(() => {
         if (!progettoId) return;
-        supabase
-            .from("utenti_progetti")
-            .select("utente_id")
-            .eq("progetto_id", progettoId)
-            .then(({ data }) => {
-                const ids = data?.map((m) => m.utente_id) || [];
-                setPartecipanti(utenti.filter((u) => ids.includes(u.id)));
-                setEsterni(utenti.filter((u) => !ids.includes(u.id)));
-                if (assegnatario) setMostraAvviso(!ids.includes(assegnatario.id));
-            });
-    }, [progettoId, utenti, assegnatario]);
+        supabase.from("utenti_progetti").select("utente_id").eq("progetto_id", progettoId).then(({ data }) => {
+            const ids = data?.map((m) => m.utente_id) || [];
+            setPartecipanti(utenti.filter((u) => ids.includes(u.id)));
+            setEsterni(utenti.filter((u) => !ids.includes(u.id)));
+            setMostraAvviso(assegnatari.some(u => !ids.includes(u.id)));
+        });
+    }, [progettoId, utenti, assegnatari]);
 
     const reset = () => {
-        setNome(""); setNote(""); setStatoId(""); setPrioritaId(""); setConsegna("");
-        setOre(0); setMinuti(0); setPopupOpen(null);
-        setProgettoId(""); setAssegnatario(null); setMostraAvviso(false);
+        setNome(""); setNote(""); setStatoId(""); setPrioritaId("");
+        setConsegna(""); setOre(0); setMinuti(0); setPopupOpen(null);
+        setProgettoId(""); setAssegnatari([]); setMostraAvviso(false);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setErrore(null); setLoading(true);
-        const { data: userInfo } = await supabase.auth.getUser();
-        const tempo = ore || minuti ? `${ore} hours ${minuti} minutes` : null;
-        const { data: createdTask, error } = await supabase.from("tasks").insert({
-            nome, note: note || null, stato_id: statoId ? +statoId : null,
-            priorita_id: prioritaId ? +prioritaId : null, consegna: consegna || null, tempo_stimato: tempo
-        }).select().single();
+        setErrore(null);
+        setSuccess(false);
+        setLoading(true);
 
-        if (error || !createdTask) {
-            setErrore(error?.message || "Errore creazione task");
+        if (!nome.trim()) {
+            setErrore("Il nome dell’attività è obbligatorio.");
             setLoading(false);
-            return setTimeout(() => setErrore(null), 3000);
+            return;
         }
 
-        const taskId = createdTask.id, azioni = [];
+        const { data: userInfo } = await supabase.auth.getUser();
+        const tempo = ore || minuti ? `${ore} hours ${minuti} minutes` : null;
+
+        const { data: createdTask, error } = await supabase
+            .from("tasks")
+            .insert({
+                nome,
+                note: note || null,
+                stato_id: statoId ? +statoId : null,
+                priorita_id: prioritaId ? +prioritaId : null,
+                consegna: consegna || null,
+                tempo_stimato: tempo,
+            })
+            .select()
+            .single();
+
+        if (error || !createdTask) {
+            setErrore(error?.message || "Errore creazione attività.");
+            setLoading(false);
+            setTimeout(() => setErrore(null), 3000);
+            return;
+        }
+
+        const taskId = createdTask.id;
+        const azioni = [];
+
         if (progettoId)
             azioni.push(supabase.from("progetti_task").insert({ task_id: taskId, progetti_id: progettoId }));
 
-        if (assegnatario) {
+        for (const u of assegnatari) {
             if (progettoId) {
-                const { data: esiste } = await supabase.from("utenti_progetti").select("id")
-                    .eq("utente_id", assegnatario.id).eq("progetto_id", progettoId).maybeSingle();
-                if (!esiste) {
-                    azioni.push(supabase.from("utenti_progetti").insert({ utente_id: assegnatario.id, progetto_id: progettoId }));
-                    inviaNotifica("PROGETTO_ASSEGNATO", [assegnatario.id],
-                        `Sei stato assegnato al progetto contenente la nuova attività: ${nome}`, userInfo.user?.id, { progetto_id: progettoId });
-                }
+                const { data: esiste } = await supabase
+                    .from("utenti_progetti")
+                    .select("id")
+                    .eq("utente_id", u.id)
+                    .eq("progetto_id", progettoId)
+                    .maybeSingle();
+
+                if (!esiste)
+                    azioni.push(supabase.from("utenti_progetti").insert({ utente_id: u.id, progetto_id: progettoId }));
+
+                inviaNotifica("PROGETTO_ASSEGNATO", [u.id], `Sei stato assegnato al progetto con nuova attività: ${nome}`, userInfo.user?.id, { progetto_id: progettoId });
             }
-            azioni.push(supabase.from("utenti_task").insert({ utente_id: assegnatario.id, task_id: taskId }));
-            inviaNotifica("TASK_ASSEGNATO", [assegnatario.id], `Ti è stata assegnata una nuova attività: ${nome}`,
-                userInfo.user?.id, { progetto_id: progettoId || undefined, task_id: taskId });
+
+            azioni.push(supabase.from("utenti_task").insert({ utente_id: u.id, task_id: taskId }));
+            inviaNotifica("TASK_ASSEGNATO", [u.id], `Ti è stata assegnata una nuova attività: ${nome}`, userInfo.user?.id, { progetto_id: progettoId || undefined, task_id: taskId });
         }
 
         await Promise.all(azioni);
-        setLoading(false); setSuccess(true); reset();
+        setSuccess(true);
+        reset();
+        setLoading(false);
         setTimeout(() => setSuccess(false), 3000);
     };
 
-    const IconButton = ({ icon, popup, color, activeColor }: any) => (
-        <button
-            key={popup} title={popup} type="button"
-            className={`${popupOpen === popup ? activeColor : color}`}
-            onClick={() => setPopupOpen(popupOpen === popup ? null : popup)}
-        >
-            <FontAwesomeIcon icon={icon} />
-        </button>
-    );
+    const baseInputClass = "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-white dark:bg-gray-700";
+
+    const popupContent: Record<PopupType, JSX.Element> = {
+        stato: (
+            <select value={statoId} onChange={(e) => setStatoId(e.target.value)} className={baseInputClass}>
+                <option value="">-- seleziona --</option>
+                {stati.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+            </select>
+        ),
+        priorita: (
+            <select value={prioritaId} onChange={(e) => setPrioritaId(e.target.value)} className={baseInputClass}>
+                <option value="">-- seleziona --</option>
+                {priorita.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            </select>
+        ),
+        consegna: (
+            <input type="date" value={consegna} onChange={(e) => setConsegna(e.target.value)} className={baseInputClass} />
+        ),
+        tempo: (
+            <div className="flex gap-2">
+                <select value={ore} onChange={(e) => setOre(+e.target.value)} className={`${baseInputClass} w-1/2`}>
+                    {[...Array(25).keys()].map((h) => <option key={h} value={h}>{h}h</option>)}
+                </select>
+                <select value={minuti} onChange={(e) => setMinuti(+e.target.value)} className={`${baseInputClass} w-1/2`}>
+                    {[0, 15, 30, 45].map((m) => <option key={m} value={m}>{m}min</option>)}
+                </select>
+            </div>
+        ),
+        progetto: (
+            <div className="space-y-1 max-h-60 overflow-auto">
+                {progetti.map((p) => (
+                    <div
+                        key={p.id}
+                        className={`p-2 rounded cursor-pointer border ${progettoId === p.id ? "selected-panel font-semibold" : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"}`}
+                        onClick={() => { setProgettoId(p.id); setPopupOpen(null); }}
+                    >
+                        {p.nome}
+                    </div>
+                ))}
+            </div>
+        ),
+        utente: (
+            <div className="space-y-1 max-h-60 overflow-auto">
+                {(progettoId ? [...partecipanti, ...esterni] : utenti).map((u) => {
+                    const selected = assegnatari.some(a => a.id === u.id);
+                    return (
+                        <div
+                            key={u.id}
+                            onClick={() =>
+                                setAssegnatari(prev =>
+                                    selected ? prev.filter(a => a.id !== u.id) : [...prev, u]
+                                )
+                            }
+                            className={`p-2 rounded cursor-pointer border ${selected ? "selected-panel font-semibold" : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"}`}
+                        >
+                            {u.nome} {u.cognome}
+                            {esterni.includes(u) && <span className="text-xs text-gray-400"> (non partecipa)</span>}
+                        </div>
+                    );
+                })}
+            </div>
+        ),
+    };
+
+    const popupButtons: { icon: any; popup: PopupType; color: string; active: string }[] = [
+        { icon: faFlag, popup: "stato", color: "text-red-400", active: "text-red-600" },
+        { icon: faSignal, popup: "priorita", color: "text-yellow-400", active: "text-yellow-600" },
+        { icon: faCalendarDays, popup: "consegna", color: "text-blue-400", active: "text-blue-600" },
+        { icon: faClock, popup: "tempo", color: "text-purple-400", active: "text-purple-600" },
+        { icon: faBuilding, popup: "progetto", color: "text-cyan-400", active: "text-cyan-600" },
+        { icon: faUserPlus, popup: "utente", color: "text-green-400", active: "text-green-600" },
+    ];
+
+    const computedLeft = offsetIndex
+        ? `min(calc(${offsetIndex} * 420px + 24px), calc(100% - 24px - 400px))`
+        : "24px";
 
     return (
         <div
-            className="fixed bottom-6 transition-all duration-300 w-[400px] rounded-xl shadow-xl p-5 modal-container"
-            style={{
-                left: `${offsetIndex * 420 + 24}px`,
-                zIndex: 100 + offsetIndex,
-            }}
+            className="fixed bottom-6 z-50 rounded-xl shadow-xl p-5 bg-white dark:bg-gray-800 modal-container"
+            style={
+                isMobile
+                    ? {
+                        left: 0,
+                        right: 0,
+                        marginLeft: "auto",
+                        marginRight: "auto",
+                        width: "calc(100% - 32px)",
+                        maxWidth: "400px",
+                        zIndex: 100 + offsetIndex,
+                    }
+                    : {
+                        left: computedLeft,
+                        width: "400px",
+                        zIndex: 100 + offsetIndex,
+                    }
+            }
         >
-            <button
-                onClick={onClose}
-                className="absolute top-4 right-4 text-red-600 text-2xl"
-                title="Chiudi"
-            >
-                <FontAwesomeIcon icon={faXmark} className="icon-color" />
+            <button onClick={onClose} className="absolute top-4 right-4 text-red-600 text-2xl" title="Chiudi">
+                <FontAwesomeIcon icon={faXmark} />
             </button>
 
             <h2 className="text-xl font-semibold mb-4 text-center text-theme">Crea Nuova Attività</h2>
@@ -142,122 +249,63 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
             <form onSubmit={handleSubmit} className="space-y-4 text-sm">
                 <div>
                     <label className="block mb-1 font-medium text-theme">Nome *</label>
-                    <input
-                        value={nome}
-                        onChange={(e) => setNome(e.target.value)}
-                        required
-                        className="w-full border rounded px-3 py-2 input-style"
-                    />
+                    <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} required className={baseInputClass} />
                 </div>
 
                 <div>
                     <label className="block mb-1 font-medium text-theme">Note</label>
-                    <textarea
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        rows={3}
-                        className="w-full border rounded px-3 py-2 resize-none input-style"
-                    />
+                    <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} className={`${baseInputClass} resize-none`} />
                 </div>
 
-                {popupOpen && (
-                    <div className="absolute bottom-10 left-0 rounded p-4 z-50 w-1/2 popup-panel">
-                        <div className="flex justify-between items-center mb-2">
-                            <strong className="capitalize">{popupOpen}</strong>
-                            <FontAwesomeIcon icon={faXmark} className="cursor-pointer icon-color" onClick={() => setPopupOpen(null)} />
+                <div className="relative">
+                    <div className="flex gap-4 text-lg mb-2">
+                        {popupButtons.map(({ icon, popup, color, active }) => (
+                            <button
+                                key={popup}
+                                type="button"
+                                aria-label={popup}
+                                onClick={() => setPopupOpen((o) => (o === popup ? null : popup))}
+                                className={`focus:outline-none ${popupOpen === popup ? active : color}`}
+                            >
+                                <FontAwesomeIcon icon={icon} />
+                            </button>
+                        ))}
+                    </div>
+
+                    {popupOpen && (
+                        <div className="absolute bottom-full mb-2 border rounded p-4 bg-white dark:bg-gray-700 text-theme shadow-md max-h-60 overflow-auto z-50 left-0 w-full">
+
+                            <div className="flex justify-between items-center mb-2">
+                                <strong className="capitalize text-theme">{popupOpen}</strong>
+                                <button type="button" onClick={() => setPopupOpen(null)} className="text-sm">
+                                    <FontAwesomeIcon icon={faXmark} />
+                                </button>
+                            </div>
+                            {popupContent[popupOpen]}
                         </div>
+                    )}
+                </div>
 
-                        {popupOpen === "stato" && (
-                            <select value={statoId} onChange={(e) => setStatoId(e.target.value)} className="w-full border rounded px-2 py-1 input-style">
-                                <option value="">-- seleziona --</option>
-                                {stati.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
-                            </select>
+                {(mostraAvviso || errore || success) && (
+                    <div className="text-center text-sm">
+                        {mostraAvviso && (
+                            <div className="text-yellow-600 text-xs">⚠️ Alcuni utenti selezionati non partecipano al progetto. Saranno aggiunti automaticamente.</div>
                         )}
-
-                        {popupOpen === "priorita" && (
-                            <select value={prioritaId} onChange={(e) => setPrioritaId(e.target.value)} className="w-full border rounded px-2 py-1 input-style">
-                                <option value="">-- seleziona --</option>
-                                {priorita.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                            </select>
-                        )}
-
-                        {popupOpen === "consegna" && (
-                            <input type="date" value={consegna} onChange={(e) => setConsegna(e.target.value)} className="w-full border rounded px-2 py-1 input-style" />
-                        )}
-
-                        {popupOpen === "tempo" && (
-                            <div className="flex gap-2">
-                                <select value={ore} onChange={(e) => setOre(+e.target.value)} className="w-1/2 border rounded px-2 py-1 text-sm h-8 hide-scrollbar input-style">
-                                    {[...Array(25).keys()].map((h) => <option key={h} value={h}>{h}h</option>)}
-                                </select>
-                                <select value={minuti} onChange={(e) => setMinuti(+e.target.value)} className="w-1/2 border rounded px-2 py-1 text-sm h-8 hide-scrollbar input-style">
-                                    {[0, 15, 30, 45].map((m) => <option key={m} value={m}>{m}min</option>)}
-                                </select>
-                            </div>
-                        )}
-
-                        {popupOpen === "progetto" && (
-                            <div className="max-h-[200px] overflow-y-auto hide-scrollbar space-y-1">
-                                {progetti.map(p => (
-                                    <div
-                                        key={p.id}
-                                        className={`p-2 cursor-pointer rounded border ${progettoId === p.id ? "bg-cyan-100 border-cyan-400 font-semibold" : "hover:bg-theme border-transparent"}`}
-                                        onClick={() => {
-                                            setProgettoId(p.id);
-                                            if (assegnatario) setMostraAvviso(!partecipanti.some(u => u.id === assegnatario.id));
-                                            setPopupOpen(null);
-                                        }}
-                                    >
-                                        {p.nome}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {popupOpen === "utente" && (
-                            <div className="max-h-[200px] overflow-y-auto space-y-1 hide-scrollbar">
-                                {(progettoId ? [...partecipanti, ...esterni] : utenti).map(u => (
-                                    <div
-                                        key={u.id}
-                                        className={`p-2 cursor-pointer rounded border ${assegnatario?.id === u.id ? "bg-green-100 border-green-400 font-semibold" : "hover:bg-theme border-transparent"}`}
-                                        onClick={() => {
-                                            setAssegnatario(u);
-                                            if (progettoId) setMostraAvviso(!partecipanti.some(p => p.id === u.id));
-                                            setPopupOpen(null);
-                                        }}
-                                    >
-                                        {u.nome} {u.cognome}
-                                        {esterni.includes(u) && <span className="text-xs text-gray-400"> (non partecipa)</span>}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        {errore && <div className="text-red-600">{errore}</div>}
+                        {success && <div className="text-green-600">✅ Attività creata</div>}
                     </div>
                 )}
 
-                <div className="relative h-4 mb-2">
-                    {mostraAvviso && <div className="absolute w-full text-yellow-600 text-xs text-center">⚠️ L’utente selezionato non è membro del progetto. Sarà aggiunto automaticamente.</div>}
-                    {errore && <div className="absolute w-full text-red-600 text-sm text-center">{errore}</div>}
-                    {success && <div className="absolute w-full text-green-600 text-sm text-center">✅ Attività creata</div>}
-                </div>
-
-                <div className="flex justify-between items-center pt-4">
-                    <div className="flex gap-4 text-lg">
-                        {[
-                            { icon: faFlag, popup: "stato", color: "text-red-400", activeColor: "text-red-600" },
-                            { icon: faSignal, popup: "priorita", color: "text-yellow-400", activeColor: "text-yellow-600" },
-                            { icon: faCalendarDays, popup: "consegna", color: "text-blue-400", activeColor: "text-blue-600" },
-                            { icon: faClock, popup: "tempo", color: "text-purple-400", activeColor: "text-purple-600" },
-                            { icon: faBuilding, popup: "progetto", color: "text-cyan-400", activeColor: "text-cyan-600" },
-                            { icon: faUserPlus, popup: "utente", color: "text-green-400", activeColor: "text-green-600" },
-                        ].map(IconButton)}
-                    </div>
-                    <button type="submit" disabled={loading} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                <div>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-60"
+                    >
                         {loading ? "Salvataggio..." : "Crea Attività"}
                     </button>
                 </div>
             </form>
         </div>
     );
-
 }
