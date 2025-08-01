@@ -77,7 +77,7 @@ export default function RegisterForm() {
     if (success) {
         return (
             <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 bg-theme text-theme">
-                <div className="max-w-md p-8 text-center rounded-xl shadow-xl bg-white dark:bg-[#2c3542] text-gray-800 dark:text-gray-100">
+                <div className="max-w-md p-8 text-center rounded-xl shadow-xl bg-theme text-theme border border-gray-200 dark:border-[#444]">
                     <p className="text-xl font-semibold">
                         ✅ Registrazione completata! Controlla la tua email per confermare.
                     </p>
@@ -90,7 +90,7 @@ export default function RegisterForm() {
         <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] px-4 sm:px-6 bg-theme text-theme">
             <form
                 onSubmit={handleRegister}
-                className="w-full max-w-sm sm:max-w-md md:max-w-lg p-6 sm:p-8 rounded-xl shadow-xl bg-white dark:bg-[#2c3542] text-gray-800 dark:text-gray-100 space-y-6"
+                className="w-full max-w-sm sm:max-w-md md:max-w-lg p-6 sm:p-8 rounded-xl shadow-xl bg-theme text-theme border border-gray-200 dark:border-[#444] space-y-6"
             >
                 <h2 className="text-2xl sm:text-3xl font-bold text-center">
                     Crea il tuo account
@@ -100,7 +100,10 @@ export default function RegisterForm() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {["nome", "cognome"].map((field) => (
                         <div key={field} className="relative">
-                            <FontAwesomeIcon icon={faUser} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 dark:text-gray-300 text-base sm:text-lg" />
+                            <FontAwesomeIcon
+                                icon={faUser}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 icon-color text-base sm:text-lg"
+                            />
                             <input
                                 name={field}
                                 placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
@@ -108,7 +111,11 @@ export default function RegisterForm() {
                                 onChange={handleChange}
                                 required
                                 autoComplete="off"
-                                className="w-full pl-10 pr-4 py-2.5 md:py-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1f2937] text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full pl-10 pr-4 py-2.5 md:py-3 rounded-md border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                style={{
+                                    backgroundColor: "var(--color-background-light)",
+                                    color: "var(--color-text-light)",
+                                }}
                             />
                         </div>
                     ))}
@@ -117,7 +124,10 @@ export default function RegisterForm() {
                 {/* Email + Conferma Email */}
                 {["email", "confermaEmail"].map((field) => (
                     <div key={field} className="relative">
-                        <FontAwesomeIcon icon={faEnvelope} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 dark:text-gray-300 text-base sm:text-lg" />
+                        <FontAwesomeIcon
+                            icon={faEnvelope}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 icon-color text-base sm:text-lg"
+                        />
                         <input
                             name={field}
                             type="email"
@@ -126,7 +136,11 @@ export default function RegisterForm() {
                             onChange={handleChange}
                             required
                             autoComplete="off"
-                            className="w-full pl-10 pr-4 py-2.5 md:py-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1f2937] text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full pl-10 pr-4 py-2.5 md:py-3 rounded-md border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            style={{
+                                backgroundColor: "var(--color-background-light)",
+                                color: "var(--color-text-light)",
+                            }}
                         />
                     </div>
                 ))}
@@ -136,7 +150,10 @@ export default function RegisterForm() {
                 { field: "confermaPassword", show: showConfirmPassword, setShow: setShowConfirmPassword }]
                     .map(({ field, show, setShow }) => (
                         <div key={field} className="relative">
-                            <FontAwesomeIcon icon={show ? faLockOpen : faLock} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 dark:text-gray-300 text-base sm:text-lg" />
+                            <FontAwesomeIcon
+                                icon={show ? faLockOpen : faLock}
+                                className="absolute left-3 top-1/2 -translate-y-1/2 icon-color text-base sm:text-lg"
+                            />
                             <input
                                 name={field}
                                 type={show ? "text" : "password"}
@@ -145,12 +162,16 @@ export default function RegisterForm() {
                                 onChange={handleChange}
                                 required
                                 autoComplete="new-password"
-                                className="w-full pl-10 pr-12 py-2.5 md:py-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1f2937] text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full pl-10 pr-12 py-2.5 md:py-3 rounded-md border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                style={{
+                                    backgroundColor: "var(--color-background-light)",
+                                    color: "var(--color-text-light)",
+                                }}
                             />
                             <button
                                 type="button"
                                 onClick={() => setShow(!show)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 p-1.5 rounded transition"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 icon-color hover-bg-theme p-1.5 rounded transition"
                                 aria-label="Mostra/Nascondi password"
                             >
                                 <FontAwesomeIcon icon={show ? faEyeSlash : faEye} />
@@ -160,14 +181,17 @@ export default function RegisterForm() {
 
                 {/* Avatar Picker */}
                 <div className="space-y-2">
-                    <label className="text-sm font-medium flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                    <label className="text-sm font-medium flex items-center gap-2 text-theme">
                         <FontAwesomeIcon icon={faImage} />
                         Seleziona un avatar (opzionale):
                     </label>
                     <div className="flex flex-wrap gap-2">
                         <div
                             onClick={() => setForm((f) => ({ ...f, avatar: "" }))}
-                            className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold bg-gray-200 dark:bg-gray-700 hover:bg-blue-100 cursor-pointer transition ${form.avatar === "" ? "ring-2 ring-blue-500" : "opacity-70 hover:opacity-100"}`}
+                            className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold bg-theme text-theme cursor-pointer transition hover:ring-2 hover:ring-blue-300 ${form.avatar === "" ? "ring-2 ring-blue-500" : "opacity-70 hover:opacity-100"}`}
+
+
+
                         >
                             N/A
                         </div>
@@ -198,7 +222,7 @@ export default function RegisterForm() {
                     {loading ? "Registrazione in corso..." : "Registrati"}
                 </button>
 
-                <p className="text-center text-sm sm:text-base text-gray-700 dark:text-gray-300">
+                <p className="text-center text-sm sm:text-base text-theme">
                     Hai già un account?{" "}
                     <Link to="/" className="text-blue-600 hover:underline">
                         Accedi

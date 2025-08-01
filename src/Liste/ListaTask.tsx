@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen, faUser } from "@fortawesome/free-solid-svg-icons";
+import { faPen, faTasks, faUser } from "@fortawesome/free-solid-svg-icons";
 
 export type Task = {
     id: string;
@@ -128,6 +128,10 @@ export default function ListaTask() {
 
     return (
         <div className="p-4 sm:p-6">
+            <h1 className="text-2xl font-bold text-theme mb-6">
+                <FontAwesomeIcon icon={faTasks} className="text-green-500 mr-2" size="lg" />
+                Lista Task
+            </h1>
             {/* Filtri + toggle */}
             <div className="flex flex-col gap-4 mb-6">
                 <div className="flex items-center gap-3 lg:hidden">
@@ -144,7 +148,9 @@ export default function ListaTask() {
                 <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
                     <div className={`w-full ${isAdmin && !soloMie
                         ? "grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 gap-y-4 md:gap-4 lg:flex lg:flex-nowrap lg:gap-4 lg:[&>*]:w-auto"
-                        : "flex flex-col md:flex-row md:gap-4 md:[&>*]:flex-1 lg:[&>*]:w-auto"}`}>
+                        : "flex flex-col gap-4 md:flex-row md:gap-4 md:[&>*]:flex-1 lg:flex-nowrap lg:[&>*]:w-auto lg:[&>*]:flex-none"}`}>
+
+
 
                         <select
                             className="input-style w-full"

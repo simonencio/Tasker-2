@@ -100,7 +100,7 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
         setTimeout(() => setSuccess(false), 3000);
     };
 
-    const baseInputClass = "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-white dark:bg-gray-700";
+    const baseInputClass = "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-theme text-theme";
 
     const popupContent: Record<PopupType, JSX.Element> = {
         cliente: (
@@ -123,7 +123,6 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
                         >
                             {u.nome} {u.cognome}
                         </div>
-
                     );
                 })}
             </div>
@@ -221,8 +220,7 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
                     </div>
 
                     {popupOpen && (
-                        <div className="absolute bottom-full mb-2 border rounded p-4 bg-white dark:bg-gray-700 text-theme shadow-md max-h-60 overflow-auto z-50 left-0 w-full">
-
+                        <div className="absolute bottom-full mb-2 border rounded p-4 bg-theme text-theme shadow-md max-h-60 overflow-auto z-50 left-0 w-full">
                             <div className="flex justify-between items-center mb-2">
                                 <strong className="capitalize text-theme">{popupOpen}</strong>
                                 <button type="button" onClick={() => setPopupOpen(null)} className="text-sm">
