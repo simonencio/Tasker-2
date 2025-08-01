@@ -1,3 +1,4 @@
+// Header.tsx completo aggiornato ✅
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -97,29 +98,21 @@ export default function Header({
     };
 
     useEffect(() => {
-        let mounted = true;
-        isUtenteAdmin().then((res) => {
-            if (mounted) setIsAdmin(res);
-        });
-        return () => {
-            mounted = false;
-        };
-    }, []);
-
-    useEffect(() => {
         const getUser = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 setUserId(user.id);
                 richiediPermessoNotificheBrowser();
 
-                // Recupera dati dell'utente da tabella utenti
                 const { data, error } = await supabase
                     .from("utenti")
                     .select("nome, cognome, avatar_url")
                     .eq("id", user.id)
                     .single();
                 if (data && !error) setUtente(data);
+
+                const admin = await isUtenteAdmin();
+                setIsAdmin(admin);
             }
         };
         getUser();
@@ -134,7 +127,11 @@ export default function Header({
                     .select("nome, cognome, avatar_url")
                     .eq("id", id)
                     .single()
-                    .then(({ data }) => setUtente(data || null));
+                    .then(async ({ data }) => {
+                        setUtente(data || null);
+                        const admin = await isUtenteAdmin();
+                        setIsAdmin(admin);
+                    });
             }
         });
 
@@ -252,7 +249,6 @@ export default function Header({
             );
         }
 
-        // fallback: icona user circle anche se loggato ma senza avatar
         return (
             <FontAwesomeIcon
                 icon={faUserCircle}
@@ -261,7 +257,6 @@ export default function Header({
             />
         );
     };
-
 
     return (
         <div className="min-h-16 px-4 py-3 flex justify-between items-center shadow-md bg-theme text-theme transition-colors duration-300">
@@ -274,7 +269,6 @@ export default function Header({
             </div>
 
             <div className="flex items-center gap-2">
-
                 {loggedIn && (
                     <div ref={createRef} className="relative">
                         <span onClick={() => setCreateOpen(p => !p)} className="cursor-pointer px-3 py-2 rounded">
@@ -295,7 +289,6 @@ export default function Header({
                     </div>
                 )}
 
-                {/* CAMBIO TEMA SEMPRE VISIBILE */}
                 <div ref={themeRef} className="relative">
                     <span onClick={() => setThemeDropdown(p => !p)} className="cursor-pointer px-3 py-2 rounded">
                         <FontAwesomeIcon icon={faMoon} size="xl" className="text-sky-500 hover:scale-125 hover:shadow-xl transition-transform" />
