@@ -1,18 +1,12 @@
 import React, { useState, useEffect, type JSX } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-    faXmark,
-    faEnvelope,
-    faUserCheck,
-    faUser,
-    faShieldAlt,
-    faImage,
+    faXmark, faEnvelope, faUserCheck, faUser, faShieldAlt, faImage,
 } from "@fortawesome/free-solid-svg-icons";
 import { supabase } from "../supporto/supabaseClient";
 
 type Props = { onClose: () => void; offsetIndex?: number };
 type PopupField = "cognome" | "ruolo" | "avatar";
-
 type Role = { id: number; nome: string };
 
 const EDGE_FUNCTION_URL =
@@ -32,33 +26,41 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
     const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {
-        const handleResize = () => setIsMobile(window.innerWidth <= 768);
-        handleResize();
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
+        const resize = () => setIsMobile(window.innerWidth <= 768);
+        resize();
+        window.addEventListener("resize", resize);
+        return () => window.removeEventListener("resize", resize);
     }, []);
 
     useEffect(() => {
-        (async () => {
-            const { data, error } = await supabase.from("ruoli").select("id,nome");
-            if (!error && data) setRoles(data);
-        })();
+        const fetchAll = async () => {
+            const [r] = await Promise.all([
+                supabase.from("ruoli").select("id,nome").is("deleted_at", null),
+            ]);
+            if (r.data) setRoles(r.data);
+        };
+
+        fetchAll();
+
+        const channel = supabase.channel("realtime_user_dropdowns");
+
+        channel
+            .on("postgres_changes", { event: "*", schema: "public", table: "ruoli" }, fetchAll)
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     const reset = () => {
-        setNome("");
-        setCognome("");
-        setEmail("");
-        setRuolo(0);
-        setAvatarUrl("");
-        setPopupOpen(null);
+        setNome(""); setCognome(""); setEmail("");
+        setRuolo(0); setAvatarUrl(""); setPopupOpen(null);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setErrore(null);
-        setSuccess(false);
-        setLoading(true);
+        setErrore(null); setSuccess(false); setLoading(true);
 
         if (!nome.trim() || !cognome.trim() || !email.trim() || !ruolo) {
             setErrore("Nome, cognome, email e ruolo sono obbligatori.");
@@ -95,8 +97,7 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
         }
     };
 
-    const baseInputClass =
-        "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-theme text-theme";
+    const baseInputClass = "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-theme text-theme";
 
     const popupInputs: Record<PopupField, JSX.Element> = {
         cognome: (
@@ -110,22 +111,23 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
             />
         ),
         ruolo: (
-            <select
-                aria-label="Ruolo"
-                value={ruolo}
-                onChange={(e) => setRuolo(+e.target.value)}
-                className={baseInputClass}
-                required
-            >
-                <option value={0} disabled>
-                    Seleziona ruolo
-                </option>
+            <div className="space-y-1 max-h-60 ">
                 {roles.map((r) => (
-                    <option key={r.id} value={r.id}>
+                    <div
+                        key={r.id}
+                        onClick={() => {
+                            setRuolo(r.id === ruolo ? 0 : r.id);
+                            setPopupOpen(null);
+                        }}
+                        className={`cursor-pointer px-2 py-1 rounded border ${ruolo === r.id
+                            ? "selected-panel font-semibold"
+                            : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
+                            }`}
+                    >
                         {r.nome}
-                    </option>
+                    </div>
                 ))}
-            </select>
+            </div>
         ),
         avatar: (
             <input
@@ -199,10 +201,7 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
                 <FontAwesomeIcon icon={faXmark} />
             </button>
 
-            <h2
-                id="mini-user-modal-title"
-                className="text-xl font-semibold mb-4 text-center text-theme"
-            >
+            <h2 id="mini-user-modal-title" className="text-xl font-semibold mb-4 text-center text-theme">
                 Aggiungi Utente
             </h2>
 
@@ -235,7 +234,9 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
                         required
                     />
                 </div>
-                <div className="h-2 sm:h-4 md:h-7" aria-hidden="true"></div>
+
+                <div className="h-2 sm:h-4 md:h-7" aria-hidden="true" />
+
                 <div className="relative">
                     <div className="flex gap-4 text-lg mb-2">
                         {popupButtons.map(({ icon, popup: field, color, active, label }) => (
@@ -243,9 +244,7 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
                                 key={field}
                                 type="button"
                                 aria-label={label}
-                                onClick={() =>
-                                    setPopupOpen((prev) => (prev === field ? null : field))
-                                }
+                                onClick={() => setPopupOpen((prev) => (prev === field ? null : field))}
                                 className={`focus:outline-none ${popupOpen === field ? active : color}`}
                             >
                                 <FontAwesomeIcon icon={icon} />
@@ -255,14 +254,13 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
 
                     {popupOpen && (
                         <div
-                            className="absolute bottom-full mb-2 border rounded p-4 bg-theme text-theme shadow-md max-h-60 overflow-auto z-60 left-0 w-full"
+                            key={`${popupOpen}-${roles.length}`}
+                            className="absolute bottom-full mb-2 border rounded p-4 bg-theme text-theme shadow-md max-h-60 hide-scrollbar overflow-auto z-60 left-0 w-full"
                             role="dialog"
                             aria-label={`Modifica ${popupOpen}`}
                         >
                             <div className="flex justify-between items-center mb-2">
-                                <strong className="capitalize text-theme">
-                                    {popupOpen}
-                                </strong>
+                                <strong className="capitalize text-theme">{popupOpen}</strong>
                                 <button
                                     type="button"
                                     onClick={() => setPopupOpen(null)}
@@ -279,27 +277,17 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
 
                 {(errore || success) && (
                     <div className="text-center text-sm">
-                        {errore && (
-                            <div className="text-red-600" role="alert">
-                                {errore}
-                            </div>
-                        )}
+                        {errore && <div className="text-red-600" role="alert">{errore}</div>}
                         {success && (
-                            <div
-                                className="text-green-600 flex items-center justify-center"
-                                role="status"
-                            >
-                                <FontAwesomeIcon icon={faUserCheck} className="mr-2" /> Utente creato e
-                                email inviata
+                            <div className="text-green-600 flex items-center justify-center" role="status">
+                                <FontAwesomeIcon icon={faUserCheck} className="mr-2" />
+                                Utente creato e email inviata
                             </div>
                         )}
                     </div>
                 )}
 
                 <div>
-
-
-
                     <button
                         type="submit"
                         disabled={loading}
