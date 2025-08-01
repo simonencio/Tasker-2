@@ -71,7 +71,7 @@ export default function MiniClientCreatorModal({ onClose, offsetIndex = 0 }: Pro
     };
 
     const baseInputClass =
-        "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-white dark:bg-gray-700";
+        "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-theme text-theme";
 
     const popupInputs: Record<PopupField, JSX.Element> = {
         email: (
@@ -136,7 +136,7 @@ export default function MiniClientCreatorModal({ onClose, offsetIndex = 0 }: Pro
 
     return (
         <div
-            className={`fixed bottom-6 z-50 rounded-xl shadow-xl p-5 bg-white dark:bg-gray-800 modal-container`}
+            className="fixed bottom-6 z-50 rounded-xl shadow-xl p-5 bg-white dark:bg-gray-800 modal-container"
             style={
                 isMobile
                     ? {
@@ -144,7 +144,7 @@ export default function MiniClientCreatorModal({ onClose, offsetIndex = 0 }: Pro
                         right: 0,
                         marginLeft: "auto",
                         marginRight: "auto",
-                        width: "calc(100% - 32px)", // 16px per lato
+                        width: "calc(100% - 32px)",
                         maxWidth: "400px",
                         zIndex: 100 + offsetIndex,
                     }
@@ -187,7 +187,7 @@ export default function MiniClientCreatorModal({ onClose, offsetIndex = 0 }: Pro
                         value={nome}
                         onChange={(e) => setNome(e.target.value)}
                         required
-                        className={`${baseInputClass} w-full`}
+                        className={baseInputClass}
                         placeholder="Es. Mario Rossi"
                     />
                 </div>
@@ -204,7 +204,7 @@ export default function MiniClientCreatorModal({ onClose, offsetIndex = 0 }: Pro
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
                         rows={3}
-                        className={`${baseInputClass} w-full resize-none`}
+                        className={`${baseInputClass} resize-none`}
                         placeholder="Note aggiuntive..."
                     />
                 </div>
@@ -226,7 +226,7 @@ export default function MiniClientCreatorModal({ onClose, offsetIndex = 0 }: Pro
 
                     {popupOpen && (
                         <div
-                            className="absolute bottom-full mb-2 border rounded p-4 bg-white dark:bg-gray-700 text-theme shadow-md max-h-60 overflow-auto z-50 left-0 w-full"
+                            className="absolute bottom-full mb-2 border rounded p-4 bg-theme text-theme shadow-md max-h-60 overflow-auto z-50 left-0 w-full"
                             role="dialog"
                             aria-label={`Modifica ${popupOpen}`}
                         >

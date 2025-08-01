@@ -5,7 +5,6 @@ import {
     Route,
     Navigate,
     useLocation,
-    useParams,
 } from "react-router-dom";
 import { supabase } from "./supporto/supabaseClient";
 import "./App.css";
@@ -22,24 +21,15 @@ import CalendarioProgetto from "./GestioneProgetti/CalendarioProgetto";
 import BachecaProgetto from "./GestioneProgetti/BachecaProgetto";
 import ListaClienti from "./Liste/ListaClienti";
 import ListaUtenti from "./Liste/ListaUtenti";
-import ResetPassword from "./Pagine/ResetPassword"; // assicurati che il path sia corretto
+import ResetPassword from "./Pagine/ResetPassword";
 
-// import AnimatedLogo from "./LandingPage/AnimatedLogo";
 import Header from "./Header/Header";
 import Sidebar from "./Sidebar/Sidebar";
 import NotificheSidebar from "./Notifiche/NotificheSidebar";
 import MiniProjectCreatorModal from "./Creazione/MiniProjectCreatorModal";
 import MiniTaskCreatorModal from "./Creazione/MiniTaskCreatorModal";
 import MiniClientCreatorModal from "./Creazione/MiniClientCreatorModal";
-import MiniUserCreatorModal from "./Creazione/MiniUserCreatorModal"; // nuovo
-
-function ResetPasswordWrapper() {
-    const { userId } = useParams<{ userId: string }>();
-    if (!userId) {
-        return <div className="p-6">User ID mancante nella rotta.</div>;
-    }
-    return <ResetPassword userId={userId} />;
-}
+import MiniUserCreatorModal from "./Creazione/MiniUserCreatorModal";
 
 type ModalType = "project" | "task" | "client" | "user";
 
@@ -92,7 +82,7 @@ function AppContent() {
     const getMaxModals = useCallback(() => {
         if (windowWidth <= 768) return 1;
         if (windowWidth <= 1024) return 2;
-        return 3;
+        return 4;
     }, [windowWidth]);
 
     useEffect(() => {
@@ -154,7 +144,7 @@ function AppContent() {
                         <Route path="/login" element={<LoginForm />} />
                         <Route path="/register" element={<RegisterForm />} />
                         <Route path="/confirm-email" element={<ConfirmEmailWelcome />} />
-                        <Route path="/reset-password/:userId" element={<ResetPasswordWrapper />} />
+                        <Route path="/reset-password/:userId" element={<ResetPassword />} />
                     </Routes>
                 </main>
             ) : (
@@ -169,7 +159,6 @@ function AppContent() {
                                 onApriClientModal={() => openModal("client")}
                                 onApriUserModal={() => openModal("user")}
                             />
-
                         </div>
                     )}
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUser } from "@fortawesome/free-solid-svg-icons";
+import { faProjectDiagram, faUser } from "@fortawesome/free-solid-svg-icons";
 
 export type Progetto = {
     id: string;
@@ -129,6 +129,11 @@ export default function ListaProgetti() {
 
     return (
         <div className="p-4 sm:p-6">
+            <h1 className="text-2xl font-bold text-theme mb-6">
+                <FontAwesomeIcon icon={faProjectDiagram} className="text-blue-500 mr-2" />
+                Lista Progetti
+            </h1>
+
             <div className="flex flex-col gap-4 mb-6">
                 {/* 👤 Toggle mobile */}
                 <div className="flex items-center gap-3 lg:hidden">

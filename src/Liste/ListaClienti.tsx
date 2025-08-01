@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen, faFolderOpen, faEnvelope, faPhone } from "@fortawesome/free-solid-svg-icons";
+import { faPen, faFolderOpen, faEnvelope, faPhone, faAddressBook } from "@fortawesome/free-solid-svg-icons";
 
 type Cliente = {
     id: string;
@@ -49,7 +49,10 @@ export default function ListaClienti() {
 
     return (
         <div className="p-4 sm:p-6">
-            <h1 className="text-2xl font-bold text-theme mb-6">📒 Lista Clienti</h1>
+            <h1 className="text-2xl font-bold text-theme mb-6">
+                <FontAwesomeIcon icon={faAddressBook} className="text-orange-500 mr-2" size="lg" />
+                Lista Clienti
+            </h1>
 
             {loading ? (
                 <p className="text-center text-theme text-lg">Caricamento...</p>

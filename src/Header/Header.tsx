@@ -15,6 +15,7 @@ import {
     richiediPermessoNotificheBrowser,
     mostraNotificaBrowser,
 } from "../Notifiche/notificheBrowserUtils";
+import { isUtenteAdmin } from "../supporto/ruolo";
 
 type NotificaUtenteRecord = {
     notifica_id: string;
@@ -31,7 +32,13 @@ type HeaderProps = {
     onToggleSidebar: () => void;
     onApriNotifiche: () => void;
     notificheSidebarAperta: boolean;
-    onApriModale: (type: "project" | "task" | "client") => void;
+    onApriModale: (type: "project" | "task" | "client" | "user") => void;
+};
+
+type Utente = {
+    nome: string;
+    cognome: string;
+    avatar_url: string | null;
 };
 
 export default function Header({
@@ -47,6 +54,8 @@ export default function Header({
     const [userId, setUserId] = useState<string | null>(null);
     const [themeDropdown, setThemeDropdown] = useState(false);
     const [, setCurrentTheme] = useState("light");
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [utente, setUtente] = useState<Utente | null>(null);
 
     const dropdownRef = useRef<HTMLDivElement>(null);
     const createRef = useRef<HTMLDivElement>(null);
@@ -88,11 +97,29 @@ export default function Header({
     };
 
     useEffect(() => {
+        let mounted = true;
+        isUtenteAdmin().then((res) => {
+            if (mounted) setIsAdmin(res);
+        });
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
         const getUser = async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 setUserId(user.id);
                 richiediPermessoNotificheBrowser();
+
+                // Recupera dati dell'utente da tabella utenti
+                const { data, error } = await supabase
+                    .from("utenti")
+                    .select("nome, cognome, avatar_url")
+                    .eq("id", user.id)
+                    .single();
+                if (data && !error) setUtente(data);
             }
         };
         getUser();
@@ -100,7 +127,15 @@ export default function Header({
         const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
             const id = session?.user?.id || null;
             setUserId(id);
-            if (id) richiediPermessoNotificheBrowser();
+            if (id) {
+                richiediPermessoNotificheBrowser();
+                supabase
+                    .from("utenti")
+                    .select("nome, cognome, avatar_url")
+                    .eq("id", id)
+                    .single()
+                    .then(({ data }) => setUtente(data || null));
+            }
         });
 
         return () => {
@@ -187,6 +222,47 @@ export default function Header({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    const renderUserIcon = () => {
+        const wrapperClass =
+            "w-[28px] h-[28px] rounded-full flex items-center justify-center flex-none";
+        const styleFix = {
+            display: "inline-block",
+            verticalAlign: "middle",
+            lineHeight: "1",
+        };
+
+        if (!loggedIn) {
+            return (
+                <FontAwesomeIcon
+                    icon={faUserCircle}
+                    size="xl"
+                    className="text-purple-500 hover:scale-125 hover:shadow-xl transition-transform"
+                />
+            );
+        }
+
+        if (utente?.avatar_url) {
+            return (
+                <img
+                    src={utente.avatar_url}
+                    alt="avatar"
+                    className={`${wrapperClass} object-cover border border-gray-400 dark:border-gray-600`}
+                    style={styleFix}
+                />
+            );
+        }
+
+        // fallback: icona user circle anche se loggato ma senza avatar
+        return (
+            <FontAwesomeIcon
+                icon={faUserCircle}
+                size="xl"
+                className="text-purple-500 hover:scale-125 hover:shadow-xl transition-transform"
+            />
+        );
+    };
+
+
     return (
         <div className="min-h-16 px-4 py-3 flex justify-between items-center shadow-md bg-theme text-theme transition-colors duration-300">
             <div className="flex items-center gap-3">
@@ -198,59 +274,65 @@ export default function Header({
             </div>
 
             <div className="flex items-center gap-2">
+
                 {loggedIn && (
-                    <>
-                        <div ref={createRef} className="relative">
-                            <span onClick={() => setCreateOpen(p => !p)} className="cursor-pointer px-3 py-2 rounded">
-                                <FontAwesomeIcon icon={faPlus} size="xl" className="text-green-500 hover:scale-125 hover:shadow-xl transition-transform duration-300" />
-                            </span>
-                            {createOpen && (
-                                <div className="dropdown-panel absolute right-0 mt-2 w-36 sm:w-40 z-50">
-                                    <button onClick={() => { onApriModale("task"); setCreateOpen(false); }} className="dropdown-button">Attività</button>
-                                    <button onClick={() => { onApriModale("project"); setCreateOpen(false); }} className="dropdown-button">Progetto</button>
-                                    <button onClick={() => { onApriModale("client"); setCreateOpen(false); }} className="dropdown-button">Clienti</button>
-                                </div>
-                            )}
-                        </div>
-
-                        <div ref={themeRef} className="relative">
-                            <span onClick={() => setThemeDropdown(p => !p)} className="cursor-pointer px-3 py-2 rounded">
-                                <FontAwesomeIcon icon={faMoon} size="xl" className="text-sky-500 hover:scale-125 hover:shadow-xl transition-transform" />
-                            </span>
-                            {themeDropdown && (
-                                <div className="dropdown-panel absolute right-0 mt-2 w-30 z-50">
-                                    {[
-                                        { icon: faSun, label: "Chiaro", theme: "light", color: "text-yellow-400" },
-                                        { icon: faMoon, label: "Scuro", theme: "dark", color: "text-sky-500" },
-                                        { icon: faDesktop, label: "Sistema", theme: "system", color: "text-blue-700" }
-                                    ].map(({ icon, label, theme, color }) => (
-                                        <button
-                                            key={label}
-                                            onClick={() => { applyTheme(theme); setThemeDropdown(false); }}
-                                            className="dropdown-button flex items-center"
-                                        >
-                                            <span className={`w-6 shrink-0 text-center ${color}`}>
-                                                <FontAwesomeIcon icon={icon} size="lg" />
-                                            </span>
-                                            <span className="ml-2 text-left">{label}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        <span onClick={onApriNotifiche} className="cursor-pointer px-3 py-2 rounded relative">
-                            <FontAwesomeIcon icon={faBell} size="xl" className="text-yellow-500 hover:scale-125 hover:shadow-xl transition-transform" />
-                            {nonViste > 0 && !notificheSidebarAperta && (
-                                <span className="notification-badge">{nonViste}</span>
-                            )}
+                    <div ref={createRef} className="relative">
+                        <span onClick={() => setCreateOpen(p => !p)} className="cursor-pointer px-3 py-2 rounded">
+                            <FontAwesomeIcon icon={faPlus} size="xl" className="text-green-500 hover:scale-125 hover:shadow-xl transition-transform duration-300" />
                         </span>
-                    </>
+                        {createOpen && (
+                            <div className="dropdown-panel absolute right-0 mt-2 w-36 sm:w-40 z-50">
+                                <button onClick={() => { onApriModale("task"); setCreateOpen(false); }} className="dropdown-button">Attività</button>
+                                <button onClick={() => { onApriModale("project"); setCreateOpen(false); }} className="dropdown-button">Progetto</button>
+                                {isAdmin && (
+                                    <>
+                                        <button onClick={() => { onApriModale("client"); setCreateOpen(false); }} className="dropdown-button">Clienti</button>
+                                        <button onClick={() => { onApriModale("user"); setCreateOpen(false); }} className="dropdown-button">Utenti</button>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* CAMBIO TEMA SEMPRE VISIBILE */}
+                <div ref={themeRef} className="relative">
+                    <span onClick={() => setThemeDropdown(p => !p)} className="cursor-pointer px-3 py-2 rounded">
+                        <FontAwesomeIcon icon={faMoon} size="xl" className="text-sky-500 hover:scale-125 hover:shadow-xl transition-transform" />
+                    </span>
+                    {themeDropdown && (
+                        <div className="dropdown-panel absolute right-0 mt-2 w-30 z-50">
+                            {[{ icon: faSun, label: "Chiaro", theme: "light", color: "text-yellow-400" },
+                            { icon: faMoon, label: "Scuro", theme: "dark", color: "text-sky-500" },
+                            { icon: faDesktop, label: "Sistema", theme: "system", color: "text-blue-700" }]
+                                .map(({ icon, label, theme, color }) => (
+                                    <button
+                                        key={label}
+                                        onClick={() => { applyTheme(theme); setThemeDropdown(false); }}
+                                        className="dropdown-button flex items-center"
+                                    >
+                                        <span className={`w-6 shrink-0 text-center ${color}`}>
+                                            <FontAwesomeIcon icon={icon} size="lg" />
+                                        </span>
+                                        <span className="ml-2 text-left">{label}</span>
+                                    </button>
+                                ))}
+                        </div>
+                    )}
+                </div>
+
+                {loggedIn && (
+                    <span onClick={onApriNotifiche} className="cursor-pointer px-3 py-2 rounded relative">
+                        <FontAwesomeIcon icon={faBell} size="xl" className="text-yellow-500 hover:scale-125 hover:shadow-xl transition-transform" />
+                        {nonViste > 0 && !notificheSidebarAperta && (
+                            <span className="notification-badge">{nonViste}</span>
+                        )}
+                    </span>
                 )}
 
                 <div ref={dropdownRef} className="relative">
                     <span onClick={() => setOpen(p => !p)} className="cursor-pointer px-3 py-2 rounded">
-                        <FontAwesomeIcon icon={faUserCircle} size="xl" className="text-purple-500 hover:scale-125 hover:shadow-xl transition-transform" />
+                        {renderUserIcon()}
                     </span>
                     {open && (
                         <div className="dropdown-panel absolute right-0 mt-2 w-44 sm:w-48 z-50">

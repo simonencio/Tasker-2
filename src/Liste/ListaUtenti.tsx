@@ -77,7 +77,10 @@ export default function ListaUtenti() {
 
     return (
         <div className="p-4 sm:p-6">
-            <h1 className="text-2xl font-bold text-theme mb-6">👤 Lista Utenti</h1>
+            <h1 className="text-2xl font-bold text-theme mb-6">
+                <FontAwesomeIcon icon={faUser} className="text-purple-500 mr-2" size="lg" />
+                Lista Utenti
+            </h1>
 
             {loading ? (
                 <p className="text-center text-theme text-lg">Caricamento...</p>

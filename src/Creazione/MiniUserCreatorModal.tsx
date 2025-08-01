@@ -1,43 +1,36 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, type JSX } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faXmark, faEnvelope, faUserCheck } from "@fortawesome/free-solid-svg-icons";
-import { supabase } from "../supporto/supabaseClient"; // adatta se il path è diverso
-
-// tipo locale per ruoli (schema public.ruoli)
-type Role = {
-    id: number;
-    nome: string;
-};
+import {
+    faXmark,
+    faEnvelope,
+    faUserCheck,
+    faUser,
+    faShieldAlt,
+    faImage,
+} from "@fortawesome/free-solid-svg-icons";
+import { supabase } from "../supporto/supabaseClient";
 
 type Props = { onClose: () => void; offsetIndex?: number };
+type PopupField = "cognome" | "ruolo" | "avatar";
 
-// form coerente con la tabella utenti: nome, cognome, email, ruolo, avatar_url
-type UserForm = {
-    email: string;
-    nome: string;
-    cognome: string;
-    ruolo: number;
-    avatar_url: string;
-};
+type Role = { id: number; nome: string };
 
-// URL della tua edge function che crea utente + invia reset
-const EDGE_FUNCTION_URL = "https://kieyhhmxinmdsnfdglrm.supabase.co/functions/v1/create_user_and_reset"; // sostituisci con il tuo endpoint reale
+const EDGE_FUNCTION_URL =
+    "https://kieyhhmxinmdsnfdglrm.supabase.co/functions/v1/create_user_and_reset";
 
 export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props) {
-    const [form, setForm] = useState<UserForm>({
-        email: "",
-        nome: "",
-        cognome: "",
-        ruolo: 0,
-        avatar_url: "",
-    });
+    const [nome, setNome] = useState("");
+    const [cognome, setCognome] = useState("");
+    const [ruolo, setRuolo] = useState(0);
+    const [email, setEmail] = useState("");
+    const [avatarUrl, setAvatarUrl] = useState("");
     const [roles, setRoles] = useState<Role[]>([]);
+    const [popupOpen, setPopupOpen] = useState<PopupField | null>(null);
     const [loading, setLoading] = useState(false);
     const [errore, setErrore] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
 
-    // gestione responsive
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth <= 768);
         handleResize();
@@ -45,74 +38,55 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
         return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    // carica ruoli dal db
     useEffect(() => {
         (async () => {
-            try {
-                const { data, error } = await supabase.from("ruoli").select("id,nome");
-                if (error) throw error;
-                setRoles(
-                    (data || []).map((r: any) => ({
-                        id: r.id,
-                        nome: r.nome,
-                    }))
-                );
-            } catch (e: any) {
-                setErrore("Impossibile caricare i ruoli: " + (e.message || e));
-            }
+            const { data, error } = await supabase.from("ruoli").select("id,nome");
+            if (!error && data) setRoles(data);
         })();
     }, []);
 
-    const handleChange = (field: keyof UserForm, value: string | number) => {
-        setForm((f) => ({ ...f, [field]: value as any }));
-    };
-
-    const resetForm = () => {
-        setForm({
-            email: "",
-            nome: "",
-            cognome: "",
-            ruolo: 0,
-            avatar_url: "",
-        });
+    const reset = () => {
+        setNome("");
+        setCognome("");
+        setEmail("");
+        setRuolo(0);
+        setAvatarUrl("");
+        setPopupOpen(null);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrore(null);
         setSuccess(false);
+        setLoading(true);
 
-        if (!form.email.trim() || !form.nome.trim() || !form.cognome.trim() || !form.ruolo) {
-            setErrore("Email, nome, cognome e ruolo sono obbligatori.");
+        if (!nome.trim() || !cognome.trim() || !email.trim() || !ruolo) {
+            setErrore("Nome, cognome, email e ruolo sono obbligatori.");
+            setLoading(false);
             return;
         }
 
-        setLoading(true);
         try {
             const payload = {
-                email: form.email,
-                first_name: form.nome, // mappatura per edge function
-                last_name: form.cognome,
-                avatar_url: form.avatar_url || null,
-                role_id: form.ruolo,
-                redirectTo: `${window.location.origin}/reset-password/${form.email}`, // adatta se serve diverso
+                email,
+                nome,
+                cognome,
+                avatar_url: avatarUrl || null,
+                ruolo,
+                redirectTo: `${window.location.origin}/reset-password`,
             };
 
             const res = await fetch(EDGE_FUNCTION_URL, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
             });
 
             const json = await res.json();
-            if (!res.ok) {
-                throw new Error(json.error || "Errore creazione utente");
-            }
+            if (!res.ok) throw new Error(json.error || "Errore creazione utente");
 
             setSuccess(true);
-            resetForm();
+            reset();
         } catch (err: any) {
             setErrore(err.message || "Errore generico");
         } finally {
@@ -122,7 +96,72 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
     };
 
     const baseInputClass =
-        "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-white dark:bg-[#1f2937]";
+        "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-theme text-theme";
+
+    const popupInputs: Record<PopupField, JSX.Element> = {
+        cognome: (
+            <input
+                aria-label="Cognome"
+                type="text"
+                value={cognome}
+                onChange={(e) => setCognome(e.target.value)}
+                className={baseInputClass}
+                placeholder="Es. Rossi"
+            />
+        ),
+        ruolo: (
+            <select
+                aria-label="Ruolo"
+                value={ruolo}
+                onChange={(e) => setRuolo(+e.target.value)}
+                className={baseInputClass}
+                required
+            >
+                <option value={0} disabled>
+                    Seleziona ruolo
+                </option>
+                {roles.map((r) => (
+                    <option key={r.id} value={r.id}>
+                        {r.nome}
+                    </option>
+                ))}
+            </select>
+        ),
+        avatar: (
+            <input
+                aria-label="Avatar URL"
+                type="text"
+                value={avatarUrl}
+                onChange={(e) => setAvatarUrl(e.target.value)}
+                className={baseInputClass}
+                placeholder="es. https://..."
+            />
+        ),
+    };
+
+    const popupButtons = [
+        {
+            icon: faUser,
+            popup: "cognome" as const,
+            label: "Cognome",
+            color: "text-orange-400",
+            active: "text-orange-600",
+        },
+        {
+            icon: faShieldAlt,
+            popup: "ruolo" as const,
+            label: "Ruolo",
+            color: "text-indigo-400",
+            active: "text-indigo-600",
+        },
+        {
+            icon: faImage,
+            popup: "avatar" as const,
+            label: "Avatar",
+            color: "text-purple-400",
+            active: "text-purple-600",
+        },
+    ];
 
     const computedLeft = offsetIndex
         ? `min(calc(${offsetIndex} * 420px + 24px), calc(100% - 24px - 400px))`
@@ -130,7 +169,7 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
 
     return (
         <div
-            className="fixed bottom-6 z-50 rounded-xl shadow-xl p-5 bg-white dark:bg-[#2c3542] modal-container"
+            className="fixed bottom-6 z-50 rounded-xl shadow-xl p-5 bg-white dark:bg-gray-800 modal-container"
             style={
                 isMobile
                     ? {
@@ -149,7 +188,7 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
                     }
             }
             role="dialog"
-            aria-labelledby="mini-user-creator-title"
+            aria-labelledby="mini-user-modal-title"
         >
             <button
                 onClick={onClose}
@@ -160,35 +199,24 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
                 <FontAwesomeIcon icon={faXmark} />
             </button>
 
-            <h2 id="mini-user-creator-title" className="text-xl font-semibold mb-4 text-center text-theme">
-                Crea Utente &amp; Reset Password
+            <h2
+                id="mini-user-modal-title"
+                className="text-xl font-semibold mb-4 text-center text-theme"
+            >
+                Aggiungi Utente
             </h2>
 
-            <form onSubmit={handleSubmit} className="space-y-3 text-sm">
+            <form onSubmit={handleSubmit} className="space-y-4 text-sm">
                 <div>
                     <label className="block mb-1 font-medium text-theme" htmlFor="nome">
                         Nome *
                     </label>
                     <input
                         id="nome"
-                        value={form.nome}
-                        onChange={(e) => handleChange("nome", e.target.value)}
+                        value={nome}
+                        onChange={(e) => setNome(e.target.value)}
                         className={baseInputClass}
-                        placeholder="Mario"
-                        required
-                    />
-                </div>
-
-                <div>
-                    <label className="block mb-1 font-medium text-theme" htmlFor="cognome">
-                        Cognome *
-                    </label>
-                    <input
-                        id="cognome"
-                        value={form.cognome}
-                        onChange={(e) => handleChange("cognome", e.target.value)}
-                        className={baseInputClass}
-                        placeholder="Rossi"
+                        placeholder="Es. Mario"
                         required
                     />
                 </div>
@@ -200,47 +228,53 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
                     <input
                         id="email"
                         type="email"
-                        value={form.email}
-                        onChange={(e) => handleChange("email", e.target.value)}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         className={baseInputClass}
                         placeholder="utente@esempio.com"
                         required
                     />
                 </div>
-
-                <div>
-                    <label className="block mb-1 font-medium text-theme" htmlFor="ruolo">
-                        Ruolo *
-                    </label>
-                    <select
-                        id="ruolo"
-                        value={form.ruolo}
-                        onChange={(e) => handleChange("ruolo", +e.target.value)}
-                        className={baseInputClass}
-                        required
-                    >
-                        <option value={0} disabled>
-                            Seleziona ruolo
-                        </option>
-                        {roles.map((r) => (
-                            <option key={r.id} value={r.id}>
-                                {r.nome}
-                            </option>
+                <div className="h-2 sm:h-4 md:h-7" aria-hidden="true"></div>
+                <div className="relative">
+                    <div className="flex gap-4 text-lg mb-2">
+                        {popupButtons.map(({ icon, popup: field, color, active, label }) => (
+                            <button
+                                key={field}
+                                type="button"
+                                aria-label={label}
+                                onClick={() =>
+                                    setPopupOpen((prev) => (prev === field ? null : field))
+                                }
+                                className={`focus:outline-none ${popupOpen === field ? active : color}`}
+                            >
+                                <FontAwesomeIcon icon={icon} />
+                            </button>
                         ))}
-                    </select>
-                </div>
+                    </div>
 
-                <div>
-                    <label className="block mb-1 font-medium text-theme" htmlFor="avatar_url">
-                        Avatar (URL)
-                    </label>
-                    <input
-                        id="avatar_url"
-                        value={form.avatar_url}
-                        onChange={(e) => handleChange("avatar_url", e.target.value)}
-                        className={baseInputClass}
-                        placeholder="https://..."
-                    />
+                    {popupOpen && (
+                        <div
+                            className="absolute bottom-full mb-2 border rounded p-4 bg-theme text-theme shadow-md max-h-60 overflow-auto z-60 left-0 w-full"
+                            role="dialog"
+                            aria-label={`Modifica ${popupOpen}`}
+                        >
+                            <div className="flex justify-between items-center mb-2">
+                                <strong className="capitalize text-theme">
+                                    {popupOpen}
+                                </strong>
+                                <button
+                                    type="button"
+                                    onClick={() => setPopupOpen(null)}
+                                    aria-label="Chiudi popup"
+                                    className="text-sm"
+                                >
+                                    <FontAwesomeIcon icon={faXmark} />
+                                </button>
+                            </div>
+                            {popupInputs[popupOpen]}
+                        </div>
+                    )}
                 </div>
 
                 {(errore || success) && (
@@ -251,14 +285,21 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
                             </div>
                         )}
                         {success && (
-                            <div className="text-green-600 flex items-center justify-center" role="status">
-                                <FontAwesomeIcon icon={faUserCheck} className="mr-2" /> Utente creato e email inviata
+                            <div
+                                className="text-green-600 flex items-center justify-center"
+                                role="status"
+                            >
+                                <FontAwesomeIcon icon={faUserCheck} className="mr-2" /> Utente creato e
+                                email inviata
                             </div>
                         )}
                     </div>
                 )}
 
                 <div>
+
+
+
                     <button
                         type="submit"
                         disabled={loading}

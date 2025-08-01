@@ -1,17 +1,14 @@
 import { useState, useEffect, type FormEvent } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../supporto/supabaseClient';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
-import { useNavigate } from 'react-router-dom';
 
-interface ResetPasswordProps {
-    userId: string;
-}
-
-export default function ResetPassword({ userId }: ResetPasswordProps) {
-    const [email, setEmail] = useState<string>('');
-    const [password, setPassword] = useState<string>('');
-    const [confirmPassword, setConfirmPassword] = useState<string>('');
+export default function ResetPassword() {
+    const { userId } = useParams<{ userId: string }>();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -19,16 +16,12 @@ export default function ResetPassword({ userId }: ResetPasswordProps) {
     const [success, setSuccess] = useState(false);
     const navigate = useNavigate();
 
-    // Redirect dopo successo
     useEffect(() => {
-        if (success) {
-            const timer = setTimeout(() => navigate('/', { replace: true }), 2000);
-            return () => clearTimeout(timer);
+        if (!userId) {
+            setError("Nessun ID utente fornito.");
+            return;
         }
-    }, [success, navigate]);
 
-    // Carica email utente dalla tabella `utenti`
-    useEffect(() => {
         const fetchEmail = async () => {
             const { data, error } = await supabase
                 .from('utenti')
@@ -37,13 +30,21 @@ export default function ResetPassword({ userId }: ResetPasswordProps) {
                 .single();
 
             if (error || !data) {
-                setError(error?.message || 'Profilo utente non trovato.');
+                setError('Utente non trovato o ID non valido.');
             } else {
                 setEmail(data.email);
             }
         };
+
         fetchEmail();
     }, [userId]);
+
+    useEffect(() => {
+        if (success) {
+            const timer = setTimeout(() => navigate('/', { replace: true }), 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [success, navigate]);
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -51,20 +52,23 @@ export default function ResetPassword({ userId }: ResetPasswordProps) {
         setSuccess(false);
 
         if (!password || !confirmPassword) {
-            setError('Inserisci entrambe le password.');
+            setError("Inserisci entrambe le password.");
             return;
         }
+
         if (password !== confirmPassword) {
-            setError('Le password non corrispondono.');
+            setError("Le password non corrispondono.");
             return;
         }
 
         setLoading(true);
+
         const { error: updateError } = await supabase.auth.updateUser({ password });
+
         setLoading(false);
 
         if (updateError) {
-            setError('Errore aggiornamento password: ' + updateError.message);
+            setError("Errore durante l'aggiornamento della password: " + updateError.message);
         } else {
             setSuccess(true);
         }
@@ -75,9 +79,9 @@ export default function ResetPassword({ userId }: ResetPasswordProps) {
             onSubmit={handleSubmit}
             className="max-w-md mx-auto bg-white dark:bg-[#2c3542] shadow-xl p-6 sm:p-8 rounded-xl space-y-4"
         >
-            <h2 className="text-xl font-semibold text-center">Reset Password</h2>
+            <h2 className="text-xl font-semibold text-center">Reset della Password</h2>
 
-            {/* Email (readonly) */}
+            {/* Email utente */}
             <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
                     Email
@@ -91,7 +95,7 @@ export default function ResetPassword({ userId }: ResetPasswordProps) {
                 />
             </div>
 
-            {/* Nuova password */}
+            {/* Nuova Password */}
             <div className="relative">
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
                     Nuova Password
@@ -113,7 +117,7 @@ export default function ResetPassword({ userId }: ResetPasswordProps) {
                 </button>
             </div>
 
-            {/* Conferma password */}
+            {/* Conferma Password */}
             <div className="relative">
                 <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
                     Conferma Password
@@ -135,12 +139,13 @@ export default function ResetPassword({ userId }: ResetPasswordProps) {
                 </button>
             </div>
 
+            {/* Pulsante */}
             <button
                 type="submit"
                 disabled={loading}
                 className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
             >
-                {loading ? 'Caricamento...' : 'Resetta Password'}
+                {loading ? 'Reset in corso...' : 'Resetta Password'}
             </button>
 
             {error && <p className="text-red-500 text-sm text-center">{error}</p>}
