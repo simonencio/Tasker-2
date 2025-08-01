@@ -18,11 +18,11 @@ import ListaProgetti from "./Liste/ListaProgetti";
 import ListaTask from "./Liste/ListaTask";
 import DettaglioProgetto from "./GestioneProgetto/DettaglioProgetto";
 import CalendarioProgetto from "./GestioneProgetto/CalendarioProgetto";
-import BachecaProgetto from "./GestioneProgetto/BachecaProgetto";
+// import BachecaProgetto from "./GestioneProgetto/BachecaProgetto";
 import ListaClienti from "./Liste/ListaClienti";
 import ListaUtenti from "./Liste/ListaUtenti";
 import ResetPassword from "./Pagine/ResetPassword";
-import AnimatedLogo from "./LandingPage/AnimatedLogo"; // ✅ Importa l'animazione
+// import AnimatedLogo from "./LandingPage/AnimatedLogo"; // ✅ Importa l'animazione
 import Header from "./Header/Header";
 import Sidebar from "./Sidebar/Sidebar";
 import NotificheSidebar from "./Notifiche/NotificheSidebar";
@@ -40,7 +40,7 @@ function AppContent() {
     const [notificheOpen, setNotificheOpen] = useState(false);
     const [activeModals, setActiveModals] = useState<ModalType[]>([]);
     const location = useLocation();
-    const [showAnimation, setShowAnimation] = useState(true); // ✅ Stato per animazione
+    // const [showAnimation, setShowAnimation] = useState(true); // ✅ Stato per animazione
     const publicRoutes = ["/login", "/register", "/confirm-email", "/reset-password/"];
     const isPublic = (() => {
         if (location.pathname.startsWith("/reset-password/")) return true;
@@ -126,7 +126,7 @@ function AppContent() {
         return activeModals.indexOf(type);
     };
     // ✅ Mostra l’animazione iniziale se attiva
-    if (showAnimation) return <AnimatedLogo onFinish={() => setShowAnimation(false)} />;
+    // if (showAnimation) return <AnimatedLogo onFinish={() => setShowAnimation(false)} />;
     return (
         <>
             <header className="fixed top-0 left-0 right-0 z-50">
@@ -181,7 +181,7 @@ function AppContent() {
                                 <Route path="/profilo" element={<Profilo />} />
                                 <Route path="/progetti/:id" element={<DettaglioProgetto />} />
                                 <Route path="/progetti/:id/calendario" element={<CalendarioProgetto />} />
-                                <Route path="/progetti/:id/bacheca" element={<BachecaProgetto />} />
+                                {/* <Route path="/progetti/:id/bacheca" element={<BachecaProgetto />} /> */}
                             </Routes>
                         </div>
                     </div>
