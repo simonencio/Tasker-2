@@ -1,3 +1,4 @@
+// IMPORTAZIONI E TIPI INVARIATI
 import React, { useEffect, useState, type JSX } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import {
@@ -12,7 +13,6 @@ type Priorita = { id: number; nome: string };
 type Progetto = { id: string; nome: string };
 type Utente = { id: string; nome: string; cognome: string };
 type PopupType = "stato" | "priorita" | "consegna" | "tempo" | "progetto" | "utente";
-
 type Props = { onClose: () => void; offsetIndex?: number };
 
 export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props) {
@@ -57,16 +57,47 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
             if (pr.data) setProgetti(pr.data);
             if (u.data) setUtenti(u.data);
         });
+
+        const channel = supabase.channel("realtime_task_dropdowns");
+
+        channel
+            .on("postgres_changes", { event: "*", schema: "public", table: "stati" }, async () => {
+                const { data } = await supabase.from("stati").select("id, nome").is("deleted_at", null);
+                if (data) setStati(data);
+            })
+            .on("postgres_changes", { event: "*", schema: "public", table: "priorita" }, async () => {
+                const { data } = await supabase.from("priorita").select("id, nome").is("deleted_at", null);
+                if (data) setPriorita(data);
+            })
+            .on("postgres_changes", { event: "*", schema: "public", table: "progetti" }, async () => {
+                const { data } = await supabase.from("progetti").select("id, nome").is("deleted_at", null);
+                if (data) setProgetti(data);
+            })
+            .on("postgres_changes", { event: "*", schema: "public", table: "utenti" }, async () => {
+                const { data } = await supabase.from("utenti").select("id, nome, cognome").is("deleted_at", null);
+                if (data) setUtenti(data);
+            })
+            .subscribe();
+
+        // 🔧 FIX: cleanup sincrono, nessun async qui
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
+
 
     useEffect(() => {
         if (!progettoId) return;
-        supabase.from("utenti_progetti").select("utente_id").eq("progetto_id", progettoId).then(({ data }) => {
-            const ids = data?.map((m) => m.utente_id) || [];
-            setPartecipanti(utenti.filter((u) => ids.includes(u.id)));
-            setEsterni(utenti.filter((u) => !ids.includes(u.id)));
-            setMostraAvviso(assegnatari.some(u => !ids.includes(u.id)));
-        });
+        supabase
+            .from("utenti_progetti")
+            .select("utente_id")
+            .eq("progetto_id", progettoId)
+            .then(({ data }) => {
+                const ids = data?.map((m) => m.utente_id) || [];
+                setPartecipanti(utenti.filter((u) => ids.includes(u.id)));
+                setEsterni(utenti.filter((u) => !ids.includes(u.id)));
+                setMostraAvviso(assegnatari.some(u => !ids.includes(u.id)));
+            });
     }, [progettoId, utenti, assegnatari]);
 
     const reset = () => {
@@ -125,10 +156,10 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
                     .eq("progetto_id", progettoId)
                     .maybeSingle();
 
-                if (!esiste)
+                if (!esiste) {
                     azioni.push(supabase.from("utenti_progetti").insert({ utente_id: u.id, progetto_id: progettoId }));
-
-                inviaNotifica("PROGETTO_ASSEGNATO", [u.id], `Sei stato assegnato al progetto con nuova attività: ${nome}`, userInfo.user?.id, { progetto_id: progettoId });
+                    inviaNotifica("PROGETTO_ASSEGNATO", [u.id], `Sei stato assegnato al progetto con nuova attività: ${nome}`, userInfo.user?.id, { progetto_id: progettoId });
+                }
             }
 
             azioni.push(supabase.from("utenti_task").insert({ utente_id: u.id, task_id: taskId }));
@@ -146,16 +177,42 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
 
     const popupContent: Record<PopupType, JSX.Element> = {
         stato: (
-            <select value={statoId} onChange={(e) => setStatoId(e.target.value)} className={baseInputClass}>
-                <option value="">-- seleziona --</option>
-                {stati.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
-            </select>
+            <div className="space-y-1 max-h-60 hide-scrollbar">
+                {stati.map((s) => (
+                    <div
+                        key={s.id}
+                        className={`p-2 rounded cursor-pointer border ${statoId === String(s.id)
+                            ? "selected-panel font-semibold"
+                            : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
+                            }`}
+                        onClick={() => {
+                            setStatoId(String(s.id));
+                            setPopupOpen(null);
+                        }}
+                    >
+                        {s.nome}
+                    </div>
+                ))}
+            </div>
         ),
         priorita: (
-            <select value={prioritaId} onChange={(e) => setPrioritaId(e.target.value)} className={baseInputClass}>
-                <option value="">-- seleziona --</option>
-                {priorita.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-            </select>
+            <div className="space-y-1 max-h-60 hide-scrollbar">
+                {priorita.map((p) => (
+                    <div
+                        key={p.id}
+                        className={`p-2 rounded cursor-pointer border ${prioritaId === String(p.id)
+                            ? "selected-panel font-semibold"
+                            : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
+                            }`}
+                        onClick={() => {
+                            setPrioritaId(String(p.id));
+                            setPopupOpen(null);
+                        }}
+                    >
+                        {p.nome}
+                    </div>
+                ))}
+            </div>
         ),
         consegna: (
             <input type="date" value={consegna} onChange={(e) => setConsegna(e.target.value)} className={baseInputClass} />
@@ -171,7 +228,7 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
             </div>
         ),
         progetto: (
-            <div className="space-y-1 max-h-60 overflow-auto">
+            <div className="space-y-1 max-h-60 hide-scrollbar">
                 {progetti.map((p) => (
                     <div
                         key={p.id}
@@ -184,7 +241,7 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
             </div>
         ),
         utente: (
-            <div className="space-y-1 max-h-60 overflow-auto">
+            <div className="space-y-1 max-h-60 hide-scrollbar">
                 {(progettoId ? [...partecipanti, ...esterni] : utenti).map((u) => {
                     const selected = assegnatari.some(a => a.id === u.id);
                     return (
@@ -273,7 +330,10 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
                     </div>
 
                     {popupOpen && (
-                        <div className="absolute bottom-full mb-2 border rounded p-4 bg-theme text-theme shadow-md max-h-60 overflow-auto z-50 left-0 w-full">
+                        <div
+                            key={popupOpen + "-" + stati.length + "-" + priorita.length + "-" + progetti.length + "-" + utenti.length}
+                            className="absolute bottom-full hide-scrollbar mb-2 border rounded p-4 bg-theme text-theme shadow-md max-h-60 overflow-auto z-50 left-0 w-full"
+                        >
                             <div className="flex justify-between items-center mb-2">
                                 <strong className="capitalize text-theme">{popupOpen}</strong>
                                 <button type="button" onClick={() => setPopupOpen(null)} className="text-sm">

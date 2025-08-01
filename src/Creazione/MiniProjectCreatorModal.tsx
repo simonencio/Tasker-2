@@ -1,3 +1,4 @@
+// MiniProjectCreatorModal.tsx
 import React, { useEffect, useState, type JSX } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import {
@@ -48,6 +49,31 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
             if (s.data) setStati(s.data);
             if (p.data) setPriorita(p.data);
         });
+
+        const channel = supabase.channel("realtime_project_dropdowns");
+
+        channel
+            .on("postgres_changes", { event: "*", schema: "public", table: "clienti" }, async () => {
+                const { data } = await supabase.from("clienti").select("id,nome").is("deleted_at", null);
+                if (data) setClienti(data);
+            })
+            .on("postgres_changes", { event: "*", schema: "public", table: "utenti" }, async () => {
+                const { data } = await supabase.from("utenti").select("id,nome,cognome").is("deleted_at", null);
+                if (data) setUtenti(data);
+            })
+            .on("postgres_changes", { event: "*", schema: "public", table: "stati" }, async () => {
+                const { data } = await supabase.from("stati").select("id,nome").is("deleted_at", null);
+                if (data) setStati(data);
+            })
+            .on("postgres_changes", { event: "*", schema: "public", table: "priorita" }, async () => {
+                const { data } = await supabase.from("priorita").select("id,nome").is("deleted_at", null);
+                if (data) setPriorita(data);
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     const reset = () => {
@@ -104,13 +130,26 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
 
     const popupContent: Record<PopupType, JSX.Element> = {
         cliente: (
-            <select value={clienteId ?? ""} onChange={(e) => setClienteId(e.target.value || null)} className={baseInputClass}>
-                <option value="">-- nessuno --</option>
-                {clienti.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-            </select>
+            <div className="space-y-1 max-h-60">
+                {clienti.map((c) => (
+                    <div
+                        key={c.id}
+                        onClick={() => {
+                            setClienteId(c.id === clienteId ? null : c.id);
+                            setPopupOpen(null);
+                        }}
+                        className={`cursor-pointer px-2 py-1 rounded border ${clienteId === c.id
+                            ? "selected-panel font-semibold"
+                            : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
+                            }`}
+                    >
+                        {c.nome}
+                    </div>
+                ))}
+            </div>
         ),
         utenti: (
-            <div className="space-y-1 max-h-60 overflow-y-auto">
+            <div className="space-y-1 max-h-60">
                 {utenti.map(u => {
                     const selected = utentiSelezionati.some(s => s.id === u.id);
                     return (
@@ -128,26 +167,52 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
             </div>
         ),
         stato: (
-            <select value={statoId} onChange={(e) => setStatoId(e.target.value)} className={baseInputClass}>
-                <option value="">-- seleziona --</option>
-                {stati.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-            </select>
+            <div className="space-y-1 max-h-60">
+                {stati.map((s) => (
+                    <div
+                        key={s.id}
+                        onClick={() => {
+                            setStatoId(String(s.id) === statoId ? "" : String(s.id));
+                            setPopupOpen(null);
+                        }}
+                        className={`cursor-pointer px-2 py-1 rounded border ${statoId === String(s.id)
+                            ? "selected-panel font-semibold"
+                            : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
+                            }`}
+                    >
+                        {s.nome}
+                    </div>
+                ))}
+            </div>
         ),
         priorita: (
-            <select value={prioritaId} onChange={(e) => setPrioritaId(e.target.value)} className={baseInputClass}>
-                <option value="">-- seleziona --</option>
-                {priorita.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-            </select>
+            <div className="space-y-1 max-h-60">
+                {priorita.map((p) => (
+                    <div
+                        key={p.id}
+                        onClick={() => {
+                            setPrioritaId(String(p.id) === prioritaId ? "" : String(p.id));
+                            setPopupOpen(null);
+                        }}
+                        className={`cursor-pointer px-2 py-1 rounded border ${prioritaId === String(p.id)
+                            ? "selected-panel font-semibold"
+                            : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
+                            }`}
+                    >
+                        {p.nome}
+                    </div>
+                ))}
+            </div>
         ),
         consegna: (
             <input type="date" value={consegna} onChange={(e) => setConsegna(e.target.value)} className={baseInputClass} />
         ),
         tempo: (
             <div className="flex gap-2">
-                <select value={ore} onChange={(e) => setOre(+e.target.value)} className={`${baseInputClass} w-1/2`}>
+                <select value={ore} onChange={(e) => setOre(+e.target.value)} className={`${baseInputClass} w-1/2 hide-scrollbar`}>
                     {[...Array(25).keys()].map(h => <option key={h} value={h}>{h}h</option>)}
                 </select>
-                <select value={minuti} onChange={(e) => setMinuti(+e.target.value)} className={`${baseInputClass} w-1/2`}>
+                <select value={minuti} onChange={(e) => setMinuti(+e.target.value)} className={`${baseInputClass} w-1/2 hide-scrollbar`}>
                     {[0, 15, 30, 45].map(m => <option key={m} value={m}>{m}min</option>)}
                 </select>
             </div>
@@ -220,7 +285,10 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
                     </div>
 
                     {popupOpen && (
-                        <div className="absolute bottom-full mb-2 border rounded p-4 bg-theme text-theme shadow-md max-h-60 overflow-auto z-50 left-0 w-full">
+                        <div
+                            key={`${popupOpen}-${clienti.length}-${utenti.length}-${stati.length}-${priorita.length}`}
+                            className="absolute bottom-full mb-2 border rounded p-4 bg-theme text-theme shadow-md max-h-60 overflow-auto z-50 left-0 w-full hide-scrollbar"
+                        >
                             <div className="flex justify-between items-center mb-2">
                                 <strong className="capitalize text-theme">{popupOpen}</strong>
                                 <button type="button" onClick={() => setPopupOpen(null)} className="text-sm">
