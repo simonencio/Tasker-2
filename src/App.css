@@ -445,20 +445,32 @@ html.dark .icon-futuro {
 
 
 
+.bg-task{
+@apply bg-blue-100  text-blue-800  
+}
 
 
 
+html.dark .bg-task{
+@apply  dark:bg-blue-900  dark:text-blue-300 
+}
+
+
+.bg-button-oggi{
+@apply bg-blue-100  text-blue-800  hover:bg-blue-200 
+}
 
 
 
+html.dark .bg-button-oggi{
+@apply dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-700
+}
 
 
 
-
-
-
-
-
-
-
-
+.bg-task-modal{
+  @apply bg-blue-100  text-blue-800 
+}
+html.dark .bg-task-modal{
+  @apply  dark:bg-blue-900  dark:text-blue-300
+}
