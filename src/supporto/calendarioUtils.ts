@@ -15,14 +15,16 @@ export const filtraTask = (
     taskList: Task[],
     giorno: Date,
     soloMieTask: boolean,
-    utenteLoggatoId: string | null
+    utenteLoggatoId: string | null,
+    isAdmin?: boolean
 ) =>
     taskList.filter(
         t =>
             t.consegna &&
             isSameDay(new Date(t.consegna), giorno) &&
-            (!soloMieTask || t.utenti_task?.some(u => u.utente?.id === utenteLoggatoId))
+            (!soloMieTask || isAdmin || t.utenti_task?.some(u => u.utente?.id === utenteLoggatoId))
     );
+
 
 export const getColorClass = (giorno: Date, oggi: Date) => {
     const g = startOfDay(giorno);
@@ -54,11 +56,12 @@ export const calcolaSettimana = (base: Date): Date[] => {
     return Array.from({ length: 7 }, (_, i) => addDays(inizio, i));
 };
 
-export const calcolaMeseEsteso = (mese: Date): Date[] =>
+export const calcolaMesePuro = (mese: Date): Date[] =>
     eachDayOfInterval({
-        start: startOfWeek(startOfMonth(mese), { weekStartsOn: 1 }),
-        end: addDays(endOfMonth(mese), 6),
+        start: startOfMonth(mese),
+        end: endOfMonth(mese),
     });
+
 
 export const generaTaskScadute = (taskList: Task[]) => {
     const oggi = new Date();

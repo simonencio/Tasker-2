@@ -17,10 +17,11 @@ import {
     getColorClass,
     getMessaggio,
     calcolaSettimana,
-    calcolaMeseEsteso,
+    calcolaMesePuro,
     generaTaskScadute
 } from '../supporto/calendarioUtils';
 import type { Task } from './DettaglioProgetto';
+import ToggleMie from './ToggleMie';
 
 type VistaCalendario = 'settimana' | 'mese';
 
@@ -29,7 +30,11 @@ export default function CalendarioProgetto() {
     const [taskList, setTaskList] = useState<Task[]>([]);
     const [utenteLoggatoId, setUtenteLoggatoId] = useState<string | null>(null);
     const [soloMieTask, setSoloMieTask] = useState(false);
-    const [vista, setVista] = useState<VistaCalendario>('settimana');
+    const [vista, setVista] = useState<VistaCalendario>(() => {
+        const salvata = localStorage.getItem('vistaCalendario');
+        return salvata === 'mese' || salvata === 'settimana' ? salvata : 'settimana';
+    });
+
     const [settimanaBase, setSettimanaBase] = useState(new Date());
     const [meseCorrente, setMeseCorrente] = useState(new Date());
     const [expandedGiorno, setExpandedGiorno] = useState<Date | null>(null);
@@ -40,7 +45,8 @@ export default function CalendarioProgetto() {
 
     const oggi = new Date();
     const giorniSettimana = calcolaSettimana(settimanaBase);
-    const giorniMese = vista === 'mese' ? calcolaMeseEsteso(meseCorrente) : [];
+    const giorniMese = vista === 'mese' ? calcolaMesePuro(meseCorrente) : [];
+    const nomiSettimana = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
 
     useEffect(() => {
         let mounted = true;
@@ -87,7 +93,7 @@ export default function CalendarioProgetto() {
     }, [taskList]);
 
     const renderGiornoSettimana = (giorno: Date) => {
-        const tasks = filtraTask(taskList, giorno, soloMieTask, utenteLoggatoId);
+        const tasks = filtraTask(taskList, giorno, soloMieTask, utenteLoggatoId, isAdmin);
         const isExpanded = giornoSelezionato && expandedGiorno && giorno.toDateString() === expandedGiorno.toDateString();
 
         return (
@@ -104,7 +110,7 @@ export default function CalendarioProgetto() {
                         {format(giorno, 'EEEE dd/MM', { locale: it }).replace(/^./, c => c.toUpperCase())}
                     </div>
                     {tasks.length > 0 && (
-                        <div className="flex-1 text-center text-sm px-3 py-1 rounded-md flex items-center justify-center gap-2 bg-white/60 dark:bg-white/10 shadow-sm">
+                        <div className="hidden sm:flex flex-1 text-center text-sm px-3 py-1 rounded-md items-center justify-center gap-2 bg-white/60 dark:bg-white/10 shadow-sm">
                             <FontAwesomeIcon icon={faTasks} className="icon-color" />
                             <span className="truncate font-medium">{getMessaggio(giorno, oggi)}</span>
                         </div>
@@ -112,13 +118,13 @@ export default function CalendarioProgetto() {
                     <div className="text-sm text-theme/70 whitespace-nowrap font-medium">{tasks.length} task</div>
                 </div>
                 {isExpanded && (
-                    <div className="px-6 py-5 bg-white dark:bg-[#1f1f1f]">
+                    <div className="px-6 py-5">
                         {tasks.length === 0 ? (
                             <div className="text-sm text-theme/60 italic">Nessuna task assegnata</div>
                         ) : (
                             <div className="flex flex-col gap-3">
                                 {tasks.map(t => (
-                                    <div key={t.id} className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 px-4 py-3 rounded-xl shadow-sm flex items-center gap-3">
+                                    <div key={t.id} className="px-4 py-3 rounded-xl shadow-sm flex items-center gap-3 bg-task">
                                         <FontAwesomeIcon icon={faTasks} className="icon-color" />
                                         <span className="truncate font-medium text-sm">{t.nome}</span>
                                     </div>
@@ -130,25 +136,32 @@ export default function CalendarioProgetto() {
             </div>
         );
     };
-
     const renderGiornoMese = (giorno: Date) => {
-        const tasks = filtraTask(taskList, giorno, soloMieTask, utenteLoggatoId);
+        const tasks = filtraTask(taskList, giorno, soloMieTask, utenteLoggatoId, isAdmin);
         const haTask = tasks.length > 0;
+        const baseColor = haTask ? getColorClass(giorno, oggi) : 'card-theme border-transparent';
+
         return (
             <div
                 key={giorno.toISOString()}
                 onClick={() => haTask && setGiornoSelezionato(giorno)}
-                className={`h-36 p-3 sm:p-4 cursor-pointer rounded-xl transition-colors flex flex-col justify-between border ${haTask ? getColorClass(giorno, oggi) + ' shadow-md' : 'card-theme border-transparent'}`}
+                className={`group aspect-square cursor-pointer border rounded-xl transition-all flex items-center justify-center p-2 sm:p-3 md:p-2 text-[14px] sm:text-[16px] md:text-xs ${baseColor}`}
             >
-                <div className="flex justify-between items-start">
-                    <div className="text-xs font-semibold">{format(giorno, 'd', { locale: it })}</div>
-                    {haTask && <FontAwesomeIcon icon={faTasks} className="icon-color" />}
-                </div>
-                {haTask && (
-                    <div className="text-[13px] font-medium text-center leading-snug mt-4">
-                        {getMessaggio(giorno, oggi)}
+                <span className="block md:hidden font-semibold">
+                    {format(giorno, 'd', { locale: it })}
+                </span>
+
+                <div className="hidden md:flex flex-col justify-between h-full w-full p-2">
+                    <div className="flex justify-between items-start">
+                        <span className="font-semibold">{format(giorno, 'd', { locale: it })}</span>
+                        {haTask && <FontAwesomeIcon icon={faTasks} className="icon-color w-4 h-4" />}
                     </div>
-                )}
+                    {haTask && (
+                        <div className="hidden lg:block text-[11px] font-medium text-center leading-snug mt-1">
+                            {getMessaggio(giorno, oggi)}
+                        </div>
+                    )}
+                </div>
             </div>
         );
     };
@@ -162,10 +175,23 @@ export default function CalendarioProgetto() {
             />
 
             <div className="p-4 sm:p-6">
-                <h1 className="text-2xl font-bold mb-6 text-theme text-center sm:text-left">📅 Calendario</h1>
+                <div className="flex flex-row items-center justify-between flex-wrap gap-3 mb-6">
+                    <h1 className="text-2xl font-bold text-theme">📅 Calendario</h1>
+                    {isAdmin && (
+                        <ToggleMie soloMieTask={soloMieTask} setSoloMieTask={setSoloMieTask} />
+                    )}
+                </div>
 
-                <div className="flex justify-between items-center flex-wrap gap-4 mb-6">
-                    <select value={vista} onChange={e => setVista(e.target.value as VistaCalendario)} className="input-style w-full sm:w-auto">
+                <div className="flex flex-wrap justify-center sm:justify-end items-center gap-4 mb-6 w-full">
+                    <select
+                        value={vista}
+                        onChange={e => {
+                            const nuovaVista = e.target.value as VistaCalendario;
+                            setVista(nuovaVista);
+                            localStorage.setItem('vistaCalendario', nuovaVista);
+                        }}
+                        className="input-style w-full max-w-xs sm:w-auto"
+                    >
                         <option value="settimana">Vista Settimana</option>
                         <option value="mese">Vista Mese</option>
                     </select>
@@ -173,20 +199,44 @@ export default function CalendarioProgetto() {
 
                 <div className="flex flex-wrap justify-center gap-3 sm:gap-4 mb-6">
                     {vista === 'settimana' ? (
-                        <>
-                            <button onClick={() => setSettimanaBase(p => addDays(p, -7))} className="text-sm hover-bg-theme px-4 py-2 rounded-md shadow-sm">← Settimana precedente</button>
-                            <button onClick={() => setSettimanaBase(new Date())} className="text-sm font-semibold bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-700 px-4 py-2 rounded-md shadow">Oggi</button>
-                            <button onClick={() => setSettimanaBase(p => addDays(p, 7))} className="text-sm hover-bg-theme px-4 py-2 rounded-md shadow-sm">Settimana successiva →</button>
-                        </>
+                        <div className="flex flex-col sm:flex-row sm:justify-center gap-2 sm:gap-3 w-full sm:max-w-md mx-auto mb-6">
+                            <button
+                                onClick={() => setSettimanaBase(p => addDays(p, -7))}
+                                className="w-full sm:w-auto text-sm px-4 py-2 rounded-md shadow-sm hover-bg-theme whitespace-nowrap"
+                            >
+                                ← Settimana precedente
+                            </button>
+                            <button
+                                onClick={() => setSettimanaBase(new Date())}
+                                className="w-full sm:w-auto text-sm font-semibold px-4 py-2 rounded-md shadow bg-button-oggi whitespace-nowrap"
+                            >
+                                Oggi
+                            </button>
+                            <button
+                                onClick={() => setSettimanaBase(p => addDays(p, 7))}
+                                className="w-full sm:w-auto text-sm px-4 py-2 rounded-md shadow-sm hover-bg-theme whitespace-nowrap"
+                            >
+                                Settimana successiva →
+                            </button>
+                        </div>
                     ) : (
-                        <>
-                            <button onClick={() => setMeseCorrente(p => new Date(p.setMonth(p.getMonth() - 1)))} className="text-sm hover-bg-theme px-4 py-2 rounded-md shadow-sm">← Mese precedente</button>
-                            <div className="px-4 py-2 text-sm font-semibold text-theme rounded-md shadow-sm bg-white/40 dark:bg-white/10">
+                        <div className="flex flex-col sm:flex-row sm:justify-center gap-2 sm:gap-3 w-full sm:max-w-md mx-auto mb-6">
+                            <button
+                                onClick={() => setMeseCorrente(p => new Date(p.setMonth(p.getMonth() - 1)))}
+                                className="w-full sm:w-auto text-sm px-4 py-2 rounded-md shadow-sm hover-bg-theme whitespace-nowrap"
+                            >
+                                ← Mese precedente
+                            </button>
+                            <div className="w-full sm:w-auto text-sm font-semibold px-4 py-2 rounded-md shadow bg-button-oggi whitespace-nowrap">
                                 {format(meseCorrente, 'MMMM yyyy', { locale: it }).replace(/^./, c => c.toUpperCase())}
                             </div>
-                            <button onClick={() => setMeseCorrente(new Date())} className="text-sm font-semibold bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-700 px-4 py-2 rounded-md shadow">Oggi</button>
-                            <button onClick={() => setMeseCorrente(p => new Date(p.setMonth(p.getMonth() + 1)))} className="text-sm hover-bg-theme px-4 py-2 rounded-md shadow-sm">Mese successivo →</button>
-                        </>
+                            <button
+                                onClick={() => setMeseCorrente(p => new Date(p.setMonth(p.getMonth() + 1)))}
+                                className="w-full sm:w-auto text-sm px-4 py-2 rounded-md shadow-sm hover-bg-theme whitespace-nowrap"
+                            >
+                                Mese successivo →
+                            </button>
+                        </div>
                     )}
                 </div>
 
@@ -195,8 +245,15 @@ export default function CalendarioProgetto() {
                         {giorniSettimana.map(renderGiornoSettimana)}
                     </div>
                 ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 sm:gap-3 max-w-6xl mx-auto w-full px-2 sm:px-4">
-                        {giorniMese.map(renderGiornoMese)}
+                    <div>
+                        <div className="grid grid-cols-7 text-center text-[11px] sm:text-xs font-semibold text-theme/80 mb-2 max-w-6xl mx-auto w-full px-[2px] sm:px-1">
+                            {nomiSettimana.map(g => (
+                                <div key={g} className="py-1">{g}</div>
+                            ))}
+                        </div>
+                        <div className="grid grid-cols-7 gap-[1px] sm:gap-[2px] md:gap-2 max-w-6xl mx-auto w-full px-[2px] sm:px-1">
+                            {giorniMese.map(renderGiornoMese)}
+                        </div>
                     </div>
                 )}
 
@@ -208,8 +265,8 @@ export default function CalendarioProgetto() {
                                 Task in scadenza il {format(giornoSelezionato, 'EEEE dd MMMM yyyy', { locale: it }).replace(/^./, c => c.toUpperCase())}
                             </h2>
                             <div className="flex flex-col gap-3 max-h-[60vh] overflow-auto scrollbar-thin">
-                                {filtraTask(taskList, giornoSelezionato, soloMieTask, utenteLoggatoId).map(t => (
-                                    <div key={t.id} className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 px-4 py-2 rounded shadow flex items-center gap-3 text-sm">
+                                {filtraTask(taskList, giornoSelezionato, soloMieTask, utenteLoggatoId, isAdmin).map(t => (
+                                    <div key={t.id} className="bg-task-modal px-4 py-2 rounded shadow flex items-center gap-3 text-sm">
                                         <FontAwesomeIcon icon={faTasks} className="icon-color" />
                                         <span className="break-words">{t.nome}</span>
                                     </div>

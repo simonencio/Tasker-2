@@ -11,6 +11,7 @@ import {
 import MiniProjectEditorModal from '../Modifica/MiniProjectEditorModal';
 import IntestazioneProgetto from './IntestazioneProgetto';
 import { isUtenteAdmin } from '../supporto/ruolo';
+import ToggleMie from './ToggleMie';
 
 type ProgettoDettaglio = {
     nome: string;
@@ -116,17 +117,25 @@ export default function DettaglioProgetto() {
             />
 
             <div className="p-6">
-                <h1 className="text-2xl font-bold mb-4 text-theme flex items-center gap-2">
-                    📁 {progetto.nome}
-                    <button
-                        type="button"
-                        onClick={() => setModaleAperta(true)}
-                        className="text-yellow-500 hover:text-yellow-600 transition"
-                        aria-label="Modifica progetto"
-                    >
-                        <FontAwesomeIcon icon={faPen} className="w-4 h-4" />
-                    </button>
+                <h1 className="text-2xl font-bold mb-4 text-theme flex flex-row items-center justify-between flex-wrap gap-2">
+
+                    <div className="flex flex-row items-center gap-2">
+                        📁 {progetto.nome}
+                        <button
+                            type="button"
+                            onClick={() => setModaleAperta(true)}
+                            className="text-yellow-500 hover:text-yellow-600 transition"
+                            aria-label="Modifica progetto"
+                        >
+                            <FontAwesomeIcon icon={faPen} className="w-4 h-4" />
+                        </button>
+                    </div>
+                    {isAdmin && (
+                        <ToggleMie soloMieTask={soloMieTask} setSoloMieTask={setSoloMieTask} />
+                    )}
                 </h1>
+
+
 
                 <div className="space-y-1 mb-4 text-[15px] text-theme">
                     {progetto.clienti?.nome && <p><span className="font-semibold">Cliente:</span> {progetto.clienti.nome}</p>}
@@ -160,12 +169,11 @@ export default function DettaglioProgetto() {
                             </div>
 
                             {/* Azioni */}
-                            {soloMieTask && (
-                                <div className="w-auto flex items-center justify-center gap-2 text-theme text-sm">
+                            <div className="w-auto flex items-center justify-center gap-2 text-theme text-sm">
+                                Azioni
+                            </div>
 
-                                    Azioni
-                                </div>
-                            )}
+
 
                             {/* Spazio per "+" */}
                             <div className="w-6" />
@@ -173,7 +181,10 @@ export default function DettaglioProgetto() {
 
                         {/* RIGHE TASK */}
                         {taskList
-                            .filter(task => !soloMieTask || task.utenti_task?.some(ut => ut.utente?.id === utenteLoggatoId))
+                            .filter(task => {
+                                if (isAdmin) return !soloMieTask || task.utenti_task?.some(ut => ut.utente?.id === utenteLoggatoId);
+                                return task.utenti_task?.some(ut => ut.utente?.id === utenteLoggatoId);
+                            })
                             .map(task => (
                                 <div key={task.id} className="border-t border-gray-100 dark:border-gray-700 hover-bg-theme transition">
                                     <div
@@ -201,15 +212,14 @@ export default function DettaglioProgetto() {
                                         </div>
 
                                         {/* Azioni */}
-                                        {soloMieTask && (
-                                            <div
-                                                className="w-auto flex-shrink-0 flex items-center justify-center gap-2 text-theme text-sm"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
+                                        {(isAdmin || task.utenti_task?.some(ut => ut.utente?.id === utenteLoggatoId)) && (
+                                            <div className="w-auto flex-shrink-0 flex items-center justify-center gap-2 text-theme text-sm" onClick={(e) => e.stopPropagation()}>
+
                                                 <FontAwesomeIcon icon={faPen} className="cursor-pointer text-yellow-500 hover:text-yellow-600 w-4 h-4" />
                                                 <FontAwesomeIcon icon={faTrash} className="cursor-pointer text-red-500 hover:text-red-600 w-4 h-4" />
                                             </div>
                                         )}
+
 
 
                                         {/* Toggle "+" */}

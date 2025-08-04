@@ -1,7 +1,8 @@
+// 📁 Modifica/MiniProjectEditorModal.tsx
 import { useEffect, useState } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faClock, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { faXmark } from "@fortawesome/free-solid-svg-icons";
 import { inviaNotifica } from "../Notifiche/notificheUtils";
 
 type Props = {
@@ -140,8 +141,10 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="modal-container p-6 rounded-xl shadow-xl w-full max-w-[600px] max-h-[90vh] overflow-y-auto relative">
+        <div className="fixed top-16 bottom-0 left-0 right-0 z-50 bg-black/60 overflow-y-auto px-4 pt-4 pb-8 flex justify-center hide-scrollbar">
+
+            <div className="modal-container p-6 rounded-xl shadow-xl w-full max-w-[600px] my-auto relative">
+
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold text-theme">✏️ Modifica Progetto</h2>
                     <button onClick={onClose}>
@@ -150,7 +153,7 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                 </div>
 
                 {/* Nome & Note */}
-                <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <div>
                         <label className="text-sm font-semibold text-theme mb-1 block">Nome</label>
                         <input
@@ -170,7 +173,7 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                 </div>
 
                 {/* Cliente & Stato */}
-                <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <div>
                         <label className="text-sm font-semibold text-theme mb-1 block">Cliente</label>
                         <select
@@ -190,7 +193,9 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                         <label className="text-sm font-semibold text-theme mb-1 block">Stato</label>
                         <select
                             value={statoId ?? ""}
-                            onChange={(e) => setStatoId(e.target.value === "" ? null : Number(e.target.value))}
+                            onChange={(e) =>
+                                setStatoId(e.target.value === "" ? null : Number(e.target.value))
+                            }
                             className="w-full input-style"
                         >
                             <option value="">Seleziona stato</option>
@@ -204,12 +209,14 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                 </div>
 
                 {/* Priorità & Consegna */}
-                <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <div>
                         <label className="text-sm font-semibold text-theme mb-1 block">Priorità</label>
                         <select
                             value={prioritaId ?? ""}
-                            onChange={(e) => setPrioritaId(e.target.value === "" ? null : Number(e.target.value))}
+                            onChange={(e) =>
+                                setPrioritaId(e.target.value === "" ? null : Number(e.target.value))
+                            }
                             className="w-full input-style"
                         >
                             <option value="">Seleziona priorità</option>
@@ -232,13 +239,11 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                 </div>
 
                 {/* Tempo & Membri */}
-                <div className="grid grid-cols-2 gap-3 mb-4 relative">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 relative">
                     <div>
                         <label className="text-sm font-semibold text-theme mb-1 block">Tempo stimato</label>
                         <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 icon-color ">
-                                <FontAwesomeIcon icon={faClock} />
-                            </span>
+
                             <input
                                 value={tempoStimato}
                                 onChange={(e) => setTempoStimato(e.target.value)}
@@ -298,5 +303,4 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
             </div>
         </div>
     );
-
 }
