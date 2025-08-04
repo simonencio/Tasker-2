@@ -1,18 +1,16 @@
-import { useNavigate, useParams, NavLink } from 'react-router-dom';
+// 📁 DettaglioProgetto.tsx
+import { useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '../supporto/supabaseClient';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-    faArrowLeft,
-    faTasks,
-    faCalendarDay,
-    faFlag,
-    faUserCheck,
-    faClock,
-    faStickyNote,
-    faPen,
+    faTasks, faCalendarDay, faFlag,
+    faUserCheck, faClock, faStickyNote,
+    faPen, faTrash
 } from '@fortawesome/free-solid-svg-icons';
 import MiniProjectEditorModal from '../Modifica/MiniProjectEditorModal';
+import IntestazioneProgetto from './IntestazioneProgetto';
+import { isUtenteAdmin } from '../supporto/ruolo';
 
 type ProgettoDettaglio = {
     nome: string;
@@ -24,7 +22,9 @@ type ProgettoDettaglio = {
     priorita?: { nome: string } | null;
 };
 
-type UtenteTask = { utente?: { id: string; nome: string } | null };
+type UtenteTask = {
+    utente?: { [x: string]: string; id: string; nome: string } | null;
+};
 
 export type Task = {
     stato_id: number;
@@ -40,13 +40,25 @@ export type Task = {
 
 export default function DettaglioProgetto() {
     const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
     const [progetto, setProgetto] = useState<ProgettoDettaglio | null>(null);
     const [taskList, setTaskList] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [soloMieTask, setSoloMieTask] = useState(false);
     const [utenteLoggatoId, setUtenteLoggatoId] = useState<string | null>(null);
     const [modaleAperta, setModaleAperta] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [taskAperta, setTaskAperta] = useState<Record<string, boolean>>({});
+
+    useEffect(() => {
+        let mounted = true;
+        isUtenteAdmin().then(res => {
+            if (mounted) {
+                setIsAdmin(res);
+                if (!res) setSoloMieTask(true);
+            }
+        });
+        return () => { mounted = false };
+    }, []);
 
     useEffect(() => {
         const fetchProgetto = async () => {
@@ -56,7 +68,6 @@ export default function DettaglioProgetto() {
                 .select(`nome, note, consegna, tempo_stimato, clienti(nome), stati(nome), priorita(nome)`)
                 .eq('id', id)
                 .single<ProgettoDettaglio>();
-
             if (!error && data) setProgetto(data);
             setLoading(false);
         };
@@ -66,41 +77,22 @@ export default function DettaglioProgetto() {
     useEffect(() => {
         const fetchTasks = async () => {
             if (!id) return;
-
-            const { data: taskRows } = await supabase
+            const { data, error } = await supabase
                 .from('progetti_task')
-                .select(`tasks (id, stato_id, nome, note, consegna, tempo_stimato, stati (nome), priorita (nome))`)
+                .select(`task:tasks (
+          id, stato_id, nome, note, consegna, tempo_stimato,
+          stati (nome),
+          priorita (nome),
+          utenti_task:utenti_task (
+            utente:utenti (id, nome)
+          )
+        )`)
                 .eq('progetti_id', id);
-
-            const tasks: Task[] = (taskRows || []).map((r: any) => r.tasks);
-            const taskIds = tasks.map(t => t.id);
-
-            const { data: assegnazioniRaw } = await supabase
-                .from('utenti_task')
-                .select('task_id, utente_id')
-                .in('task_id', taskIds);
-
-            const userIds = [...new Set(assegnazioniRaw?.map(r => r.utente_id) || [])];
-            const { data: utentiData } = await supabase
-                .from('utenti')
-                .select('id, nome')
-                .in('id', userIds);
-
-            const utentiMap = Object.fromEntries((utentiData || []).map(u => [u.id, u]));
-
-            const taskListFinale: Task[] = tasks.map(task => {
-                const assegnazioni = (assegnazioniRaw || []).filter(ut => ut.task_id === task.id);
-                return {
-                    ...task,
-                    utenti_task: assegnazioni.map(ut => ({
-                        utente: utentiMap[ut.utente_id] || null
-                    }))
-                };
-            });
-
-            setTaskList(taskListFinale);
+            if (!error && data) {
+                const taskListFinale: Task[] = data.map((r: any) => r.task);
+                setTaskList(taskListFinale);
+            }
         };
-
         fetchTasks();
     }, [id]);
 
@@ -117,30 +109,11 @@ export default function DettaglioProgetto() {
 
     return (
         <div className="min-h-screen bg-theme text-theme">
-            <div className="bg-theme px-6 py-4 flex items-center justify-between">
-                <button
-                    onClick={() => navigate('/progetti')}
-                    className="text-sm flex items-center gap-2 text-theme hover:text-blue-500"
-                >
-                    <FontAwesomeIcon icon={faArrowLeft} className="icon-color" />
-                    <span>Torna indietro</span>
-                </button>
-
-                <div className="flex gap-6 text-sm items-center">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">👤 Mie</span>
-                        <div onClick={() => setSoloMieTask(v => !v)} className={`toggle-theme ${soloMieTask ? 'active' : ''}`}>
-                            <div className={`toggle-thumb ${soloMieTask ? 'translate' : ''} ${document.documentElement.classList.contains('dark') ? 'dark' : ''}`} />
-                        </div>
-                    </div>
-                    <NavLink to={`/progetti/${id}`} end className={({ isActive }) => `hover:text-blue-600 ${isActive ? 'text-blue-700 font-semibold' : 'text-theme'}`}>
-                        Dashboard
-                    </NavLink>
-                    <NavLink to={`/progetti/${id}/calendario`} className={({ isActive }) => `hover:text-blue-600 ${isActive ? 'text-blue-700 font-semibold' : 'text-theme'}`}>
-                        Calendario
-                    </NavLink>
-                </div>
-            </div>
+            <IntestazioneProgetto
+                id={id!}
+                soloMieTask={soloMieTask}
+                setSoloMieTask={isAdmin ? setSoloMieTask : () => { }}
+            />
 
             <div className="p-6">
                 <h1 className="text-2xl font-bold mb-4 text-theme flex items-center gap-2">
@@ -155,7 +128,7 @@ export default function DettaglioProgetto() {
                     </button>
                 </h1>
 
-                <div className="space-y-1 mb-4 text-sm text-theme">
+                <div className="space-y-1 mb-4 text-[15px] text-theme">
                     {progetto.clienti?.nome && <p><span className="font-semibold">Cliente:</span> {progetto.clienti.nome}</p>}
                     {progetto.consegna && <p><span className="font-semibold">Consegna:</span> {new Date(progetto.consegna).toLocaleDateString()}</p>}
                     {progetto.stati?.nome && <p><span className="font-semibold">Stato:</span> {progetto.stati.nome}</p>}
@@ -174,17 +147,129 @@ export default function DettaglioProgetto() {
                         {taskList.length > 0 ? 'Task del progetto' : 'Nessuna Task Assegnata'}
                     </h2>
 
-                    <div className="card-theme overflow-hidden">
-                        <div className="flex items-center justify-between px-4 py-2 text-xs text-theme uppercase font-semibold">
-                            <div className="flex-1">Nome</div>
-                            <div className="w-32 text-right">Consegna</div>
-                            <div className="w-24 text-right">Stato</div>
+                    <div className="card-theme shadow-md">
+                        {/* INTESTAZIONE */}
+                        <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center justify-between px-4 py-3 cursor-default gap-2 border-b border-gray-200 dark:border-gray-700">
+                            {/* Nome */}
+                            <div className="flex-1 text-[15px] text-theme font-medium">Nome</div>
+
+                            {/* Consegna + Stato (solo desktop) */}
+                            <div className="hidden sm:flex gap-4 sm:gap-0 sm:flex-row justify-center">
+                                <div className="w-40 text-[15px] text-theme flex items-center justify-center">Consegna</div>
+                                <div className="w-32 text-[15px] text-theme flex items-center justify-center">Stato</div>
+                            </div>
+
+                            {/* Azioni */}
+                            {soloMieTask && (
+                                <div className="w-auto flex items-center justify-center gap-2 text-theme text-sm">
+
+                                    Azioni
+                                </div>
+                            )}
+
+                            {/* Spazio per "+" */}
                             <div className="w-6" />
                         </div>
+
+                        {/* RIGHE TASK */}
                         {taskList
                             .filter(task => !soloMieTask || task.utenti_task?.some(ut => ut.utente?.id === utenteLoggatoId))
-                            .map(task => <TaskRow key={task.id} task={task} />)}
+                            .map(task => (
+                                <div key={task.id} className="border-t border-gray-100 dark:border-gray-700 hover-bg-theme transition">
+                                    <div
+                                        className="flex flex-nowrap sm:flex-nowrap items-center justify-between px-4 py-3 cursor-pointer gap-2 sm:gap-4"
+                                        onClick={() => setTaskAperta(prev => ({ ...prev, [task.id]: !prev[task.id] }))}
+                                    >
+
+
+                                        {/* Nome */}
+                                        <div className="flex-1 text-[15px] text-theme flex items-center gap-2 font-medium">
+                                            <FontAwesomeIcon icon={faTasks} className="icon-color w-4 h-4" />
+                                            {task.nome}
+                                        </div>
+
+                                        {/* Consegna + Stato (solo desktop) */}
+                                        <div className="hidden sm:flex gap-4 sm:gap-0 sm:flex-row justify-center">
+                                            <div className="w-40 text-[15px] text-theme flex items-center gap-1 justify-center">
+                                                <FontAwesomeIcon icon={faCalendarDay} className="icon-color w-4 h-4" />
+                                                {task.consegna ? new Date(task.consegna).toLocaleDateString() : '—'}
+                                            </div>
+                                            <div className="w-32 text-[15px] text-theme flex items-center gap-1 justify-center">
+                                                <FontAwesomeIcon icon={faFlag} className="icon-color w-4 h-4" />
+                                                {task.stati?.nome || '—'}
+                                            </div>
+                                        </div>
+
+                                        {/* Azioni */}
+                                        {soloMieTask && (
+                                            <div
+                                                className="w-auto flex-shrink-0 flex items-center justify-center gap-2 text-theme text-sm"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <FontAwesomeIcon icon={faPen} className="cursor-pointer text-yellow-500 hover:text-yellow-600 w-4 h-4" />
+                                                <FontAwesomeIcon icon={faTrash} className="cursor-pointer text-red-500 hover:text-red-600 w-4 h-4" />
+                                            </div>
+                                        )}
+
+
+                                        {/* Toggle "+" */}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setTaskAperta(p => ({ ...p, [task.id]: !p[task.id] }));
+                                            }}
+                                            className="w-6 h-6 flex-shrink-0 text-blue-600 text-sm flex items-center justify-center rounded hover-bg-theme"
+                                            aria-label={taskAperta[task.id] ? 'Chiudi dettagli' : 'Apri dettagli'}
+                                        >
+                                            {taskAperta[task.id] ? '−' : '+'}
+                                        </button>
+
+                                    </div>
+
+                                    {/* DETTAGLI (solo se aperta) */}
+                                    {taskAperta[task.id] && (
+                                        <div className="px-4 py-3 text-sm space-y-2 bg-theme border-t border-gray-100 dark:border-gray-700 animate-scale-fade text-theme">
+                                            {/* Consegna + Stato (mobile) */}
+                                            <div className="flex sm:hidden flex-col gap-2">
+                                                <p className="flex items-center gap-2">
+                                                    <FontAwesomeIcon icon={faCalendarDay} className="icon-color w-4 h-4" />
+                                                    <span><strong>Consegna:</strong> {task.consegna ? new Date(task.consegna).toLocaleDateString() : '—'}</span>
+                                                </p>
+                                                <p className="flex items-center gap-2">
+                                                    <FontAwesomeIcon icon={faFlag} className="icon-color w-4 h-4" />
+                                                    <span><strong>Stato:</strong> {task.stati?.nome || '—'}</span>
+                                                </p>
+                                            </div>
+
+                                            {/* Assegnato a */}
+                                            {task.utenti_task.length > 0 && (
+                                                <p className="flex items-center gap-2">
+                                                    <FontAwesomeIcon icon={faUserCheck} className="icon-color w-4 h-4" />
+                                                    <span><strong>Assegnato a:</strong> {task.utenti_task.map(ut => ut.utente?.nome).filter(Boolean).join(', ')}</span>
+                                                </p>
+                                            )}
+
+                                            {/* Tempo stimato */}
+                                            {task.tempo_stimato && (
+                                                <p className="flex items-center gap-2">
+                                                    <FontAwesomeIcon icon={faClock} className="icon-color w-4 h-4" />
+                                                    <span><strong>Tempo stimato:</strong> {task.tempo_stimato}</span>
+                                                </p>
+                                            )}
+
+                                            {/* Note */}
+                                            {task.note && (
+                                                <p className="flex items-start gap-2">
+                                                    <FontAwesomeIcon icon={faStickyNote} className="icon-color w-4 h-4 mt-1" />
+                                                    <span><strong>Note:</strong> {task.note}</span>
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
                     </div>
+
                 </div>
             </div>
 
@@ -193,62 +278,6 @@ export default function DettaglioProgetto() {
                     progettoId={id}
                     onClose={() => setModaleAperta(false)}
                 />
-            )}
-        </div>
-    );
-}
-
-function TaskRow({ task }: { task: Task }) {
-    const [aperta, setAperta] = useState(false);
-
-    return (
-        <div className="border-t border-gray-200 dark:border-gray-700">
-            <div
-                className="flex items-center justify-between px-4 py-3 hover-bg-theme transition-colors cursor-pointer"
-                onClick={() => setAperta(prev => !prev)}
-            >
-                <div className="flex-1 text-sm font-medium text-theme flex items-center gap-2">
-                    <FontAwesomeIcon icon={faTasks} className="icon-color w-4 h-4" />
-                    {task.nome}
-                </div>
-                <div className="w-32 text-sm text-theme flex items-center gap-1 justify-end">
-                    <FontAwesomeIcon icon={faCalendarDay} className="icon-color w-4 h-4" />
-                    {task.consegna ? new Date(task.consegna).toLocaleDateString() : '—'}
-                </div>
-                <div className="w-24 text-sm text-theme flex items-center gap-1 justify-end">
-                    <FontAwesomeIcon icon={faFlag} className="icon-color w-4 h-4" />
-                    {task.stati?.nome || '—'}
-                </div>
-                <button
-                    onClick={(e) => { e.stopPropagation(); setAperta(p => !p); }}
-                    className="text-blue-600 text-sm w-6 h-6 flex items-center justify-center rounded hover-bg-theme"
-                    aria-label={aperta ? 'Chiudi dettagli' : 'Apri dettagli'}
-                >
-                    {aperta ? '−' : '+'}
-                </button>
-            </div>
-
-            {aperta && (
-                <div className="px-4 py-3 text-sm space-y-2 bg-theme border-t border-gray-200 dark:border-gray-700 animate-scale-fade text-theme">
-                    {task.utenti_task.length > 0 && (
-                        <p className="flex items-center gap-2">
-                            <FontAwesomeIcon icon={faUserCheck} className="icon-color w-4 h-4" />
-                            <span><strong>Assegnato a:</strong> {task.utenti_task.map(ut => ut.utente?.nome).filter(Boolean).join(', ')}</span>
-                        </p>
-                    )}
-                    {task.tempo_stimato && (
-                        <p className="flex items-center gap-2">
-                            <FontAwesomeIcon icon={faClock} className="icon-color w-4 h-4" />
-                            <span><strong>Tempo stimato:</strong> {task.tempo_stimato}</span>
-                        </p>
-                    )}
-                    {task.note && (
-                        <p className="flex items-start gap-2">
-                            <FontAwesomeIcon icon={faStickyNote} className="icon-color w-4 h-4 mt-1" />
-                            <span><strong>Note:</strong> {task.note}</span>
-                        </p>
-                    )}
-                </div>
             )}
         </div>
     );

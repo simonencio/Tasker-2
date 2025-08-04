@@ -371,3 +371,94 @@ html.dark .selected-panel {
   background-color: rgba(96, 165, 250, 0.18); /* blu-400 soft in dark */
   border: 1px solid #3b82f6;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* 📅 Celle calendario */
+
+.bg-oggi {
+  @apply bg-yellow-200 text-yellow-900;
+}
+html.dark .bg-oggi {
+  @apply dark:bg-yellow-700 dark:text-yellow-200;
+}
+
+.bg-passato {
+  @apply bg-red-200 text-red-900;
+}
+html.dark .bg-passato {
+  @apply dark:bg-red-700 dark:text-red-200;
+}
+
+.bg-futuro {
+  @apply bg-green-200 text-green-900;
+}
+html.dark .bg-futuro {
+  @apply dark:bg-green-700 dark:text-green-200;
+}
+
+/* 🧩 Icone (FontAwesome) */
+
+.icon-oggi {
+  @apply text-yellow-500;
+}
+html.dark .icon-oggi {
+  @apply dark:text-yellow-300;
+}
+
+.icon-passato {
+  @apply text-red-500;
+}
+html.dark .icon-passato {
+  @apply dark:text-red-300;
+}
+
+.icon-futuro {
+  @apply text-green-600;
+}
+html.dark .icon-futuro {
+  @apply dark:text-green-300;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
