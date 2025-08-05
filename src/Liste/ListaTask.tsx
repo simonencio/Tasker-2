@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faTasks, faUser } from "@fortawesome/free-solid-svg-icons";
 import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
+import FiltriTaskAvanzati, { type FiltroAvanzato } from "../supporto/FiltriTaskAvanzati";
 
 export type Task = {
     id: string;
@@ -13,9 +13,10 @@ export type Task = {
     tempo_stimato?: string | null;
     created_at: string;
     modified_at: string;
-    stato?: { nome: string; colore?: string | null } | null;
-    priorita?: { nome: string } | null;
+    stato?: { id: number; nome: string; colore?: string | null } | null;
+    priorita?: { id: number; nome: string } | null;
     progetto?: { id: string; nome: string } | null;
+    assegnatari?: { id: string; nome: string }[];
 };
 
 export default function ListaTask() {
@@ -26,18 +27,15 @@ export default function ListaTask() {
     const [utenteId, setUtenteId] = useState<string | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [taskDaModificareId, setTaskDaModificareId] = useState<string | null>(null);
-
-    const [progetti, setProgetti] = useState<{ id: string; nome: string }[]>([]);
-    const [utenti, setUtenti] = useState<{ id: string; nome: string }[]>([]);
-    const [stati, setStati] = useState<{ id: number; nome: string }[]>([]);
-    const [priorita, setPriorita] = useState<{ id: number; nome: string }[]>([]);
-
-    const [progettoFilter, setProgettoFilter] = useState<string | null>(null);
-    const [utenteFilter, setUtenteFilter] = useState<string | null>(null);
-    const [statoFilter, setStatoFilter] = useState<number | null>(null);
-    const [prioritaFilter, setPrioritaFilter] = useState<number | null>(null);
-
-    const navigate = useNavigate();
+    const [taskEspansaId, setTaskEspansaId] = useState<string | null>(null);
+    const [filtroAvanzato, setFiltroAvanzato] = useState<FiltroAvanzato>({
+        progetto: null,
+        utente: null,
+        stato: null,
+        priorita: null,
+        consegna: null,
+        ordine: null,
+    });
 
     useEffect(() => {
         const fetchUtente = async () => {
@@ -47,22 +45,7 @@ export default function ListaTask() {
             const { data: ruoloData } = await supabase.from("utenti").select("ruolo").eq("id", user.id).single();
             if (ruoloData?.ruolo === 1) setIsAdmin(true);
         };
-
-        const fetchFiltri = async () => {
-            const [progettiRes, utentiRes, statiRes, prioritaRes] = await Promise.all([
-                supabase.from("progetti").select("id, nome").is("deleted_at", null),
-                supabase.from("utenti").select("id, nome"),
-                supabase.from("stati").select("id, nome").is("deleted_at", null),
-                supabase.from("priorita").select("id, nome").is("deleted_at", null),
-            ]);
-            setProgetti(progettiRes.data || []);
-            setUtenti(utentiRes.data || []);
-            setStati(statiRes.data || []);
-            setPriorita(prioritaRes.data || []);
-        };
-
         fetchUtente();
-        fetchFiltri();
     }, []);
 
     useEffect(() => {
@@ -70,48 +53,49 @@ export default function ListaTask() {
             setLoading(true);
             let taskIds: string[] = [];
 
-            if ((soloMie || utenteFilter) && utenteId) {
-                const idFiltro = utenteFilter || utenteId;
-                const { data } = await supabase
-                    .from("utenti_task")
-                    .select("task_id")
-                    .eq("utente_id", idFiltro);
+            if ((soloMie || filtroAvanzato.utente) && utenteId) {
+                const idFiltro = filtroAvanzato.utente || utenteId;
+                const { data } = await supabase.from("utenti_task").select("task_id").eq("utente_id", idFiltro);
                 if (!data || data.length === 0) {
                     setTasks([]);
                     setLoading(false);
                     return;
                 }
-                taskIds = data.map((t) => t.task_id);
+                taskIds = data.map(t => t.task_id);
             }
 
             const query = supabase
                 .from("tasks")
                 .select(`
                     id, nome, note, consegna, tempo_stimato, created_at, modified_at,
-                    stato:stato_id (nome, colore),
-                    priorita:priorita_id (nome),
-                    progetti_task:progetti_task ( progetti ( id, nome ) )
+                    stato:stato_id (id, nome, colore),
+                    priorita:priorita_id (id, nome),
+                    progetti_task:progetti_task ( progetti ( id, nome ) ),
+                    utenti_task ( utenti ( id, nome ) )
                 `)
-                .is("deleted_at", null)
-                .order("created_at", { ascending: false });
+                .is("deleted_at", null);
 
-            if ((soloMie || utenteFilter) && taskIds.length > 0) query.in("id", taskIds);
-            if (statoFilter) query.eq("stato_id", statoFilter);
-            if (prioritaFilter) query.eq("priorita_id", prioritaFilter);
+            if ((soloMie || filtroAvanzato.utente) && taskIds.length > 0) query.in("id", taskIds);
+            if (filtroAvanzato.stato) query.eq("stato_id", filtroAvanzato.stato);
+            if (filtroAvanzato.priorita) query.eq("priorita_id", filtroAvanzato.priorita);
+            if (filtroAvanzato.consegna) query.eq("consegna", filtroAvanzato.consegna);
 
             const { data } = await query;
-
             if (data) {
                 const tasksPulite: Task[] = data.map((item: any) => ({
-                    ...item,
+                    id: item.id,
+                    nome: item.nome,
+                    note: item.note,
+                    consegna: item.consegna,
+                    tempo_stimato: item.tempo_stimato,
+                    created_at: item.created_at,
+                    modified_at: item.modified_at,
                     stato: item.stato,
                     priorita: item.priorita,
                     progetto: item.progetti_task?.[0]?.progetti ?? null,
+                    assegnatari: item.utenti_task?.map((u: any) => u.utenti) ?? [],
                 }));
-                const filtrate = progettoFilter
-                    ? tasksPulite.filter((t) => t.progetto?.id === progettoFilter)
-                    : tasksPulite;
-                setTasks(filtrate);
+                setTasks(ordinaTaskClientSide(tasksPulite, filtroAvanzato.ordine ?? null));
             }
             setLoading(false);
         };
@@ -119,185 +103,167 @@ export default function ListaTask() {
         const caricaTaskAssegnate = async () => {
             if (!utenteId) return;
             const { data } = await supabase.from("utenti_task").select("task_id").eq("utente_id", utenteId);
-            if (data) setTaskAssegnate(new Set(data.map((t) => t.task_id)));
+            if (data) setTaskAssegnate(new Set(data.map(t => t.task_id)));
         };
 
         if (utenteId) {
             caricaTasks();
             caricaTaskAssegnate();
         }
-    }, [soloMie, utenteFilter, statoFilter, prioritaFilter, progettoFilter, utenteId]);
+    }, [soloMie, filtroAvanzato, utenteId]);
 
     return (
         <div className="p-4 sm:p-6">
-            <h1 className="text-2xl font-bold text-theme mb-6">
-                <FontAwesomeIcon icon={faTasks} className="text-green-500 mr-2" size="lg" />
-                Lista Task
-            </h1>
-            {/* Filtri + toggle */}
-            <div className="flex flex-col gap-4 mb-6">
-                <div className="flex items-center gap-3 lg:hidden">
-                    <FontAwesomeIcon icon={faUser} className="w-5 h-5 text-purple-900" />
-                    <span className="text-theme font-medium text-base">Miei</span>
+            <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
+                <h1 className="text-2xl font-bold text-theme">
+                    <FontAwesomeIcon icon={faTasks} className="text-green-500 mr-2" />
+                    Lista Task
+                </h1>
+                <div className="flex items-center gap-2">
+                    <FontAwesomeIcon icon={faUser} className="w-5 h-5 icon-color" />
+                    <span className="text-theme font-medium">Mie</span>
                     <div
-                        onClick={() => setSoloMie((v) => !v)}
+                        onClick={() => setSoloMie(v => !v)}
                         className={`toggle-theme ${soloMie ? "active" : ""}`}
                     >
                         <div className={`toggle-thumb ${soloMie ? "translate" : ""}`} />
                     </div>
                 </div>
-
-                <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
-                    <div className={`w-full ${isAdmin && !soloMie
-                        ? "grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 gap-y-4 md:gap-4 lg:flex lg:flex-nowrap lg:gap-4 lg:[&>*]:w-auto"
-                        : "flex flex-col gap-4 md:flex-row md:gap-4 md:[&>*]:flex-1 lg:flex-nowrap lg:[&>*]:w-auto lg:[&>*]:flex-none"}`}>
-
-
-
-                        <select
-                            className="input-style w-full"
-                            value={progettoFilter || ""}
-                            onChange={(e) => setProgettoFilter(e.target.value || null)}
-                        >
-                            <option value="">📁 Tutti i progetti</option>
-                            {progetti.map((p) => (
-                                <option key={p.id} value={p.id}>{p.nome}</option>
-                            ))}
-                        </select>
-
-                        <select
-                            className="input-style w-full"
-                            value={statoFilter || ""}
-                            onChange={(e) => setStatoFilter(Number(e.target.value) || null)}
-                        >
-                            <option value="">📊 Tutti gli stati</option>
-                            {stati.map((s) => (
-                                <option key={s.id} value={s.id}>{s.nome}</option>
-                            ))}
-                        </select>
-
-                        <select
-                            className="input-style w-full"
-                            value={prioritaFilter || ""}
-                            onChange={(e) => setPrioritaFilter(Number(e.target.value) || null)}
-                        >
-                            <option value="">⏫ Tutte le priorità</option>
-                            {priorita.map((p) => (
-                                <option key={p.id} value={p.id}>{p.nome}</option>
-                            ))}
-                        </select>
-
-                        {isAdmin && !soloMie && (
-                            <select
-                                className="input-style w-full"
-                                value={utenteFilter || ""}
-                                onChange={(e) => setUtenteFilter(e.target.value || null)}
-                            >
-                                <option value="">🧑‍💼 Tutti gli utenti</option>
-                                {utenti.map((u) => (
-                                    <option key={u.id} value={u.id}>{u.nome}</option>
-                                ))}
-                            </select>
-                        )}
-                    </div>
-
-                    <div className="hidden lg:flex items-center gap-3">
-                        <FontAwesomeIcon icon={faUser} className="w-5 h-5 text-purple-900" />
-                        <span className="text-theme font-medium text-base">Miei</span>
-                        <div
-                            onClick={() => setSoloMie((v) => !v)}
-                            className={`toggle-theme ${soloMie ? "active" : ""}`}
-                        >
-                            <div className={`toggle-thumb ${soloMie ? "translate" : ""}`} />
-                        </div>
-                    </div>
-                </div>
             </div>
 
-            {/* Lista task */}
+            <div className="mb-6">
+                <FiltriTaskAvanzati
+                    tasks={tasks}
+                    isAdmin={isAdmin}
+                    soloMie={soloMie}
+                    onChange={setFiltroAvanzato}
+                />
+            </div>
+
             {loading ? (
-                <p className="text-center text-theme text-lg">Caricamento...</p>
+                <p className="text-theme text-center text-lg">Caricamento...</p>
             ) : (
-                <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {tasks.map((task) => (
-                        <div
-                            key={task.id}
-                            onClick={() => navigate(`/task/${task.id}`)}
-                            className="relative cursor-pointer card-theme hover:bg-gray-50 dark:hover:bg-gray-700 transition-all p-5"
-                        >
-                            {taskAssegnate.has(task.id) && (
-                                <div className="mb-3 flex justify-between items-center">
-                                    <div />
-                                    <div className="bg-violet-600 text-white text-xs font-semibold px-2 py-1 rounded shadow">
-                                        🧠 Assegnata a te
+                <div className="rounded-xl overflow-hidden shadow-md card-theme">
+                    <div className="hidden lg:flex px-4 py-2 text-xs font-semibold text-theme border-b border-gray-300 dark:border-gray-600">
+                        <div className="flex-1">Nome</div>
+                        <div className="w-40">Consegna</div>
+                        <div className="w-32">Stato</div>
+                        <div className="w-32">Priorità</div>
+                        <div className="w-20 text-center">Azioni</div>
+                    </div>
+
+
+                    {tasks.map(task => {
+                        const isAssegnata = taskAssegnate.has(task.id);
+                        const isOpen = taskEspansaId === task.id;
+
+                        return (
+                            <div key={task.id} className="border-t border-gray-200 dark:border-gray-700 hover-bg-theme">
+                                <div className="flex items-center px-4 py-3 text-sm text-theme">
+                                    <div className="flex-1 font-medium flex items-center gap-2">
+                                        {isAssegnata && (
+                                            <span className="text-xs text-white bg-violet-600 px-2 py-1 rounded shadow">
+                                                🧠
+                                            </span>
+                                        )}
+                                        {task.nome}
+                                    </div>
+
+                                    {/* Solo in lg e oltre */}
+                                    <div className="hidden lg:block w-40 text-sm">
+                                        {task.consegna ? new Date(task.consegna).toLocaleDateString() : "—"}
+                                    </div>
+                                    <div className="hidden lg:block w-32 text-sm">
+                                        {task.stato?.nome ?? "—"}
+                                    </div>
+                                    <div className="hidden lg:block w-32 text-sm">
+                                        {task.priorita?.nome ?? "—"}
+                                    </div>
+
+                                    <div className="w-20 flex justify-end items-center gap-3">
+                                        <button
+                                            onClick={() => setTaskDaModificareId(task.id)}
+                                            className="icon-color hover:text-blue-600"
+                                            title="Modifica"
+                                        >
+                                            <FontAwesomeIcon icon={faPen} />
+                                        </button>
+                                        <button
+                                            onClick={() => setTaskEspansaId(isOpen ? null : task.id)}
+                                            className="text-theme text-xl font-bold"
+                                            title={isOpen ? "Chiudi dettagli" : "Apri dettagli"}
+                                        >
+                                            {isOpen ? "−" : "+"}
+                                        </button>
                                     </div>
                                 </div>
-                            )}
 
+                                {isOpen && (
+                                    <div className="animate-scale-fade px-6 pb-4 text-sm text-theme space-y-1">
+                                        {task.progetto?.nome && <p>📁 Progetto: {task.progetto.nome}</p>}
+                                        {task.tempo_stimato && <p>⏱️ Tempo stimato: {task.tempo_stimato}</p>}
 
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setTaskDaModificareId(task.id);
-                                }}
-                                className="absolute bottom-2 right-2 text-sm text-theme hover:text-blue-500"
-                                aria-label={`Modifica task ${task.nome}`}
-                            >
-                                <FontAwesomeIcon icon={faPen} />
-                            </button>
+                                        {/* Questi ora SEMPRE nei dettagli, da lg in giù visibili solo qui */}
+                                        <p>📅 Consegna: {task.consegna ? new Date(task.consegna).toLocaleDateString() : "—"}</p>
+                                        <p>📊 Stato: {task.stato?.nome ?? "—"}</p>
+                                        <p>⏫ Priorità: {task.priorita?.nome ?? "—"}</p>
 
-
-                            <h2 className="text-xl font-semibold mb-1">{task.nome}</h2>
-
-                            {task.progetto?.nome && (
-                                <p className="text-sm mb-1">
-                                    📁 Progetto: <span className="font-medium">{task.progetto.nome}</span>
-                                </p>
-                            )}
-
-                            {task.consegna && (
-                                <p className="text-sm mb-1">
-                                    📅 Consegna: <span className="font-medium">{task.consegna}</span>
-                                </p>
-                            )}
-
-                            {task.tempo_stimato && (
-                                <p className="text-sm mb-1">
-                                    ⏱️ Tempo stimato: <span className="font-medium">{task.tempo_stimato}</span>
-                                </p>
-                            )}
-
-                            <div className="flex flex-wrap gap-2 mt-2 text-sm">
-                                {task.stato && (
-                                    <span
-                                        className="px-3 py-1 rounded-full text-white text-xs font-medium"
-                                        style={{ backgroundColor: task.stato.colore || "#6366f1" }}
-                                    >
-                                        {task.stato.nome}
-                                    </span>
-                                )}
-                                {task.priorita && (
-                                    <span className="px-3 py-1 rounded-full text-white bg-green-500 text-xs font-medium">
-                                        {task.priorita.nome}
-                                    </span>
+                                        {task.note && <p className="whitespace-pre-line">🗒️ {task.note}</p>}
+                                    </div>
                                 )}
                             </div>
+                        );
+                    })}
 
-                            {task.note && (
-                                <p className="text-xs mt-3 italic line-clamp-3">{task.note}</p>
-                            )}
-                        </div>
-                    ))}
                 </div>
             )}
+
             {taskDaModificareId && (
                 <MiniTaskEditorModal
                     taskId={taskDaModificareId}
                     onClose={() => setTaskDaModificareId(null)}
                 />
             )}
-
         </div>
-
     );
+}
+
+function ordinaTaskClientSide(tasks: Task[], criterio: string | null): Task[] {
+    if (!criterio) return tasks;
+
+    const [conValore, senzaValore] = tasks.reduce<[Task[], Task[]]>((acc, task) => {
+        const valore = getValore(task, criterio);
+        if (valore === null || valore === undefined || valore === "") acc[1].push(task);
+        else acc[0].push(task);
+        return acc;
+    }, [[], []]);
+
+    conValore.sort((a, b) => {
+        const aVal = getValore(a, criterio);
+        const bVal = getValore(b, criterio);
+        if (criterio.endsWith("_desc") || criterio.endsWith("za") || criterio.endsWith("meno_urgente"))
+            return bVal > aVal ? 1 : -1;
+        else return aVal > bVal ? 1 : -1;
+    });
+
+    return [...conValore, ...senzaValore];
+}
+
+function getValore(task: Task, criterio: string): any {
+    switch (criterio) {
+        case "consegna_asc":
+        case "consegna_desc":
+            return task.consegna ?? null;
+        case "priorita_urgente":
+        case "priorita_meno_urgente":
+            return task.priorita?.id ?? null;
+        case "stato_az":
+        case "stato_za":
+            return task.stato?.nome ?? null;
+        case "nome_az":
+        case "nome_za":
+            return task.nome ?? null;
+        default:
+            return null;
+    }
 }
