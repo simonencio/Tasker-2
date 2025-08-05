@@ -12,6 +12,7 @@ import MiniProjectEditorModal from '../Modifica/MiniProjectEditorModal';
 import IntestazioneProgetto from './IntestazioneProgetto';
 import { isUtenteAdmin } from '../supporto/ruolo';
 import ToggleMie from './ToggleMie';
+import MiniTaskEditorModal from '../Modifica/MiniTaskEditorModal';
 
 type ProgettoDettaglio = {
     nome: string;
@@ -49,6 +50,7 @@ export default function DettaglioProgetto() {
     const [modaleAperta, setModaleAperta] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
     const [taskAperta, setTaskAperta] = useState<Record<string, boolean>>({});
+    const [taskDaModificare, setTaskDaModificare] = useState<string | null>(null);
 
     useEffect(() => {
         let mounted = true;
@@ -215,7 +217,12 @@ export default function DettaglioProgetto() {
                                         {(isAdmin || task.utenti_task?.some(ut => ut.utente?.id === utenteLoggatoId)) && (
                                             <div className="w-auto flex-shrink-0 flex items-center justify-center gap-2 text-theme text-sm" onClick={(e) => e.stopPropagation()}>
 
-                                                <FontAwesomeIcon icon={faPen} className="cursor-pointer text-yellow-500 hover:text-yellow-600 w-4 h-4" />
+                                                <FontAwesomeIcon
+                                                    icon={faPen}
+                                                    className="cursor-pointer text-yellow-500 hover:text-yellow-600 w-4 h-4"
+                                                    onClick={() => setTaskDaModificare(task.id)}
+                                                />
+
                                                 <FontAwesomeIcon icon={faTrash} className="cursor-pointer text-red-500 hover:text-red-600 w-4 h-4" />
                                             </div>
                                         )}
@@ -289,6 +296,13 @@ export default function DettaglioProgetto() {
                     onClose={() => setModaleAperta(false)}
                 />
             )}
+            {taskDaModificare && (
+                <MiniTaskEditorModal
+                    taskId={taskDaModificare}
+                    onClose={() => setTaskDaModificare(null)}
+                />
+            )}
+
         </div>
     );
 }

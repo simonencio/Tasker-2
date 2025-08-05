@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faTasks, faUser } from "@fortawesome/free-solid-svg-icons";
+import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
 
 export type Task = {
     id: string;
@@ -24,6 +25,7 @@ export default function ListaTask() {
     const [soloMie, setSoloMie] = useState(false);
     const [utenteId, setUtenteId] = useState<string | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [taskDaModificareId, setTaskDaModificareId] = useState<string | null>(null);
 
     const [progetti, setProgetti] = useState<{ id: string; nome: string }[]>([]);
     const [utenti, setUtenti] = useState<{ id: string; nome: string }[]>([]);
@@ -236,13 +238,14 @@ export default function ListaTask() {
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    console.log("Modifica task:", task.id);
+                                    setTaskDaModificareId(task.id);
                                 }}
                                 className="absolute bottom-2 right-2 text-sm text-theme hover:text-blue-500"
                                 aria-label={`Modifica task ${task.nome}`}
                             >
                                 <FontAwesomeIcon icon={faPen} />
                             </button>
+
 
                             <h2 className="text-xl font-semibold mb-1">{task.nome}</h2>
 
@@ -287,6 +290,14 @@ export default function ListaTask() {
                     ))}
                 </div>
             )}
+            {taskDaModificareId && (
+                <MiniTaskEditorModal
+                    taskId={taskDaModificareId}
+                    onClose={() => setTaskDaModificareId(null)}
+                />
+            )}
+
         </div>
+
     );
 }
