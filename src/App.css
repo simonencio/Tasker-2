@@ -493,3 +493,10 @@ html.dark .input-date-native {
   color: var(--color-text-dark);
   border-color: #444;
 }
+
+.link{
+  @apply text-violet-900 
+}
+html.dark .link{
+  @apply  dark:text-violet-300
+}
