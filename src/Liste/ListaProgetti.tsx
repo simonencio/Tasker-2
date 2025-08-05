@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faProjectDiagram, faUser } from "@fortawesome/free-solid-svg-icons";
+import MiniProjectEditorModal from "../Modifica/MiniProjectEditorModal";
+import { faPen } from "@fortawesome/free-solid-svg-icons";
 
 export type Progetto = {
     id: string;
@@ -28,6 +30,7 @@ export default function ListaProgetti() {
     const [soloMie, setSoloMie] = useState(false);
     const [utenteId, setUtenteId] = useState<string | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [progettoDaModificareId, setProgettoDaModificareId] = useState<string | null>(null);
 
     const [utenti, setUtenti] = useState<{ id: string; nome: string }[]>([]);
     const [stati, setStati] = useState<{ id: number; nome: string }[]>([]);
@@ -209,8 +212,9 @@ export default function ListaProgetti() {
                         <div
                             key={proj.id}
                             onClick={() => navigate(`/progetti/${proj.id}`)}
-                            className="cursor-pointer card-theme hover:bg-gray-50 dark:hover:bg-gray-700 transition-all p-5"
+                            className="relative cursor-pointer card-theme hover:bg-gray-50 dark:hover:bg-gray-700 transition-all p-5"
                         >
+
                             {progettiConTaskAssegnate.has(proj.id) && (
                                 <div className="mb-3 flex justify-between items-center">
                                     <div />
@@ -253,10 +257,29 @@ export default function ListaProgetti() {
                                 )}
                             </div>
                             {proj.note && <p className="text-xs mt-3 italic line-clamp-3">{proj.note}</p>}
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setProgettoDaModificareId(proj.id);
+                                }}
+                                className="absolute bottom-2 right-2 text-sm text-theme hover:text-blue-500"
+                                aria-label={`Modifica progetto ${proj.nome}`}
+                            >
+                                <FontAwesomeIcon icon={faPen} />
+                            </button>
+
                         </div>
                     ))}
                 </div>
             )}
+            {progettoDaModificareId && (
+                <MiniProjectEditorModal
+                    progettoId={progettoDaModificareId}
+                    onClose={() => setProgettoDaModificareId(null)}
+                />
+            )}
+
         </div>
+
     );
 }
