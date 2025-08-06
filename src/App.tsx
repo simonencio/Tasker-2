@@ -18,7 +18,7 @@ import ListaProgetti from "./Liste/ListaProgetti";
 import ListaTask from "./Liste/ListaTask";
 import DettaglioProgetto from "./GestioneProgetto/DettaglioProgetto";
 import CalendarioProgetto from "./GestioneProgetto/CalendarioProgetto";
-// import BachecaProgetto from "./GestioneProgetto/BachecaProgetto";
+import BachecaProgetto from "./GestioneProgetto/BachecaProgetto";
 import ListaClienti from "./Liste/ListaClienti";
 import ListaUtenti from "./Liste/ListaUtenti";
 import ResetPassword from "./Pagine/ResetPassword";
@@ -30,6 +30,7 @@ import MiniProjectCreatorModal from "./Creazione/MiniProjectCreatorModal";
 import MiniTaskCreatorModal from "./Creazione/MiniTaskCreatorModal";
 import MiniClientCreatorModal from "./Creazione/MiniClientCreatorModal";
 import MiniUserCreatorModal from "./Creazione/MiniUserCreatorModal";
+import DettaglioTask from "./GestioneTask/DettaglioTask";
 
 type ModalType = "project" | "task" | "client" | "user";
 
@@ -181,7 +182,8 @@ function AppContent() {
                                 <Route path="/profilo" element={<Profilo />} />
                                 <Route path="/progetti/:id" element={<DettaglioProgetto />} />
                                 <Route path="/progetti/:id/calendario" element={<CalendarioProgetto />} />
-                                {/* <Route path="/progetti/:id/bacheca" element={<BachecaProgetto />} /> */}
+                                <Route path="/progetti/:id/bacheca" element={<BachecaProgetto />} /> 
+                                <Route path="/tasks/:id" element={<DettaglioTask />} />
                             </Routes>
                         </div>
                     </div>

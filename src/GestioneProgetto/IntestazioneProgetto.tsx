@@ -15,6 +15,12 @@ export default function IntestazioneProgetto({ id }: Props) {
     const navigate = useNavigate();
     const [, setIsAdmin] = useState(false);
 
+    const links = [
+        { label: 'Dashboard', path: `/progetti/${id}`, end: true },
+        { label: 'Calendario', path: `/progetti/${id}/calendario`, end: false },
+        { label: 'Bacheca', path: `/progetti/${id}/bacheca`, end: false },
+    ];
+
     useEffect(() => {
         let mounted = true;
         isUtenteAdmin().then((res) => {
@@ -38,11 +44,11 @@ export default function IntestazioneProgetto({ id }: Props) {
 
             {/* 🔗 Link Dashboard / Calendario a destra */}
             <div className="flex gap-4 sm:gap-6 items-center text-sm">
-                {['Dashboard', 'Calendario'].map((label, i) => (
+                {links.map(({ label, path, end }) => (
                     <NavLink
                         key={label}
-                        to={`/progetti/${id}${i ? '/calendario' : ''}`}
-                        end={i === 0}
+                        to={path}
+                        end={end}
                         className={({ isActive }) =>
                             `hover:text-blue-600 ${isActive ? 'text-blue-700 font-semibold' : 'text-theme'
                             }`

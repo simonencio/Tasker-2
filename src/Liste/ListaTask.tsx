@@ -5,6 +5,8 @@ import { faPen, faTasks, faUser } from "@fortawesome/free-solid-svg-icons";
 import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
 import FiltriTaskAvanzati, { ordinaTaskClientSide } from "../supporto/FiltriTaskAvanzati";
 import type { FiltroAvanzato, Task } from "../supporto/tipi";
+import { useNavigate } from "react-router-dom";
+
 
 export default function ListaTask() {
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -23,6 +25,9 @@ export default function ListaTask() {
         consegna: null,
         ordine: null,
     });
+
+    const navigate = useNavigate();
+
 
     useEffect(() => {
         const fetchUtente = async () => {
@@ -171,6 +176,19 @@ export default function ListaTask() {
                                         >
                                             <FontAwesomeIcon icon={faPen} />
                                         </button>
+
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigate(`/tasks/${task.id}`);
+                                            }}
+                                            className="icon-color hover:text-green-600"
+                                            title="Vai al dettaglio"
+                                        >
+                                            <FontAwesomeIcon icon={faTasks} />
+                                        </button>
+
+
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
