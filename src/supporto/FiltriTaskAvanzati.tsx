@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { DateRange } from "react-date-range";
+import { format } from "date-fns";
+import type { Range } from "react-date-range";
 import type { FiltroAvanzato, Task } from "./tipi";
 
-
-
+import "react-date-range/dist/styles.css";
+import "react-date-range/dist/theme/default.css";
 
 type Props = {
     tasks: Task[];
@@ -12,14 +15,35 @@ type Props = {
 };
 
 export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }: Props) {
+    const [mostraCalendario, setMostraCalendario] = useState(false);
+    const [rangeSelezionato, setRangeSelezionato] = useState<Range[]>([{
+        startDate: undefined,
+        endDate: undefined,
+        key: "selection"
+    }]);
+
     const [filtro, setFiltro] = useState<FiltroAvanzato>({
         progetto: null,
         utente: null,
         stato: null,
         priorita: null,
-        consegna: null,
+        dataInizio: null,
+        dataFine: null,
         ordine: null,
     });
+
+    useEffect(() => {
+        const { startDate, endDate } = rangeSelezionato[0];
+        setFiltro(prev => ({
+            ...prev,
+            dataInizio: startDate ? format(startDate, "yyyy-MM-dd") : null,
+            dataFine: endDate ? format(endDate, "yyyy-MM-dd") : null,
+        }));
+    }, [rangeSelezionato]);
+
+    useEffect(() => {
+        onChange(filtro);
+    }, [filtro]);
 
     const taskFiltrate = useMemo(() => {
         return tasks.filter((t) => {
@@ -27,14 +51,17 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
             if (filtro.utente && !t.assegnatari?.some((u) => u.id === filtro.utente)) return false;
             if (filtro.stato && t.stato?.id !== filtro.stato) return false;
             if (filtro.priorita && t.priorita?.id !== filtro.priorita) return false;
-            if (filtro.consegna && t.consegna !== filtro.consegna) return false;
+            if (filtro.dataInizio || filtro.dataFine) {
+                const data = t.consegna ? new Date(t.consegna) : null;
+                if (!data) return false;
+                const inizio = filtro.dataInizio ? new Date(filtro.dataInizio) : null;
+                const fine = filtro.dataFine ? new Date(filtro.dataFine) : null;
+                if (inizio && data < inizio) return false;
+                if (fine && data > fine) return false;
+            }
             return true;
         });
     }, [tasks, filtro]);
-
-    useEffect(() => {
-        onChange(filtro);
-    }, [filtro]);
 
     const opzioniProgetti = useMemo(() => {
         const set = new Map();
@@ -66,14 +93,6 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
             if (t.priorita) set.set(t.priorita.id, t.priorita.nome);
         });
         return Array.from(set.entries()).map(([id, nome]) => ({ id, nome }));
-    }, [taskFiltrate]);
-
-    const opzioniDate = useMemo(() => {
-        const set = new Set<string>();
-        taskFiltrate.forEach((t) => {
-            if (t.consegna) set.add(t.consegna);
-        });
-        return Array.from(set).sort();
     }, [taskFiltrate]);
 
     return (
@@ -126,16 +145,59 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
                 ))}
             </select>
 
-            <select
-                className="input-style w-full xl:w-auto xl:max-w-[220px]"
-                value={filtro.consegna || ""}
-                onChange={(e) => setFiltro((prev) => ({ ...prev, consegna: e.target.value || null }))}
-            >
-                <option value="">📅 Tutte le date</option>
-                {opzioniDate.map((d) => (
-                    <option key={d} value={d}>📅 {new Date(d).toLocaleDateString()}</option>
-                ))}
-            </select>
+            {/* Intervallo Date */}
+            <div className="relative w-full xl:w-auto">
+                <button
+                    type="button"
+                    onClick={() => setMostraCalendario(prev => !prev)}
+                    className="input-style w-full text-left"
+                >
+                    📅 {filtro.dataInizio && filtro.dataFine
+                        ? `${filtro.dataInizio} → ${filtro.dataFine}`
+                        : "Filtra per intervallo"}
+                </button>
+                {mostraCalendario && (
+                    <div className="absolute z-20 mt-2 popup-panel shadow-xl rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1f2937]">
+                        <DateRange
+                            editableDateInputs
+                            onChange={item => {
+                                const { startDate, endDate, key } = item.selection;
+                                setRangeSelezionato([{ startDate, endDate, key: key ?? "selection" }]);
+                                setFiltro(prev => ({
+                                    ...prev,
+                                    dataInizio: startDate ? format(startDate, "yyyy-MM-dd") : null,
+                                    dataFine: endDate ? format(endDate, "yyyy-MM-dd") : null
+                                }));
+                            }}
+                            moveRangeOnFirstSelection={false}
+                            ranges={[{
+                                startDate: rangeSelezionato[0].startDate ?? new Date(),
+                                endDate: rangeSelezionato[0].endDate ?? new Date(),
+                                key: "selection"
+                            }]}
+                            showDateDisplay={false}
+                            rangeColors={
+                                rangeSelezionato[0].startDate && rangeSelezionato[0].endDate
+                                    ? ["#2563eb"]
+                                    : ["transparent"]
+                            }
+                            className="popup-panel text-theme border rounded shadow-xl"
+                        />
+                        <div className="flex justify-end px-4 py-2">
+                            <button
+                                className="text-sm text-red-600 hover:underline"
+                                onClick={() => {
+                                    setRangeSelezionato([{ startDate: undefined, endDate: undefined, key: "selection" }]);
+                                    setFiltro(prev => ({ ...prev, dataInizio: null, dataFine: null }));
+                                    setMostraCalendario(false);
+                                }}
+                            >
+                                ❌ Pulisci intervallo
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             <select
                 className="input-style w-full xl:w-auto xl:max-w-[220px]"
@@ -156,7 +218,7 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
     );
 }
 
-// ✅ ORDINAMENTO ESPORTATO
+// ✅ ORDINAMENTO
 export function ordinaTaskClientSide(tasks: Task[], criterio: string | null): Task[] {
     if (!criterio) return tasks;
 
@@ -165,11 +227,9 @@ export function ordinaTaskClientSide(tasks: Task[], criterio: string | null): Ta
         return [...tasks].sort((a, b) => {
             const aPriorita = a.priorita?.id ?? Infinity;
             const bPriorita = b.priorita?.id ?? Infinity;
-
             if (aPriorita !== bPriorita) {
                 return crescente ? aPriorita - bPriorita : bPriorita - aPriorita;
             }
-
             const aData = a.consegna ? new Date(a.consegna).getTime() : Infinity;
             const bData = b.consegna ? new Date(b.consegna).getTime() : Infinity;
             return aData - bData;

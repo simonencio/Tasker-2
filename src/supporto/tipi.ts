@@ -17,6 +17,7 @@ export type FiltroAvanzato = {
     utente?: string | null;
     stato?: number | null;
     priorita?: number | null;
-    consegna?: string | null;
+    dataInizio?: string | null;
+    dataFine?: string | null;
     ordine?: string | null;
 };
