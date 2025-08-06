@@ -374,10 +374,64 @@ html.dark .selected-panel {
 
 
 
+/* 📅 Numeri del calendario (giorni) */
+.rdrDayNumber span {
+  color: var(--color-text-light) !important;
+}
 
+html.dark .rdrDayNumber span {
+  color: var(--color-text-dark) !important;
+}
 
+/* ❌ Rimuove il cerchio visuale selezionato/hoverato */
+.rdrDayNumber span::after {
+  content: none !important;
+}
 
+/* 📅 Evidenziazione giorno attuale */
+.rdrDayToday .rdrDayNumber span {
+  font-weight: bold;
+  border-bottom: 2px solid #2563eb;
+}
 
+html.dark .rdrDayToday .rdrDayNumber span {
+  border-bottom: 2px solid #60a5fa;
+}
+
+/* 📅 Testo mese e anno */
+.rdrMonthAndYearWrapper,
+.rdrMonthPicker select,
+.rdrYearPicker select {
+  color: var(--color-text-light) !important;
+  background-color: var(--color-background-light) !important;
+}
+
+html.dark .rdrMonthAndYearWrapper,
+html.dark .rdrMonthPicker select,
+html.dark .rdrYearPicker select {
+  color: var(--color-text-dark) !important;
+  background-color: var(--color-background-dark) !important;
+}
+
+/* 📅 Freccette navigazione */
+.rdrNextPrevButton {
+  filter: none !important;
+  background-color: transparent !important;
+  color: var(--color-icon-light) !important;
+}
+
+html.dark .rdrNextPrevButton {
+  color: var(--color-icon-dark) !important;
+}
+
+/* 📅 Hover sui giorni passivi (fuori mese) */
+.rdrDayPassive:hover {
+  background-color: rgba(96, 165, 250, 0.12) !important; /* blu-400 soft */
+}
+
+html.dark .rdrDayPassive:hover {
+  background-color: rgba(147, 197, 253, 0.12) !important;
+}
 
 
 
