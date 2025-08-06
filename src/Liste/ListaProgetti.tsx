@@ -4,10 +4,9 @@ import { useNavigate } from "react-router-dom";
 
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen, faProjectDiagram, faUser } from "@fortawesome/free-solid-svg-icons";
+import { faLink, faPen, faProjectDiagram } from "@fortawesome/free-solid-svg-icons";
 import MiniProjectEditorModal from "../Modifica/MiniProjectEditorModal";
 import FiltriProgettoAvanzati, { ordinaProgettiClientSide, type FiltroAvanzatoProgetto } from "../supporto/FiltriProgettoAvanzati";
-import { faUsers } from "@fortawesome/free-solid-svg-icons";
 import { faCheckCircle } from "@fortawesome/free-solid-svg-icons";
 
 type Utente = { id: string; nome: string; cognome: string | null };
@@ -23,7 +22,9 @@ export type Progetto = {
     priorita: Priorita | null;
     cliente: Cliente | null;
     membri: Utente[];
+    note?: string | null; // ✅ aggiungi questa riga
 };
+
 
 type TaskBreve = {
     id: string;
@@ -39,8 +40,9 @@ export default function ListaProgetti() {
     const [loading, setLoading] = useState(true);
     const [soloMie, setSoloMie] = useState(false);
     const [utenteId, setUtenteId] = useState<string | null>(null);
-    const [isAdmin, setIsAdmin] = useState(false);
+    const [, setIsAdmin] = useState(false);
     const [progettiCompletati, setProgettiCompletati] = useState<Set<string>>(new Set());
+    const [soloCompletati, setSoloCompletati] = useState(false);
 
     const [filtroAvanzato, setFiltroAvanzato] = useState<FiltroAvanzatoProgetto>({
         membri: [],
@@ -87,11 +89,12 @@ export default function ListaProgetti() {
             const query = supabase
                 .from("progetti")
                 .select(`
-                    id, nome, consegna,
-                    stato:stato_id ( id, nome, colore ),
-                    priorita:priorita_id ( id, nome ),
-                    cliente:cliente_id ( id, nome )
-                `)
+      id, nome, consegna, note,
+      stato:stato_id ( id, nome, colore ),
+      priorita:priorita_id ( id, nome ),
+      cliente:cliente_id ( id, nome )
+  `)
+
                 .is("deleted_at", null)
                 .order("created_at", { ascending: false });
 
@@ -116,11 +119,13 @@ export default function ListaProgetti() {
                 id: p.id,
                 nome: p.nome,
                 consegna: p.consegna,
+                note: p.note, // ✅ qui
                 stato: Array.isArray(p.stato) ? p.stato[0] : p.stato,
                 priorita: Array.isArray(p.priorita) ? p.priorita[0] : p.priorita,
                 cliente: Array.isArray(p.cliente) ? p.cliente[0] : p.cliente,
                 membri: membriPerProgetto[p.id] || [],
             }));
+
 
             setProgetti(progettiConMembri);
             await caricaTaskPerProgetto(progettiConMembri.map(p => p.id));
@@ -134,7 +139,7 @@ export default function ListaProgetti() {
             const taskIds = mappa.map(r => r.task_id);
             const { data: taskDettagli } = await supabase
                 .from("tasks")
-             
+
                 .select("id, nome, consegna, fine_task, utenti_task ( utenti ( id, nome, cognome ) )")
                 .in("id", taskIds)
                 .is("deleted_at", null);
@@ -194,11 +199,12 @@ export default function ListaProgetti() {
                 if (filtroAvanzato.dataInizio && data < new Date(filtroAvanzato.dataInizio)) return false;
                 if (filtroAvanzato.dataFine && data > new Date(filtroAvanzato.dataFine)) return false;
             }
+            if (soloCompletati && !progettiCompletati.has(p.id)) return false;
             return true;
         });
 
         return ordinaProgettiClientSide(filtrati, filtroAvanzato.ordine);
-    }, [progetti, filtroAvanzato]);
+    }, [progetti, filtroAvanzato, soloCompletati, progettiCompletati]);
 
     return (
         <div className="p-4 sm:p-6">
@@ -207,15 +213,25 @@ export default function ListaProgetti() {
                     <FontAwesomeIcon icon={faProjectDiagram} className="text-blue-500 mr-2" />
                     Lista Progetti
                 </h1>
-                {isAdmin && (
+                <div className="flex items-center gap-4 flex-wrap">
+                    {/* Toggle Mie */}
                     <div className="flex items-center gap-2">
-                        <FontAwesomeIcon icon={faUser} className="w-5 h-5 icon-color" />
+                        <FontAwesomeIcon icon={faLink} className="w-5 h-5 text-blue-600" />
                         <span className="text-theme font-medium">Mie</span>
                         <div onClick={() => setSoloMie(v => !v)} className={`toggle-theme ${soloMie ? "active" : ""}`}>
                             <div className={`toggle-thumb ${soloMie ? "translate" : ""}`} />
                         </div>
                     </div>
-                )}
+                    {/* Toggle Completati */}
+                    <div className="flex items-center gap-2">
+                        <FontAwesomeIcon icon={faCheckCircle} className="w-5 h-5 text-green-600" />
+                        <span className="text-theme font-medium">Completati</span>
+                        <div onClick={() => setSoloCompletati(v => !v)} className={`toggle-theme ${soloCompletati ? "active" : ""}`}>
+                            <div className={`toggle-thumb ${soloCompletati ? "translate" : ""}`} />
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
             <FiltriProgettoAvanzati progetti={progetti} onChange={setFiltroAvanzato} />
@@ -245,7 +261,7 @@ export default function ListaProgetti() {
 
                                             {isMembro && (
                                                 <FontAwesomeIcon
-                                                    icon={faUsers}
+                                                    icon={faLink}
                                                     className="w-4 h-4 text-blue-600"
                                                     title="Sei membro di questo progetto"
                                                 />
@@ -294,6 +310,7 @@ export default function ListaProgetti() {
                                         </div>
                                         {proj.cliente?.nome && <p>👤 Cliente: {proj.cliente.nome}</p>}
                                         {proj.membri.length > 0 && <p>👥 Membri: {proj.membri.map(m => `${m.nome} ${m.cognome ?? ""}`).join(", ")}</p>}
+                                        {proj.note && <p>🗒️ Note: {proj.note}</p>}
                                         <div className="pt-2">
                                             <p className="font-semibold mb-1">📌 Task assegnate:</p>
                                             <ul className="list-disc ml-5 space-y-1">
@@ -308,6 +325,8 @@ export default function ListaProgetti() {
                                                 )}
                                             </ul>
                                         </div>
+
+
                                     </div>
                                 )}
                             </div>
