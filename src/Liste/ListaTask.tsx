@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen, faTasks, faUser } from "@fortawesome/free-solid-svg-icons";
+import { faPen, faPlay, faStop, faTasks, faUser } from "@fortawesome/free-solid-svg-icons";
 import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
 import FiltriTaskAvanzati, { ordinaTaskClientSide } from "../supporto/FiltriTaskAvanzati";
 import type { FiltroAvanzato, Task } from "../supporto/tipi";
 import { useNavigate } from "react-router-dom";
+import { Toast } from "toaster-js";
+
 
 
 export default function ListaTask() {
@@ -26,7 +28,75 @@ export default function ListaTask() {
         dataFine: null,
         ordine: null,
     });
- const navigate = useNavigate();
+    const navigate = useNavigate();
+
+    //Timer
+    const [activeTimer, setActiveTimer] = useState<{ taskId: string; startTime: Date } | null>(null);
+
+    const [elapsed, setElapsed] = useState<number>(0);
+
+
+
+    const handleStartTimer = (taskId: string) => {
+        setActiveTimer({ taskId, startTime: new Date() });
+    };
+
+    const handleStopTimer = async (task: Task) => {
+        if (!activeTimer || !utenteId) {
+            setActiveTimer(null);
+            return;
+        }
+
+        const taskPlayed = tasks.find(t => t.id === activeTimer.taskId);
+        if (!taskPlayed || !taskPlayed.progetto?.id) {
+            new Toast("Questa task non è collegata a nessun progetto", Toast.TYPE_ERROR, Toast.TIME_SHORT);
+            setActiveTimer(null);
+            return;
+        }
+
+        const endTime = new Date();
+        const durata = Math.floor((endTime.getTime() - activeTimer.startTime.getTime()) / 1000);
+
+        const { error } = await supabase.from("time_entries").insert({
+            utente_id: utenteId,
+            progetto_id: taskPlayed.progetto.id,
+            task_id: taskPlayed.id,
+            nome: taskPlayed.nome,
+            data_inizio: activeTimer.startTime.toISOString(),
+            data_fine: endTime.toISOString(),
+            durata,
+        });
+
+        if (error) {
+            new Toast("Errore nel salvataggio del tempo", Toast.TYPE_ERROR, Toast.TIME_SHORT);
+            console.error(error);
+        } else {
+            new Toast("Tempo salvato con successo", Toast.TYPE_DONE, Toast.TIME_SHORT);
+        }
+
+        setActiveTimer(null);
+    };
+
+
+
+
+    useEffect(() => {
+        let interval: NodeJS.Timeout | null = null;
+
+        if (activeTimer) {
+            // Aggiorna ogni secondo
+            interval = setInterval(() => {
+                setElapsed(Math.floor((Date.now() - activeTimer.startTime.getTime()) / 1000));
+            }, 1000);
+        } else {
+            setElapsed(0);
+        }
+
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [activeTimer]);
+
 
 
     useEffect(() => {
@@ -195,6 +265,27 @@ export default function ListaTask() {
                                     <div className="hidden lg:block w-32">{task.priorita?.nome ?? "—"}</div>
 
                                     <div className="w-20 flex justify-end items-center gap-3">
+
+                                        {task.progetto?.id && task.assegnatari?.length > 0 && ( 
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (activeTimer?.taskId === task.id) {
+                                                        handleStopTimer(task);
+                                                    } else {
+                                                        handleStartTimer(task.id);
+                                                    }
+                                                }}
+                                                className={`icon-color ${activeTimer?.taskId === task.id ? 'hover:text-red-600' : 'hover:text-green-600'}`}
+                                                title={activeTimer?.taskId === task.id ? 'Ferma timer' : 'Avvia timer'}
+                                            >
+                                                <FontAwesomeIcon icon={activeTimer?.taskId === task.id ? faStop : faPlay} />
+                                            </button>
+                                         )} 
+
+
+
+
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
