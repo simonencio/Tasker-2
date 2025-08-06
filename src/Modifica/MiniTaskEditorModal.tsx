@@ -60,47 +60,69 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
     };
 
     const salva = async () => {
-        await supabase.from("tasks").update({
-            nome,
-            note,
-            stato_id: statoId,
-            priorita_id: prioritaId,
-            consegna,
-            tempo_stimato: tempoStimato,
-        }).eq("id", taskId);
+        await supabase
+            .from("tasks")
+            .update({
+                nome,
+                note,
+                stato_id: statoId,
+                priorita_id: prioritaId,
+                consegna,
+                tempo_stimato: tempoStimato,
+            })
+            .eq("id", taskId);
 
         const { data: esistenti } = await supabase
             .from("utenti_task")
             .select("utente_id")
             .eq("task_id", taskId);
-        const esistentiIds = esistenti?.map((r: any) => r.utente_id) || [];
 
+        const esistentiIds = esistenti?.map((r: any) => r.utente_id) || [];
         const daAggiungere = assegnati.filter(id => !esistentiIds.includes(id));
         const daRimuovere = esistentiIds.filter(id => !assegnati.includes(id));
         const rimasti = assegnati.filter(id => esistentiIds.includes(id));
 
-        const { data: user } = await supabase.auth.getUser();
-        const creatoreId = user?.user?.id;
+        const { data: userData } = await supabase.auth.getUser();
+        const creatoreId = userData?.user?.id;
 
         if (daAggiungere.length > 0) {
             await supabase.from("utenti_task").insert(
                 daAggiungere.map(id => ({ task_id: taskId, utente_id: id }))
             );
-            await inviaNotifica("TASK_ASSEGNATA", daAggiungere, `Ti è stata assegnata una task: ${nome}`, creatoreId, { task_id: taskId });
+            await inviaNotifica(
+                "TASK_ASSEGNATO",
+                daAggiungere,
+                `Ti è stata assegnata una task: ${nome}`,
+                creatoreId,
+                { task_id: taskId }
+            );
         }
 
         if (daRimuovere.length > 0) {
             for (const id of daRimuovere) {
-                await supabase.from("utenti_task")
+                await supabase
+                    .from("utenti_task")
                     .delete()
                     .eq("task_id", taskId)
                     .eq("utente_id", id);
             }
-            await inviaNotifica("TASK_RIMOSSA", daRimuovere, `Sei stato rimosso dalla task: ${nome}`, creatoreId, { task_id: taskId });
+            await inviaNotifica(
+                "TASK_RIMOSSO",
+                daRimuovere,
+                `Sei stato rimosso dalla task: ${nome}`,
+                creatoreId,
+                { task_id: taskId }
+            );
         }
 
         if (rimasti.length > 0) {
-            await inviaNotifica("TASK_MODIFICATA", rimasti, `La task "${nome}" è stata modificata.`, creatoreId, { task_id: taskId });
+            await inviaNotifica(
+                "TASK_MODIFICATO",
+                rimasti,
+                `La task "${nome}" è stata modificata.`,
+                creatoreId,
+                { task_id: taskId }
+            );
         }
 
         onClose();
@@ -116,7 +138,6 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                     </button>
                 </div>
 
-                {/* Nome e Note */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <div>
                         <label className="text-sm font-semibold text-theme mb-1 block">Nome</label>
@@ -128,7 +149,6 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                     </div>
                 </div>
 
-                {/* Stato & Priorità */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <div>
                         <label className="text-sm font-semibold text-theme mb-1 block">Stato</label>
@@ -154,7 +174,6 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                     </div>
                 </div>
 
-                {/* Consegna & Tempo stimato */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <div className="relative">
                         <label className="text-sm font-semibold text-theme mb-1 block">Consegna</label>
@@ -169,14 +188,12 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                             className="absolute right-3 top-[34px] text-gray-500 icon-color pointer-events-none"
                         />
                     </div>
-
                     <div>
                         <label className="text-sm font-semibold text-theme mb-1 block">Tempo stimato</label>
                         <input value={tempoStimato} onChange={(e) => setTempoStimato(e.target.value)} placeholder="es: 03:30" className="w-full input-style" />
                     </div>
                 </div>
 
-                {/* Assegnatari */}
                 <div className="relative mb-4">
                     <label className="text-sm font-semibold text-theme mb-1 block">Assegnatari</label>
                     <div onClick={() => setPopupOpen(!popupOpen)} className="cursor-pointer input-style text-sm">

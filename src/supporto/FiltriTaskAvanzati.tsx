@@ -1,23 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import type { FiltroAvanzato, Task } from "./tipi";
 
-export type Task = {
-    id: string;
-    nome: string;
-    consegna?: string | null;
-    stato?: { id: number; nome: string } | null;
-    priorita?: { id: number; nome: string } | null;
-    progetto?: { id: string; nome: string } | null;
-    assegnatari?: { id: string; nome: string }[]; // ← può essere singolo o multiplo
-};
 
-export type FiltroAvanzato = {
-    progetto?: string | null;
-    utente?: string | null;
-    stato?: number | null;
-    priorita?: number | null;
-    consegna?: string | null;
-    ordine?: string | null;
-};
+
 
 type Props = {
     tasks: Task[];
@@ -36,7 +21,6 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
         ordine: null,
     });
 
-    // 🔁 Filtra le task che corrispondono ai filtri attuali
     const taskFiltrate = useMemo(() => {
         return tasks.filter((t) => {
             if (filtro.progetto && t.progetto?.id !== filtro.progetto) return false;
@@ -48,12 +32,10 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
         });
     }, [tasks, filtro]);
 
-    // 🔄 Aggiorna filtro esterno ogni volta che cambia qualcosa
     useEffect(() => {
         onChange(filtro);
     }, [filtro]);
 
-    // 🔢 Opzioni dinamiche in base alle task filtrate
     const opzioniProgetti = useMemo(() => {
         const set = new Map();
         taskFiltrate.forEach((t) => {
@@ -95,32 +77,27 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
     }, [taskFiltrate]);
 
     return (
-        <div className="flex flex-col gap-3 mb-6 md:grid md:grid-cols-3 md:gap-4">
-            {/* Riga 1 */}
+        <div className="flex flex-col gap-3 mb-6 md:grid md:grid-cols-3 md:gap-4 xl:flex xl:flex-row xl:flex-wrap xl:gap-4">
             <select
-                className="input-style w-full lg:w-auto"
+                className="input-style w-full xl:w-auto xl:max-w-[220px]"
                 value={filtro.progetto || ""}
                 onChange={(e) => setFiltro((prev) => ({ ...prev, progetto: e.target.value || null }))}
             >
                 <option value="">📁 Tutti i progetti</option>
                 {opzioniProgetti.map((p) => (
-                    <option key={p.id} value={p.id}>
-                        {p.nome}
-                    </option>
+                    <option key={p.id} value={p.id}>{p.nome}</option>
                 ))}
             </select>
 
             {isAdmin && !soloMie ? (
                 <select
-                    className="input-style w-full lg:w-auto"
+                    className="input-style w-full xl:w-auto xl:max-w-[220px]"
                     value={filtro.utente || ""}
                     onChange={(e) => setFiltro((prev) => ({ ...prev, utente: e.target.value || null }))}
                 >
                     <option value="">🧑‍💼 Tutti gli utenti</option>
                     {opzioniUtenti.map((u) => (
-                        <option key={u.id} value={u.id}>
-                            {u.nome}
-                        </option>
+                        <option key={u.id} value={u.id}>{u.nome}</option>
                     ))}
                 </select>
             ) : (
@@ -128,47 +105,40 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
             )}
 
             <select
-                className="input-style w-full lg:w-auto"
+                className="input-style w-full xl:w-auto xl:max-w-[220px]"
                 value={filtro.stato || ""}
                 onChange={(e) => setFiltro((prev) => ({ ...prev, stato: Number(e.target.value) || null }))}
             >
                 <option value="">📊 Tutti gli stati</option>
                 {opzioniStati.map((s) => (
-                    <option key={s.id} value={s.id}>
-                        {s.nome}
-                    </option>
+                    <option key={s.id} value={s.id}>{s.nome}</option>
                 ))}
             </select>
 
-            {/* Riga 2 */}
             <select
-                className="input-style w-full lg:w-auto"
+                className="input-style w-full xl:w-auto xl:max-w-[220px]"
                 value={filtro.priorita || ""}
                 onChange={(e) => setFiltro((prev) => ({ ...prev, priorita: Number(e.target.value) || null }))}
             >
                 <option value="">⏫ Tutte le priorità</option>
                 {opzioniPriorita.map((p) => (
-                    <option key={p.id} value={p.id}>
-                        {p.nome}
-                    </option>
+                    <option key={p.id} value={p.id}>{p.nome}</option>
                 ))}
             </select>
 
             <select
-                className="input-style w-full lg:w-auto"
+                className="input-style w-full xl:w-auto xl:max-w-[220px]"
                 value={filtro.consegna || ""}
                 onChange={(e) => setFiltro((prev) => ({ ...prev, consegna: e.target.value || null }))}
             >
                 <option value="">📅 Tutte le date</option>
                 {opzioniDate.map((d) => (
-                    <option key={d} value={d}>
-                        📅 {new Date(d).toLocaleDateString()}
-                    </option>
+                    <option key={d} value={d}>📅 {new Date(d).toLocaleDateString()}</option>
                 ))}
             </select>
 
             <select
-                className="input-style w-full lg:w-auto"
+                className="input-style w-full xl:w-auto xl:max-w-[220px]"
                 value={filtro.ordine || ""}
                 onChange={(e) => setFiltro((prev) => ({ ...prev, ordine: e.target.value || null }))}
             >
@@ -184,4 +154,60 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
             </select>
         </div>
     );
+}
+
+// ✅ ORDINAMENTO ESPORTATO
+export function ordinaTaskClientSide(tasks: Task[], criterio: string | null): Task[] {
+    if (!criterio) return tasks;
+
+    if (criterio === "priorita_urgente" || criterio === "priorita_meno_urgente") {
+        const crescente = criterio === "priorita_urgente";
+        return [...tasks].sort((a, b) => {
+            const aPriorita = a.priorita?.id ?? Infinity;
+            const bPriorita = b.priorita?.id ?? Infinity;
+
+            if (aPriorita !== bPriorita) {
+                return crescente ? aPriorita - bPriorita : bPriorita - aPriorita;
+            }
+
+            const aData = a.consegna ? new Date(a.consegna).getTime() : Infinity;
+            const bData = b.consegna ? new Date(b.consegna).getTime() : Infinity;
+            return aData - bData;
+        });
+    }
+
+    const [conValore, senzaValore] = tasks.reduce<[Task[], Task[]]>((acc, task) => {
+        const valore = getValore(task, criterio);
+        if (valore === null || valore === undefined || valore === "") acc[1].push(task);
+        else acc[0].push(task);
+        return acc;
+    }, [[], []]);
+
+    conValore.sort((a, b) => {
+        const aVal = getValore(a, criterio);
+        const bVal = getValore(b, criterio);
+        if (criterio.endsWith("_desc") || criterio.endsWith("za")) return bVal > aVal ? 1 : -1;
+        return aVal > bVal ? 1 : -1;
+    });
+
+    return [...conValore, ...senzaValore];
+}
+
+function getValore(task: Task, criterio: string): any {
+    switch (criterio) {
+        case "consegna_asc":
+        case "consegna_desc":
+            return task.consegna ?? null;
+        case "priorita_urgente":
+        case "priorita_meno_urgente":
+            return task.priorita?.id ?? null;
+        case "stato_az":
+        case "stato_za":
+            return task.stato?.nome ?? null;
+        case "nome_az":
+        case "nome_za":
+            return task.nome ?? null;
+        default:
+            return null;
+    }
 }

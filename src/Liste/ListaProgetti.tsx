@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faProjectDiagram, faUser } from "@fortawesome/free-solid-svg-icons";
+import { faPen, faProjectDiagram, faUser } from "@fortawesome/free-solid-svg-icons";
 import MiniProjectEditorModal from "../Modifica/MiniProjectEditorModal";
-import { faPen } from "@fortawesome/free-solid-svg-icons";
 
 export type Progetto = {
     id: string;
@@ -23,24 +21,31 @@ export type Progetto = {
     priorita: { id: number; nome: string } | null;
 };
 
+type TaskBreve = {
+    id: string;
+    nome: string;
+    consegna: string | null;
+    assegnatari: { id: string; nome: string; cognome: string | null }[];
+};
+
+
 export default function ListaProgetti() {
     const [progetti, setProgetti] = useState<Progetto[]>([]);
+    const [taskPerProgetto, setTaskPerProgetto] = useState<Record<string, TaskBreve[]>>({});
     const [progettiConTaskAssegnate, setProgettiConTaskAssegnate] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
     const [soloMie, setSoloMie] = useState(false);
     const [utenteId, setUtenteId] = useState<string | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [progettoDaModificareId, setProgettoDaModificareId] = useState<string | null>(null);
+    const [progettoEspansoId, setProgettoEspansoId] = useState<string | null>(null);
 
     const [utenti, setUtenti] = useState<{ id: string; nome: string }[]>([]);
     const [stati, setStati] = useState<{ id: number; nome: string }[]>([]);
     const [priorita, setPriorita] = useState<{ id: number; nome: string }[]>([]);
-
     const [utenteFilter, setUtenteFilter] = useState<string | null>(null);
     const [statoFilter, setStatoFilter] = useState<number | null>(null);
     const [prioritaFilter, setPrioritaFilter] = useState<number | null>(null);
-
-    const navigate = useNavigate();
 
     useEffect(() => {
         const fetchUtente = async () => {
@@ -77,6 +82,7 @@ export default function ListaProgetti() {
                 progettiIds = data?.map((r) => r.progetto_id) || [];
                 if (progettiIds.length === 0) {
                     setProgetti([]);
+                    setTaskPerProgetto({});
                     setLoading(false);
                     return;
                 }
@@ -95,8 +101,8 @@ export default function ListaProgetti() {
             if (statoFilter) query.eq("stato_id", statoFilter);
             if (prioritaFilter) query.eq("priorita_id", prioritaFilter);
 
-            const { data, error } = await query;
-            if (!error && data) {
+            const { data } = await query;
+            if (data) {
                 const progettiPuliti = data.map((item: any) => ({
                     ...item,
                     cliente: Array.isArray(item.cliente) ? item.cliente[0] : item.cliente ?? null,
@@ -104,22 +110,76 @@ export default function ListaProgetti() {
                     priorita: Array.isArray(item.priorita) ? item.priorita[0] : item.priorita ?? null,
                 }));
                 setProgetti(progettiPuliti);
+                await caricaTaskPerProgetto(progettiPuliti.map(p => p.id));
             }
 
             setLoading(false);
         };
 
+        const caricaTaskPerProgetto = async (progettiIds: string[]) => {
+            // 1. Carico la mappatura progetto_id → task_id
+            const { data: mappaPT } = await supabase
+                .from("progetti_task")
+                .select("progetti_id, task_id")
+                .in("progetti_id", progettiIds);
+
+            if (!mappaPT || mappaPT.length === 0) {
+                setTaskPerProgetto({});
+                return;
+            }
+
+            // 2. Ottengo tutti i task_id
+            const taskIds = mappaPT.map(r => r.task_id);
+
+            // 3. Query dettagliata dei task con assegnatari
+            const { data: taskDettagli } = await supabase
+                .from("tasks")
+                .select(`
+      id,
+      nome,
+      consegna,
+      utenti_task (
+        utenti (
+          id,
+          nome,
+          cognome
+        )
+      )
+    `)
+                .in("id", taskIds);
+
+            // 4. Creo la mappa finale: progetto_id → TaskBreve[]
+            const mappa: Record<string, TaskBreve[]> = {};
+            for (const { progetti_id, task_id } of mappaPT) {
+                const task = taskDettagli?.find(t => t.id === task_id);
+                if (!task) continue;
+
+                const assegnatari = (task.utenti_task || []).map((r: any) => r.utenti);
+                const voce: TaskBreve = {
+                    id: task.id,
+                    nome: task.nome,
+                    consegna: task.consegna,
+                    assegnatari,
+                };
+
+                if (!mappa[progetti_id]) mappa[progetti_id] = [];
+                mappa[progetti_id].push(voce);
+            }
+
+            setTaskPerProgetto(mappa);
+        };
+
+
         const caricaTaskAssegnate = async () => {
             if (!utenteId) return;
             const { data } = await supabase.from("utenti_task").select("task_id").eq("utente_id", utenteId);
-            if (!data) return;
-            const taskIds = data.map((t) => t.task_id);
+            const taskIds = data?.map(t => t.task_id) || [];
             const { data: progettiTask } = await supabase
                 .from("progetti_task")
                 .select("progetti_id, task_id")
                 .in("task_id", taskIds);
             if (progettiTask) {
-                const progettiIdConTask = progettiTask.map((pt) => pt.progetti_id);
+                const progettiIdConTask = progettiTask.map(pt => pt.progetti_id);
                 setProgettiConTaskAssegnate(new Set(progettiIdConTask));
             }
         };
@@ -132,154 +192,122 @@ export default function ListaProgetti() {
 
     return (
         <div className="p-4 sm:p-6">
-            <h1 className="text-2xl font-bold text-theme mb-6">
-                <FontAwesomeIcon icon={faProjectDiagram} className="text-blue-500 mr-2" />
-                Lista Progetti
-            </h1>
-
-            <div className="flex flex-col gap-4 mb-6">
-                {/* 👤 Toggle mobile */}
-                <div className="flex items-center gap-3 lg:hidden">
-                    <FontAwesomeIcon icon={faUser} className="w-5 h-5 text-purple-900" />
-                    <span className="text-theme font-medium text-base">Miei</span>
-                    <div
-                        onClick={() => setSoloMie((v) => !v)}
-                        className={`toggle-theme ${soloMie ? "active" : ""}`}
-                    >
+            <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
+                <h1 className="text-2xl font-bold text-theme">
+                    <FontAwesomeIcon icon={faProjectDiagram} className="text-blue-500 mr-2" />
+                    Lista Progetti
+                </h1>
+                <div className="flex items-center gap-2">
+                    <FontAwesomeIcon icon={faUser} className="w-5 h-5 icon-color" />
+                    <span className="text-theme font-medium">Mie</span>
+                    <div onClick={() => setSoloMie(v => !v)} className={`toggle-theme ${soloMie ? "active" : ""}`}>
                         <div className={`toggle-thumb ${soloMie ? "translate" : ""}`} />
-                    </div>
-                </div>
-
-                {/* Filtri + toggle desktop */}
-                <div className="flex flex-col sm:flex-row sm:flex-wrap lg:flex-nowrap lg:justify-between lg:items-center gap-4">
-                    <div className="w-full flex flex-col gap-4 md:flex-row md:gap-4 md:w-full lg:w-auto">
-                        <select
-                            className="input-style w-full md:flex-1 lg:w-auto"
-                            value={statoFilter || ""}
-                            onChange={(e) => setStatoFilter(Number(e.target.value) || null)}
-                        >
-                            <option value="">📊 Tutti gli stati</option>
-                            {stati.map((s) => (
-                                <option key={s.id} value={s.id}>{s.nome}</option>
-                            ))}
-                        </select>
-
-                        <select
-                            className="input-style w-full md:flex-1 lg:w-auto"
-                            value={prioritaFilter || ""}
-                            onChange={(e) => setPrioritaFilter(Number(e.target.value) || null)}
-                        >
-                            <option value="">⏫ Tutte le priorità</option>
-                            {priorita.map((p) => (
-                                <option key={p.id} value={p.id}>{p.nome}</option>
-                            ))}
-                        </select>
-
-                        {isAdmin && !soloMie && (
-                            <select
-                                className="input-style w-full md:flex-1 lg:w-auto"
-                                value={utenteFilter || ""}
-                                onChange={(e) => setUtenteFilter(e.target.value || null)}
-                            >
-                                <option value="">🧑‍💼 Tutti gli utenti</option>
-                                {utenti.map((u) => (
-                                    <option key={u.id} value={u.id}>{u.nome}</option>
-                                ))}
-                            </select>
-                        )}
-                    </div>
-
-                    <div className="hidden lg:flex items-center gap-3">
-                        <FontAwesomeIcon icon={faUser} className="w-5 h-5 text-purple-900" />
-                        <span className="text-theme font-medium text-base">Miei</span>
-                        <div
-                            onClick={() => setSoloMie((v) => !v)}
-                            className={`toggle-theme ${soloMie ? "active" : ""}`}
-                        >
-                            <div className={`toggle-thumb ${soloMie ? "translate" : ""}`} />
-                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Lista progetti */}
+            {/* Filtri */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+                <select className="input-style w-full" value={statoFilter || ""} onChange={(e) => setStatoFilter(Number(e.target.value) || null)}>
+                    <option value="">📊 Tutti gli stati</option>
+                    {stati.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                </select>
+                <select className="input-style w-full" value={prioritaFilter || ""} onChange={(e) => setPrioritaFilter(Number(e.target.value) || null)}>
+                    <option value="">⏫ Tutte le priorità</option>
+                    {priorita.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                </select>
+                {isAdmin && !soloMie && (
+                    <select className="input-style w-full" value={utenteFilter || ""} onChange={(e) => setUtenteFilter(e.target.value || null)}>
+                        <option value="">🧑‍💼 Tutti gli utenti</option>
+                        {utenti.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+                    </select>
+                )}
+            </div>
+
             {loading ? (
                 <p className="text-center text-theme text-lg">Caricamento...</p>
             ) : (
-                <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="rounded-xl overflow-hidden shadow-md card-theme">
+                    <div className="hidden lg:flex px-4 py-2 text-xs font-semibold text-theme border-b border-gray-300 dark:border-gray-600">
+                        <div className="flex-1">Nome</div>
+                        <div className="w-40">Consegna</div>
+                        <div className="w-32">Stato</div>
+                        <div className="w-32">Priorità</div>
+                        <div className="w-20 text-center">Azioni</div>
+                    </div>
 
-                    {progetti.map((proj) => (
-                        <div
-                            key={proj.id}
-                            onClick={() => navigate(`/progetti/${proj.id}`)}
-                            className="relative cursor-pointer card-theme hover:bg-gray-50 dark:hover:bg-gray-700 transition-all p-5"
-                        >
-
-                            {progettiConTaskAssegnate.has(proj.id) && (
-                                <div className="mb-3 flex justify-between items-center">
-                                    <div />
-                                    <div className="bg-orange-500 text-white text-xs font-semibold px-2 py-1 rounded shadow">
-                                        Task per te
+                    {progetti.map(proj => {
+                        const isAssegnato = progettiConTaskAssegnate.has(proj.id);
+                        const isOpen = progettoEspansoId === proj.id;
+                        return (
+                            <div key={proj.id} className="border-t border-gray-200 dark:border-gray-700 hover-bg-theme">
+                                <div className="flex items-center px-4 py-3 text-sm text-theme cursor-pointer" onClick={() => setProgettoEspansoId(isOpen ? null : proj.id)}>
+                                    <div className="flex-1 font-medium flex items-center gap-2">
+                                        {isAssegnato && (
+                                            <span className="text-xs text-white bg-orange-500 px-2 py-1 rounded shadow">🧠</span>
+                                        )}
+                                        {proj.nome}
+                                    </div>
+                                    <div className="hidden lg:block w-40">{proj.consegna ?? "—"}</div>
+                                    <div className="hidden lg:block w-32">{proj.stato?.nome ?? "—"}</div>
+                                    <div className="hidden lg:block w-32">{proj.priorita?.nome ?? "—"}</div>
+                                    <div className="w-20 flex justify-end items-center gap-3">
+                                        <button onClick={(e) => { e.stopPropagation(); setProgettoDaModificareId(proj.id); }} className="icon-color hover:text-blue-600" title="Modifica">
+                                            <FontAwesomeIcon icon={faPen} />
+                                        </button>
+                                        <button onClick={(e) => { e.stopPropagation(); setProgettoEspansoId(isOpen ? null : proj.id); }} className="text-theme text-xl font-bold">
+                                            {isOpen ? "−" : "+"}
+                                        </button>
                                     </div>
                                 </div>
-                            )}
 
-                            <h2 className="text-xl font-semibold mb-1">{proj.nome}</h2>
-                            {proj.cliente?.nome && (
-                                <p className="text-sm mb-1 flex items-center gap-1">
-                                    <FontAwesomeIcon icon={faUser} className="w-4 h-4 text-purple-900" />
-                                    Cliente: <span className="font-medium">{proj.cliente.nome}</span>
-                                </p>
-                            )}
-                            {proj.consegna && (
-                                <p className="text-sm mb-1">
-                                    📅 Consegna: <span className="font-medium">{proj.consegna}</span>
-                                </p>
-                            )}
-                            {proj.tempo_stimato && (
-                                <p className="text-sm mb-1">
-                                    ⏱️ Tempo stimato: <span className="font-medium">{proj.tempo_stimato}</span>
-                                </p>
-                            )}
-                            <div className="flex flex-wrap gap-2 mt-2 text-sm">
-                                {proj.stato && (
-                                    <span
-                                        className="px-3 py-1 rounded-full text-white text-xs font-medium"
-                                        style={{ backgroundColor: proj.stato.colore || "#3b82f6" }}
-                                    >
-                                        {proj.stato.nome}
-                                    </span>
+                                {isOpen && (
+                                    <div className="animate-scale-fade px-6 pb-4 text-sm text-theme space-y-1">
+                                        {/* Campi visibili solo su viewport < lg */}
+                                        <div className="block lg:hidden space-y-1">
+                                            <p>📅 Consegna: {proj.consegna ?? "—"}</p>
+                                            <p>📊 Stato: {proj.stato?.nome ?? "—"}</p>
+                                            <p>⏫ Priorità: {proj.priorita?.nome ?? "—"}</p>
+                                        </div>
+
+                                        {/* Dettagli sempre visibili */}
+                                        {proj.cliente?.nome && <p>👤 Cliente: {proj.cliente.nome}</p>}
+                                        {proj.tempo_stimato && <p>⏱️ Tempo stimato: {proj.tempo_stimato}</p>}
+                                        {proj.note && <p className="whitespace-pre-line">🗒️ {proj.note}</p>}
+
+                                        <div className="pt-2">
+                                            <p className="font-semibold mb-1">📌 Task assegnate:</p>
+                                            <ul className="list-disc ml-5 space-y-1">
+                                                {(taskPerProgetto[proj.id] ?? []).map(t => {
+                                                    const utenti = t.assegnatari.map(u => `${u.nome} ${u.cognome ?? ""}`).join(", ");
+                                                    return (
+                                                        <li key={t.id}>
+                                                            📝 {t.nome} | {utenti || "—"} | {t.consegna ? new Date(t.consegna).toLocaleDateString() : "—"}
+                                                        </li>
+                                                    );
+                                                })}
+                                                {(taskPerProgetto[proj.id] ?? []).length === 0 && (
+                                                    <li className="italic text-gray-500">Nessuna task assegnata</li>
+                                                )}
+                                            </ul>
+
+
+                                        </div>
+                                    </div>
                                 )}
-                                {proj.priorita && (
-                                    <span className="px-3 py-1 rounded-full text-white bg-green-500 text-xs font-medium">
-                                        {proj.priorita.nome}
-                                    </span>
-                                )}
+
                             </div>
-                            {proj.note && <p className="text-xs mt-3 italic line-clamp-3">{proj.note}</p>}
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setProgettoDaModificareId(proj.id);
-                                }}
-                                className="absolute bottom-2 right-2 text-sm text-theme hover:text-blue-500"
-                                aria-label={`Modifica progetto ${proj.nome}`}
-                            >
-                                <FontAwesomeIcon icon={faPen} />
-                            </button>
-
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
+
             {progettoDaModificareId && (
                 <MiniProjectEditorModal
                     progettoId={progettoDaModificareId}
                     onClose={() => setProgettoDaModificareId(null)}
                 />
             )}
-
         </div>
-
     );
 }

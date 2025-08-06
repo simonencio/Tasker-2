@@ -3,21 +3,8 @@ import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faTasks, faUser } from "@fortawesome/free-solid-svg-icons";
 import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
-import FiltriTaskAvanzati, { type FiltroAvanzato } from "../supporto/FiltriTaskAvanzati";
-
-export type Task = {
-    id: string;
-    nome: string;
-    note?: string | null;
-    consegna?: string | null;
-    tempo_stimato?: string | null;
-    created_at: string;
-    modified_at: string;
-    stato?: { id: number; nome: string; colore?: string | null } | null;
-    priorita?: { id: number; nome: string } | null;
-    progetto?: { id: string; nome: string } | null;
-    assegnatari?: { id: string; nome: string }[];
-};
+import FiltriTaskAvanzati, { ordinaTaskClientSide } from "../supporto/FiltriTaskAvanzati";
+import type { FiltroAvanzato, Task } from "../supporto/tipi";
 
 export default function ListaTask() {
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -71,7 +58,7 @@ export default function ListaTask() {
                     stato:stato_id (id, nome, colore),
                     priorita:priorita_id (id, nome),
                     progetti_task:progetti_task ( progetti ( id, nome ) ),
-                    utenti_task ( utenti ( id, nome ) )
+                    utenti_task ( utenti ( id, nome, cognome ) )
                 `)
                 .is("deleted_at", null);
 
@@ -152,44 +139,43 @@ export default function ListaTask() {
                         <div className="w-20 text-center">Azioni</div>
                     </div>
 
-
                     {tasks.map(task => {
                         const isAssegnata = taskAssegnate.has(task.id);
                         const isOpen = taskEspansaId === task.id;
 
                         return (
                             <div key={task.id} className="border-t border-gray-200 dark:border-gray-700 hover-bg-theme">
-                                <div className="flex items-center px-4 py-3 text-sm text-theme">
+                                <div
+                                    className="flex items-center px-4 py-3 text-sm text-theme cursor-pointer"
+                                    onClick={() => setTaskEspansaId(isOpen ? null : task.id)}
+                                >
                                     <div className="flex-1 font-medium flex items-center gap-2">
                                         {isAssegnata && (
-                                            <span className="text-xs text-white bg-violet-600 px-2 py-1 rounded shadow">
-                                                🧠
-                                            </span>
+                                            <span className="text-xs text-white bg-violet-600 px-2 py-1 rounded shadow">🧠</span>
                                         )}
                                         {task.nome}
                                     </div>
 
-                                    {/* Solo in lg e oltre */}
-                                    <div className="hidden lg:block w-40 text-sm">
-                                        {task.consegna ? new Date(task.consegna).toLocaleDateString() : "—"}
-                                    </div>
-                                    <div className="hidden lg:block w-32 text-sm">
-                                        {task.stato?.nome ?? "—"}
-                                    </div>
-                                    <div className="hidden lg:block w-32 text-sm">
-                                        {task.priorita?.nome ?? "—"}
-                                    </div>
+                                    <div className="hidden lg:block w-40">{task.consegna ? new Date(task.consegna).toLocaleDateString() : "—"}</div>
+                                    <div className="hidden lg:block w-32">{task.stato?.nome ?? "—"}</div>
+                                    <div className="hidden lg:block w-32">{task.priorita?.nome ?? "—"}</div>
 
                                     <div className="w-20 flex justify-end items-center gap-3">
                                         <button
-                                            onClick={() => setTaskDaModificareId(task.id)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setTaskDaModificareId(task.id);
+                                            }}
                                             className="icon-color hover:text-blue-600"
                                             title="Modifica"
                                         >
                                             <FontAwesomeIcon icon={faPen} />
                                         </button>
                                         <button
-                                            onClick={() => setTaskEspansaId(isOpen ? null : task.id)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setTaskEspansaId(isOpen ? null : task.id);
+                                            }}
                                             className="text-theme text-xl font-bold"
                                             title={isOpen ? "Chiudi dettagli" : "Apri dettagli"}
                                         >
@@ -200,21 +186,25 @@ export default function ListaTask() {
 
                                 {isOpen && (
                                     <div className="animate-scale-fade px-6 pb-4 text-sm text-theme space-y-1">
+                                        {/* Da md in giù: mostra tutti i campi */}
+                                        <div className="block lg:hidden space-y-1">
+                                            <p>📅 Consegna: {task.consegna ? new Date(task.consegna).toLocaleDateString() : "—"}</p>
+                                            <p>📊 Stato: {task.stato?.nome ?? "—"}</p>
+                                            <p>⏫ Priorità: {task.priorita?.nome ?? "—"}</p>
+                                        </div>
+
+                                        {/* Sempre visibili */}
+                                        {task.note && <p>🗒️ {task.note}</p>}
                                         {task.progetto?.nome && <p>📁 Progetto: {task.progetto.nome}</p>}
                                         {task.tempo_stimato && <p>⏱️ Tempo stimato: {task.tempo_stimato}</p>}
-
-                                        {/* Questi ora SEMPRE nei dettagli, da lg in giù visibili solo qui */}
-                                        <p>📅 Consegna: {task.consegna ? new Date(task.consegna).toLocaleDateString() : "—"}</p>
-                                        <p>📊 Stato: {task.stato?.nome ?? "—"}</p>
-                                        <p>⏫ Priorità: {task.priorita?.nome ?? "—"}</p>
-
-                                        {task.note && <p className="whitespace-pre-line">🗒️ {task.note}</p>}
+                                        {task.assegnatari?.length > 0 && (
+                                            <p>👥 Assegnata a: {task.assegnatari.map(u => `${u.nome} ${u.cognome || ""}`).join(", ")}</p>
+                                        )}
                                     </div>
                                 )}
                             </div>
                         );
                     })}
-
                 </div>
             )}
 
@@ -226,44 +216,4 @@ export default function ListaTask() {
             )}
         </div>
     );
-}
-
-function ordinaTaskClientSide(tasks: Task[], criterio: string | null): Task[] {
-    if (!criterio) return tasks;
-
-    const [conValore, senzaValore] = tasks.reduce<[Task[], Task[]]>((acc, task) => {
-        const valore = getValore(task, criterio);
-        if (valore === null || valore === undefined || valore === "") acc[1].push(task);
-        else acc[0].push(task);
-        return acc;
-    }, [[], []]);
-
-    conValore.sort((a, b) => {
-        const aVal = getValore(a, criterio);
-        const bVal = getValore(b, criterio);
-        if (criterio.endsWith("_desc") || criterio.endsWith("za") || criterio.endsWith("meno_urgente"))
-            return bVal > aVal ? 1 : -1;
-        else return aVal > bVal ? 1 : -1;
-    });
-
-    return [...conValore, ...senzaValore];
-}
-
-function getValore(task: Task, criterio: string): any {
-    switch (criterio) {
-        case "consegna_asc":
-        case "consegna_desc":
-            return task.consegna ?? null;
-        case "priorita_urgente":
-        case "priorita_meno_urgente":
-            return task.priorita?.id ?? null;
-        case "stato_az":
-        case "stato_za":
-            return task.stato?.nome ?? null;
-        case "nome_az":
-        case "nome_za":
-            return task.nome ?? null;
-        default:
-            return null;
-    }
 }
