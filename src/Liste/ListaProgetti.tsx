@@ -1,4 +1,7 @@
+
 import { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faProjectDiagram, faUser } from "@fortawesome/free-solid-svg-icons";
@@ -50,6 +53,9 @@ export default function ListaProgetti() {
     });
     const [progettoEspansoId, setProgettoEspansoId] = useState<string | null>(null);
     const [progettoDaModificareId, setProgettoDaModificareId] = useState<string | null>(null);
+
+    const navigate = useNavigate();
+
 
     useEffect(() => {
         const fetchUtente = async () => {
@@ -128,6 +134,7 @@ export default function ListaProgetti() {
             const taskIds = mappa.map(r => r.task_id);
             const { data: taskDettagli } = await supabase
                 .from("tasks")
+             
                 .select("id, nome, consegna, fine_task, utenti_task ( utenti ( id, nome, cognome ) )")
                 .in("id", taskIds)
                 .is("deleted_at", null);
@@ -148,6 +155,7 @@ export default function ListaProgetti() {
                     if (!taskMap[id]) taskMap[id] = [];
                     taskMap[id].push(voce);
                 }
+
             }
 
             setTaskPerProgetto(taskMap);
@@ -262,6 +270,15 @@ export default function ListaProgetti() {
                                         <button onClick={(e) => { e.stopPropagation(); setProgettoDaModificareId(proj.id); }} className="icon-color hover:text-blue-600" title="Modifica">
                                             <FontAwesomeIcon icon={faPen} />
                                         </button>
+
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); navigate(`/progetti/${proj.id}`); }}
+                                            className="icon-color hover:text-green-600"
+                                            title="Vai al dettaglio"
+                                        >
+                                            <FontAwesomeIcon icon={faProjectDiagram} />
+                                        </button>
+
                                         <button onClick={(e) => { e.stopPropagation(); setProgettoEspansoId(isOpen ? null : proj.id); }} className="text-theme text-xl font-bold">
                                             {isOpen ? "−" : "+"}
                                         </button>

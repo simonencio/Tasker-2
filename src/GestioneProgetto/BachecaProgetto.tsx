@@ -1,201 +1,375 @@
-// import { useEffect, useState } from 'react';
-// import { NavLink, useNavigate, useParams } from 'react-router-dom';
-// import { supabase } from '../supporto/supabaseClient';
-// import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-// import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import { useEffect, useState, useRef } from 'react';
+import { useParams } from 'react-router-dom';
+import { supabase } from '../supporto/supabaseClient';
+import IntestazioneProgetto from './IntestazioneProgetto';
+import { isUtenteAdmin } from '../supporto/ruolo';
+import ToggleMie from './ToggleMie';
+import { format, isToday, isTomorrow, isBefore, startOfDay, addDays } from 'date-fns';
+import { it } from 'date-fns/locale';
 
-// export type Stato = {
-//     id: number;
-//     nome: string;
-// };
+type StatoTask = {
+    id: number;
+    nome: string;
+};
 
-// type Raggruppamento = 'stato' | 'assegnatario' | 'priorita';
+type Utente = {
+    id: string;
+    nome: string;
+};
 
-// type Task = {
-//     stato_id: number;
-//     id: string;
-//     nome: string;
-//     note?: string | null;
-//     consegna?: string | null;
-//     tempo_stimato?: string | null;
-//     stati?: { nome: string } | null;
-//     priorita?: { nome: string } | null;
-//     utenti_task?: { utente?: { id: string; nome: string } }[];
-// };
+type UtenteTask = {
+    utente?: Utente | null;
+};
 
-// export default function BachecaProgetto() {
-//     const { id } = useParams<{ id: string }>();
-//     const navigate = useNavigate();
+type PrioritaTask = {
+    id: number;
+    nome: string;
+};
 
-//     const [taskList, setTaskList] = useState<Task[]>([]);
-//     const [stati, setStati] = useState<Stato[]>([]);
-//     const [soloMieTask, setSoloMieTask] = useState(false);
-//     const [utenteLoggatoId, setUtenteLoggatoId] = useState<string | null>(null);
-//     const [groupBy, setGroupBy] = useState<Raggruppamento>('stato');
-//     const [filtroData, setFiltroData] = useState<string | null>(null);
+type ProgettoTaskRow = {
+    task: Task;
+};
 
-//     useEffect(() => {
-//         const fetchUtente = async () => {
-//             const { data: session } = await supabase.auth.getSession();
-//             setUtenteLoggatoId(session?.session?.user.id || null);
-//         };
-//         fetchUtente();
-//     }, []);
+ type Colonna = {
+        chiave: string;
+        label: string;
+    };
 
-//     useEffect(() => {
-//         const fetchStati = async () => {
-//             const { data, error } = await supabase.from('stati').select('id, nome').is('deleted_at', null);
-//             if (!error && data) setStati(data);
-//         };
+type Raggruppamento = 'stato' | 'assegnatario' | 'priorita' | 'scadenza';
 
-//         const fetchTasks = async () => {
-//             const { data, error } = await supabase
-//                 .from('progetti_task')
-//                 .select(`tasks!inner(id, stato_id, nome, note, consegna, tempo_stimato, stati(id, nome), priorita(id, nome), utenti_task(utente(id, nome)))`)
-//                 .eq('progetti_id', id);
+export type Task = {
+    stato_id: number;
+    id: string;
+    nome: string;
+    note?: string | null;
+    consegna?: string | null;
+    tempo_stimato?: string | null;
+    stati?: StatoTask | null;
+    priorita?: PrioritaTask | null;
+    utenti_task?: UtenteTask[];
+};
 
-//             if (!error && data) {
-//                 const tasksPulite: Task[] = (data as any[]).map(row => ({
-//                     ...row.tasks,
-//                     stati: row.tasks.stati ?? null,
-//                     priorita: row.tasks.priorita ?? null,
-//                     utenti_task: row.tasks.utenti_task ?? [],
-//                 }));
-//                 setTaskList(tasksPulite);
-//             }
-//         };
+export default function BachecaProgetto() {
+    const { id } = useParams<{ id: string }>();
 
-//         if (id) {
-//             fetchStati();
-//             fetchTasks();
-//         }
-//     }, [id]);
+    const [taskList, setTaskList] = useState<Task[]>([]);
+    const [stati, setStati] = useState<StatoTask[]>([]);
+    const [soloMieTask, setSoloMieTask] = useState(false);
+    const [utenteLoggatoId, setUtenteLoggatoId] = useState<string | null>(null);
+    const [groupBy, setGroupBy] = useState<Raggruppamento>('stato');
+    const [offsetSettimana, setOffsetSettimana] = useState(0);
 
-//     type Colonna = {
-//         chiave: string;
-//         label: string;
-//     };
+    const [isAdmin, setIsAdmin] = useState(false);
 
-//     let colonne: Colonna[] = [];
+    
 
-//     if (groupBy === 'stato') {
-//         colonne = stati.map(s => ({ chiave: String(s.id), label: s.nome }));
-//     } else if (groupBy === 'assegnatario') {
-//         const assegnatariUnici = Array.from(new Set(
-//             taskList.flatMap(t => t.utenti_task?.map(ut => ut.utente?.nome || 'Non assegnata') ?? [])
-//         )).filter((nome): nome is string => !!nome);
-//         colonne = assegnatariUnici.map(nome => ({ chiave: nome, label: nome }));
-//     } else if (groupBy === 'priorita') {
-//         const prioritaUniche = Array.from(new Set(taskList.map(t => t.priorita?.nome || 'Nessuna')));
-//         colonne = prioritaUniche.map(p => ({ chiave: p, label: p }));
-//     }
+    let colonne: Colonna[] = [];
 
-//     return (
-//         <div className="min-h-screen bg-theme text-theme">
-//             <div className="border-b bg-theme px-6 py-4 flex items-center justify-between shadow-sm">
-//                 <button
-//                     onClick={() => navigate('/progetti')}
-//                     className="text-sm flex items-center gap-2 text-theme hover:text-blue-500"
-//                 >
-//                     <FontAwesomeIcon icon={faArrowLeft} className="icon-color" /> <span>Torna indietro</span>
-//                 </button>
+    //drag con mouse
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const isDragging = useRef(false);
+    const startX = useRef(0);
+    const scrollLeftStart = useRef(0);
 
-//                 <div className="flex gap-6 text-sm items-center">
-//                     <NavLink to={`/progetti/${id}`} end className={({ isActive }) => `hover:text-blue-600 ${isActive ? 'text-blue-700 font-semibold' : 'text-theme'}`}>
-//                         Dashboard
-//                     </NavLink>
-//                     <button
-//                         onClick={() => setSoloMieTask(prev => !prev)}
-//                         className={`hover:text-blue-600 ${soloMieTask ? 'text-blue-700 font-semibold' : 'text-theme'}`}
-//                     >
-//                         {soloMieTask ? 'Tutte le Task' : 'Le mie Task'}
-//                     </button>
-//                     <NavLink to={`/progetti/${id}/calendario`} className={({ isActive }) => `hover:text-blue-600 ${isActive ? 'text-blue-700 font-semibold' : 'text-theme'}`}>
-//                         Calendario
-//                     </NavLink>
-//                     <NavLink to={`/progetti/${id}/bacheca`} className={({ isActive }) => `hover:text-blue-600 ${isActive ? 'text-blue-700 font-semibold' : 'text-theme'}`}>
-//                         Bacheca
-//                     </NavLink>
-//                 </div>
-//             </div>
+    const [dragEnabled, setDragEnabled] = useState(false);
 
-//             <div className="p-6">
-//                 <div className="flex justify-end mb-4 gap-4 items-end">
-//                     <div>
-//                         <label className="text-sm font-medium mr-2">Visualizza per:</label>
-//                         <select
-//                             value={groupBy}
-//                             onChange={(e) => setGroupBy(e.target.value as Raggruppamento)}
-//                             className="input-style"
-//                         >
-//                             <option value="stato">Stato</option>
-//                             <option value="assegnatario">Assegnatario</option>
-//                             <option value="priorita">Priorità</option>
-//                         </select>
-//                     </div>
+    const handleMouseDown = (e: React.MouseEvent) => {
+        if (!scrollRef.current) return;
 
-//                     <div>
-//                         <label className="text-sm font-medium mr-2">Data di scadenza:</label>
-//                         <input
-//                             type="date"
-//                             value={filtroData ?? ''}
-//                             onChange={(e) => setFiltroData(e.target.value || null)}
-//                             className="input-style"
-//                         />
-//                     </div>
-//                 </div>
+        // Attiva il drag solo se il contenuto eccede la larghezza visibile
+        if (scrollRef.current.scrollWidth <= scrollRef.current.clientWidth) return;
 
-//                 <h1 className="text-2xl font-bold mb-6">📋 Bacheca</h1>
+        isDragging.current = true;
+        startX.current = e.pageX - scrollRef.current.offsetLeft;
+        scrollLeftStart.current = scrollRef.current.scrollLeft;
+    };
 
-//                 <div className="flex gap-4 overflow-x-auto hide-scrollbar">
-//                     {colonne.map(col => (
-//                         <div key={col.chiave} className="w-64 card-theme flex-shrink-0">
-//                             <div className="bg-gray-200 dark:bg-gray-700 px-3 py-2 font-semibold text-sm text-gray-700 dark:text-gray-200">
-//                                 {col.label}
-//                             </div>
-//                             <div className="p-2 space-y-2">
-//                                 {taskList.filter(task => {
-//                                     const assegnataAme = task.utenti_task?.some((ut): boolean => ut.utente?.id === utenteLoggatoId) ?? false;
-//                                     const passaMieTask = !soloMieTask || assegnataAme;
-//                                     if (!passaMieTask) return false;
+    const handleMouseLeave = () => {
+        isDragging.current = false;
+    };
 
-//                                     if (filtroData && task.consegna !== filtroData) return false;
+    const handleMouseUp = () => {
+        isDragging.current = false;
+    };
 
-//                                     if (groupBy === 'stato') return String(task.stato_id) === col.chiave;
-//                                     if (groupBy === 'assegnatario') {
-//                                         const nomi = task.utenti_task?.map(ut => ut.utente?.nome) ?? ['Non assegnata'];
-//                                         return nomi.includes(col.chiave);
-//                                     }
-//                                     if (groupBy === 'priorita') return (task.priorita?.nome || 'Nessuna') === col.chiave;
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (!isDragging.current || !scrollRef.current) return;
+        e.preventDefault();
+        const x = e.pageX - scrollRef.current.offsetLeft;
+        const walk = (x - startX.current) * 1; // fattore di velocità
+        scrollRef.current.scrollLeft = scrollLeftStart.current - walk;
+    };
 
-//                                     return false;
-//                                 }).map(task => (
-//                                     <div key={task.id} className="bg-theme border border-gray-200 dark:border-gray-600 p-3 rounded shadow text-sm space-y-1">
-//                                         <div className="font-semibold text-theme">{task.nome}</div>
-//                                         {Array.isArray(task.utenti_task) && task.utenti_task.length > 0 && (
-//                                             <div className="text-xs text-gray-600 dark:text-gray-400">
-//                                                 👤 <span className="font-medium">Assegnata a:</span>{' '}
-//                                                 {task.utenti_task.map(ut => ut.utente?.nome).filter(Boolean).join(', ')}
-//                                             </div>
-//                                         )}
-//                                         {task.consegna && (
-//                                             <div className="text-xs text-gray-600 dark:text-gray-400">
-//                                                 📅 <span className="font-medium">Scadenza:</span>{' '}
-//                                                 {new Date(task.consegna).toLocaleDateString()}
-//                                             </div>
-//                                         )}
-//                                         {task.stati?.nome && (
-//                                             <div className="text-xs text-gray-500 italic dark:text-gray-300">
-//                                                 📌 Stato: {task.stati.nome}
-//                                             </div>
-//                                         )}
-//                                     </div>
-//                                 ))}
-//                             </div>
-//                         </div>
-//                     ))}
-//                 </div>
-//             </div>
-//         </div>
-//     );
-// }
+
+
+
+
+
+    useEffect(() => {
+        if (scrollRef.current) {
+            const enabled = scrollRef.current.scrollWidth > scrollRef.current.clientWidth;
+            setDragEnabled(enabled);
+        }
+    }, [colonne]); // si ricalcola ogni volta che cambia il numero o la larghezza delle colonne
+
+
+
+    useEffect(() => {
+        const fetchUtente = async () => {
+            const { data: session } = await supabase.auth.getSession();
+            setUtenteLoggatoId(session?.session?.user.id || null);
+        };
+        fetchUtente();
+    }, []);
+
+
+
+    useEffect(() => {
+        let mounted = true;
+        isUtenteAdmin().then(res => {
+            if (mounted) {
+                setIsAdmin(res);
+                if (!res) setSoloMieTask(true);
+            }
+        });
+        return () => { mounted = false };
+    }, []);
+
+
+    useEffect(() => {
+        const fetchStati = async () => {
+            const { data, error } = await supabase.from('stati').select('id, nome').is('deleted_at', null);
+            if (!error && data) setStati(data);
+        };
+
+        const fetchTasks = async () => {
+            const { data, error } = await supabase
+                .from('progetti_task')
+                .select(`
+                        task:tasks (
+                        id,
+                        stato_id,
+                        nome,
+                        note,
+                        consegna,
+                        tempo_stimato,
+                        stati ( id, nome ),
+                        priorita ( id, nome ),
+                        utenti_task (
+                            utente:utenti ( id, nome )
+                        )
+                        )
+                    `)
+                .eq('progetti_id', id) as { data: ProgettoTaskRow[] | null, error: any };
+
+            if (!error && data) {
+                const tasksPulite: Task[] = data.map(row => ({
+                    ...row.task,
+                    stati: row.task.stati ?? null,
+                    priorita: row.task.priorita ?? null,
+                    utenti_task: row.task.utenti_task ?? [],
+                }));
+                setTaskList(tasksPulite);
+            }
+
+
+        };
+
+        if (id) {
+            fetchStati();
+            fetchTasks();
+        }
+    }, [id]);
+
+    // useEffect per reimpostare offsettimana
+    useEffect(() => {
+        if (groupBy !== 'scadenza') {
+            setOffsetSettimana(0);
+        }
+    }, [groupBy]);
+
+
+   
+
+    if (groupBy === 'stato') {
+        colonne = stati.map(s => ({ chiave: String(s.id), label: s.nome }));
+    } else if (groupBy === 'assegnatario') {
+        const assegnatariUnici = Array.from(new Set(
+            taskList.flatMap(t => t.utenti_task?.map(ut => ut.utente?.nome || 'Non assegnata') ?? [])
+        )).filter((nome): nome is string => !!nome);
+        colonne = assegnatariUnici.map(nome => ({ chiave: nome, label: nome }));
+    } else if (groupBy === 'priorita') {
+        const prioritaUniche = Array.from(new Set(taskList.map(t => t.priorita?.nome || 'Nessuna')));
+        colonne = prioritaUniche.map(p => ({ chiave: p, label: p }));
+    } else if (groupBy === 'scadenza') {
+        const oggi = startOfDay(new Date());
+        const colonneOrdinate: Colonna[] = [
+            { chiave: 'scaduti', label: 'Scaduti' },
+            { chiave: 'oggi', label: 'Oggi' },
+            { chiave: 'domani', label: 'Domani' }
+        ];
+
+        // Aggiungi fino a 5 giorni lavorativi successivi
+        let aggiunti = 0;
+        let giorno = addDays(oggi, 2);
+        while (aggiunti < 5) {
+            const giornoSettimana = giorno.getDay(); // 0=Dom, 6=Sab
+            if (giornoSettimana !== 0 && giornoSettimana !== 6) {
+                colonneOrdinate.push({
+                    chiave: giorno.toISOString().split('T')[0],
+                    label: format(giorno, 'EEEE', { locale: it })
+                });
+                aggiunti++;
+            }
+            giorno = addDays(giorno, 1);
+        }
+
+        colonneOrdinate.push({ chiave: 'futuri', label: 'Futuri' });
+        colonneOrdinate.push({ chiave: 'senza', label: 'Senza data' });
+        colonneOrdinate.push({ chiave: 'completati', label: 'Completati' });
+
+        colonne = colonneOrdinate;
+    }
+
+
+
+    return (
+        <div className="min-h-screen bg-theme text-theme">
+            <IntestazioneProgetto
+                id={id!}
+                soloMieTask={soloMieTask}
+                setSoloMieTask={isAdmin ? setSoloMieTask : () => { }}
+            />
+
+            <div className="p-4 flex justify-end">
+                {isAdmin && (
+                    <ToggleMie soloMieTask={soloMieTask} setSoloMieTask={setSoloMieTask} />
+                )}
+            </div>
+
+            <div className="p-6">
+                <div className="flex justify-end mb-4 gap-4 items-end">
+
+                    <div>
+                        <label className="text-sm font-medium mr-2">Visualizza per:</label>
+                        <select
+                            value={groupBy}
+                            onChange={(e) => setGroupBy(e.target.value as Raggruppamento)}
+                            className="input-style"
+                        >
+                            <option value="stato">Stato</option>
+                            <option value="assegnatario">Assegnatario</option>
+                            <option value="priorita">Priorità</option>
+                            <option value="scadenza">Data di scadenza</option>
+                        </select>
+                    </div>
+
+                </div>
+
+                <h1 className="text-2xl font-bold mb-6">📋 Bacheca</h1>
+
+
+                <div
+                    ref={scrollRef}
+                    className={`flex gap-4 overflow-x-auto hide-scrollbar ${dragEnabled ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
+                        }`}
+                    onMouseDown={(e) => {
+                        if (!dragEnabled) return; // niente drag
+                        isDragging.current = true;
+                        startX.current = e.pageX - scrollRef.current!.offsetLeft;
+                        scrollLeftStart.current = scrollRef.current!.scrollLeft;
+                    }}
+                    onMouseLeave={() => (isDragging.current = false)}
+                    onMouseUp={() => (isDragging.current = false)}
+                    onMouseMove={(e) => {
+                        if (!isDragging.current || !dragEnabled) return;
+                        e.preventDefault();
+                        const x = e.pageX - scrollRef.current!.offsetLeft;
+                        const walk = (x - startX.current) * 1;
+                        scrollRef.current!.scrollLeft = scrollLeftStart.current - walk;
+                    }}
+                >
+                    {colonne.map(col => (
+                        <div key={col.chiave} className="w-64 card-theme flex-shrink-0">
+                            <div className="bg-gray-200 dark:bg-gray-700 px-3 py-2 font-semibold text-sm text-gray-700 dark:text-gray-200">
+                                {col.label}
+                            </div>
+                            <div className="p-2 space-y-2">
+                                {taskList.filter(task => {
+                                    const assegnataAme = task.utenti_task?.some((ut): boolean => ut.utente?.id === utenteLoggatoId) ?? false;
+                                    const passaMieTask = !soloMieTask || assegnataAme;
+                                    if (!passaMieTask) return false;
+
+
+
+                                    if (groupBy === 'stato') return String(task.stato_id) === col.chiave;
+                                    if (groupBy === 'assegnatario') {
+                                        const nomi = task.utenti_task?.map(ut => ut.utente?.nome) ?? ['Non assegnata'];
+                                        return nomi.includes(col.chiave);
+                                    }
+                                    if (groupBy === 'priorita') return (task.priorita?.nome || 'Nessuna') === col.chiave;
+                                    if (groupBy === 'scadenza') {
+                                        // Completati
+                                        if (task.stati?.nome?.toLowerCase() === 'completato') {
+                                            return col.chiave === 'completati';
+                                        }
+
+                                        // Senza data
+                                        if (!task.consegna) return col.chiave === 'senza';
+
+                                        const dataTask = startOfDay(new Date(task.consegna));
+                                        const oggi = startOfDay(new Date());
+                                        const domani = addDays(oggi, 1);
+
+                                        if (isBefore(dataTask, oggi)) return col.chiave === 'scaduti';
+                                        if (isToday(dataTask)) return col.chiave === 'oggi';
+                                        if (isTomorrow(dataTask)) return col.chiave === 'domani';
+
+                                        // Giorni lavorativi successivi
+                                        let aggiunti = 0;
+                                        let giorno = addDays(oggi, 2);
+                                        while (aggiunti < 5) {
+                                            const giornoSettimana = giorno.getDay();
+                                            if (giornoSettimana !== 0 && giornoSettimana !== 6) {
+                                                if (dataTask.getTime() === giorno.getTime()) {
+                                                    return col.chiave === giorno.toISOString().split('T')[0];
+                                                }
+                                                aggiunti++;
+                                            }
+                                            giorno = addDays(giorno, 1);
+                                        }
+
+                                        // Futuri
+                                        return col.chiave === 'futuri';
+                                    }
+
+                                }).map(task => (
+                                    <div key={task.id} className="bg-theme border border-gray-200 dark:border-gray-600 p-3 rounded shadow text-sm space-y-1">
+                                        <div className="font-semibold text-theme">{task.nome}</div>
+                                        {Array.isArray(task.utenti_task) && task.utenti_task.length > 0 && (
+                                            <div className="text-xs text-gray-600 dark:text-gray-400">
+                                                👤 <span className="font-medium">Assegnata a:</span>{' '}
+                                                {task.utenti_task.map(ut => ut.utente?.nome).filter(Boolean).join(', ')}
+                                            </div>
+                                        )}
+                                        {task.consegna && (
+                                            <div className="text-xs text-gray-600 dark:text-gray-400">
+                                                📅 <span className="font-medium">Scadenza:</span>{' '}
+                                                {new Date(task.consegna).toLocaleDateString()}
+                                            </div>
+                                        )}
+                                        {task.stati?.nome && (
+                                            <div className="text-xs text-gray-500 italic dark:text-gray-300">
+                                                📌 Stato: {task.stati.nome}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}
