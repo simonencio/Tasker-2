@@ -1,4 +1,64 @@
 @import "tailwindcss";
+@import "toaster-js/default.css";
+
+
+/* Contenitore toast in alto centrato */
+.toast-container {
+  position: fixed !important;
+  top: 20px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 9999 !important;
+
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Toast base */
+.toast {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 220px;
+  max-width: 320px;
+  padding: 12px 18px;
+  margin-top: 8px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: none !important;
+  color: #fff !important;
+}
+
+/* Successo */
+.toast.toast-done {
+  background-color: #16a34a !important; /* Verde tailwind-600 */
+}
+
+/* Errore */
+.toast.toast-error {
+  background-color: #dc2626 !important; /* Rosso tailwind-600 */
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  .toast.toast-done {
+    background-color: #22c55e !important; /* Verde acceso */
+    color: #fff !important;
+  }
+  .toast.toast-error {
+    background-color: #ef4444 !important; /* Rosso acceso */
+    color: #fff !important;
+  }
+}
+
+
+
+
 
 /* 🌙 Modalità chiara e scura via classi Tailwind */
 :root {
@@ -7,12 +67,18 @@
 
 /* 🌓 Colori personalizzati per il tema */
 :root {
-  --color-background-light: #f9fafb; /* Grigio chiaro */
-  --color-background-dark: #1f2937; /* Grigio scuro */
-  --color-text-light: #1f2937; /* Grigio scuro */
-  --color-text-dark: #e5e7eb; /* Grigio chiaro */
-  --color-icon-light: #4b5563; /* Grigio medio */
-  --color-icon-dark: #d1d5db; /* Grigio chiaro */
+  --color-background-light: #f9fafb;
+  /* Grigio chiaro */
+  --color-background-dark: #1f2937;
+  /* Grigio scuro */
+  --color-text-light: #1f2937;
+  /* Grigio scuro */
+  --color-text-dark: #e5e7eb;
+  /* Grigio chiaro */
+  --color-icon-light: #4b5563;
+  /* Grigio medio */
+  --color-icon-dark: #d1d5db;
+  /* Grigio chiaro */
 }
 
 /* 🌓 Stili per il tema chiaro */
@@ -31,6 +97,7 @@ html.dark {
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -121,7 +188,7 @@ html.dark .input-style {
   color: var(--color-text-light);
   border: 1px solid #ccc;
   border-radius: 0.5rem;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 html.dark .dropdown-panel {
@@ -140,11 +207,11 @@ html.dark .dropdown-panel {
 }
 
 .dropdown-button:hover {
-  background-color: rgba(0,0,0,0.05);
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
 html.dark .dropdown-button:hover {
-  background-color: rgba(255,255,255,0.05);
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
 /* 🔔 Badge notifica */
@@ -207,7 +274,7 @@ html.dark .checkbox-icon {
   color: var(--color-icon-dark);
 }
 
-.checkbox-theme:checked + .checkbox-icon {
+.checkbox-theme:checked+.checkbox-icon {
   display: block;
 }
 
@@ -231,6 +298,7 @@ html.dark .hover-bg-theme:hover {
   text-align: center;
   color: var(--color-text-light);
 }
+
 html.dark .form-heading {
   color: var(--color-text-dark);
 }
@@ -240,10 +308,12 @@ input:-webkit-autofill {
   -webkit-box-shadow: 0 0 0px 1000px white inset !important;
   -webkit-text-fill-color: #111 !important;
 }
+
 input:-webkit-autofill {
   box-shadow: 0 0 0px 1000px white inset !important;
   -webkit-text-fill-color: #111 !important;
 }
+
 html.dark input:-webkit-autofill {
   box-shadow: 0 0 0px 1000px #1f2937 inset !important;
   -webkit-text-fill-color: #f5f5f5 !important;
@@ -261,24 +331,29 @@ html.dark input:-webkit-autofill {
   transition: all 0.3s ease;
   cursor: pointer;
   background-color: var(--color-background-light);
-  border: 2px solid rgba(0, 0, 0, 0.1); /* ✅ bordo soft */
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  /* ✅ bordo soft */
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 html.dark .toggle-theme {
   background-color: var(--color-background-dark);
-  border: 2px solid rgba(255, 255, 255, 0.15); /* ✅ bordo chiaro semi */
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  /* ✅ bordo chiaro semi */
   box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.05);
 }
 
 /* ✅ Stato attivo con colori blu */
 .toggle-theme.active {
-  background-color: #2563eb;     /* blu-600 */
-  border-color: #1e40af;         /* blu-700 */
+  background-color: #2563eb;
+  /* blu-600 */
+  border-color: #1e40af;
+  /* blu-700 */
 }
 
 html.dark .toggle-theme.active {
-  background-color: #3b82f6;     /* tonalità visibile in dark */
+  background-color: #3b82f6;
+  /* tonalità visibile in dark */
   border-color: #60a5fa;
 }
 
@@ -319,6 +394,7 @@ html.dark .card-theme {
 .sidebar-theme {
   background-color: var(--color-background-light);
 }
+
 html.dark .sidebar-theme {
   background-color: #2c354230;
 }
@@ -327,9 +403,11 @@ html.dark .sidebar-theme {
 .sidebar-shadow-open {
   box-shadow: 3px 0 6px rgba(0, 0, 0, 0.08), 0 -3px 6px rgba(0, 0, 0, 0.05);
 }
+
 html.dark .sidebar-shadow-open {
   box-shadow: 3px 0 8px rgba(0, 0, 0, 0.2), 0 -3px 8px rgba(0, 0, 0, 0.15);
 }
+
 /* 📩 Sidebar notifiche: ombra sinistra e sopra */
 .notifiche-shadow-open {
   box-shadow: -3px 0 6px rgba(0, 0, 0, 0.08), 0 -3px 6px rgba(0, 0, 0, 0.05);
@@ -350,6 +428,7 @@ html.dark .notifiche-shadow-open {
     transform: scale(0.95);
     opacity: 0;
   }
+
   100% {
     transform: scale(1);
     opacity: 1;
@@ -363,12 +442,14 @@ html.dark .notifiche-shadow-open {
 
 /* ✅ Evidenziazione selezionato coerente con tema */
 .selected-panel {
-  background-color: rgba(37, 99, 235, 0.12); /* blu-600 soft */
+  background-color: rgba(37, 99, 235, 0.12);
+  /* blu-600 soft */
   border: 1px solid #2563eb;
 }
 
 html.dark .selected-panel {
-  background-color: rgba(96, 165, 250, 0.18); /* blu-400 soft in dark */
+  background-color: rgba(96, 165, 250, 0.18);
+  /* blu-400 soft in dark */
   border: 1px solid #3b82f6;
 }
 
@@ -426,7 +507,8 @@ html.dark .rdrNextPrevButton {
 
 /* 📅 Hover sui giorni passivi (fuori mese) */
 .rdrDayPassive:hover {
-  background-color: rgba(96, 165, 250, 0.12) !important; /* blu-400 soft */
+  background-color: rgba(96, 165, 250, 0.12) !important;
+  /* blu-400 soft */
 }
 
 html.dark .rdrDayPassive:hover {
@@ -456,6 +538,7 @@ html.dark .rdrDayPassive:hover {
 .bg-oggi {
   @apply bg-yellow-200 text-yellow-900;
 }
+
 html.dark .bg-oggi {
   @apply dark:bg-yellow-700 dark:text-yellow-200;
 }
@@ -463,6 +546,7 @@ html.dark .bg-oggi {
 .bg-passato {
   @apply bg-red-200 text-red-900;
 }
+
 html.dark .bg-passato {
   @apply dark:bg-red-700 dark:text-red-200;
 }
@@ -470,6 +554,7 @@ html.dark .bg-passato {
 .bg-futuro {
   @apply bg-green-200 text-green-900;
 }
+
 html.dark .bg-futuro {
   @apply dark:bg-green-700 dark:text-green-200;
 }
@@ -479,6 +564,7 @@ html.dark .bg-futuro {
 .icon-oggi {
   @apply text-yellow-500;
 }
+
 html.dark .icon-oggi {
   @apply dark:text-yellow-300;
 }
@@ -486,6 +572,7 @@ html.dark .icon-oggi {
 .icon-passato {
   @apply text-red-500;
 }
+
 html.dark .icon-passato {
   @apply dark:text-red-300;
 }
@@ -493,40 +580,42 @@ html.dark .icon-passato {
 .icon-futuro {
   @apply text-green-600;
 }
+
 html.dark .icon-futuro {
   @apply dark:text-green-300;
 }
 
 
 
-.bg-task{
-@apply bg-blue-100  text-blue-800  
+.bg-task {
+  @apply bg-blue-100 text-blue-800
 }
 
 
 
-html.dark .bg-task{
-@apply  dark:bg-blue-900  dark:text-blue-300 
+html.dark .bg-task {
+  @apply dark:bg-blue-900 dark:text-blue-300
 }
 
 
-.bg-button-oggi{
-@apply bg-blue-100  text-blue-800  hover:bg-blue-200 
-}
-
-
-
-html.dark .bg-button-oggi{
-@apply dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-700
+.bg-button-oggi {
+  @apply bg-blue-100 text-blue-800 hover:bg-blue-200
 }
 
 
 
-.bg-task-modal{
-  @apply bg-blue-100  text-blue-800 
+html.dark .bg-button-oggi {
+  @apply dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-700
 }
-html.dark .bg-task-modal{
-  @apply  dark:bg-blue-900  dark:text-blue-300
+
+
+
+.bg-task-modal {
+  @apply bg-blue-100 text-blue-800
+}
+
+html.dark .bg-task-modal {
+  @apply dark:bg-blue-900 dark:text-blue-300
 }
 
 
@@ -548,9 +637,10 @@ html.dark .input-date-native {
   border-color: #444;
 }
 
-.link{
-  @apply text-violet-900 
+.link {
+  @apply text-violet-900
 }
-html.dark .link{
-  @apply  dark:text-violet-300
+
+html.dark .link {
+  @apply dark:text-violet-300
 }

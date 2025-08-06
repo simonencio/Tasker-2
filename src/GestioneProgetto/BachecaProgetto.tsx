@@ -57,7 +57,7 @@ export default function BachecaProgetto() {
     const [soloMieTask, setSoloMieTask] = useState(false);
     const [utenteLoggatoId, setUtenteLoggatoId] = useState<string | null>(null);
     const [groupBy, setGroupBy] = useState<Raggruppamento>('stato');
-    const [offsetSettimana, setOffsetSettimana] = useState(0);
+    const [, setOffsetSettimana] = useState(0);
 
     const [isAdmin, setIsAdmin] = useState(false);
 
