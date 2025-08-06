@@ -3,6 +3,7 @@ import { DateRange } from "react-date-range";
 import { format } from "date-fns";
 import type { Range } from "react-date-range";
 import type { FiltroAvanzato, Task } from "./tipi";
+import { useRef } from "react";
 
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
@@ -16,6 +17,8 @@ type Props = {
 
 export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }: Props) {
     const [mostraCalendario, setMostraCalendario] = useState(false);
+    const calendarioRef = useRef<HTMLDivElement>(null);
+
     const [rangeSelezionato, setRangeSelezionato] = useState<Range[]>([{
         startDate: undefined,
         endDate: undefined,
@@ -62,6 +65,20 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
             return true;
         });
     }, [tasks, filtro]);
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (
+                mostraCalendario &&
+                calendarioRef.current &&
+                !calendarioRef.current.contains(e.target as Node)
+            ) {
+                setMostraCalendario(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [mostraCalendario]);
 
     const opzioniProgetti = useMemo(() => {
         const set = new Map();
@@ -157,7 +174,11 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
                         : "Filtra per intervallo"}
                 </button>
                 {mostraCalendario && (
-                    <div className="absolute z-20 mt-2 popup-panel shadow-xl rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1f2937]">
+                    <div
+                        ref={calendarioRef}
+                        className="absolute z-20 mt-2 popup-panel shadow-xl rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1f2937]"
+                    >
+
                         <DateRange
                             editableDateInputs
                             onChange={item => {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { DateRange } from "react-date-range";
 import type { Range } from "react-date-range";
+import { useRef } from "react"; // aggiungi se manca
 
 import { format } from "date-fns";
 import "react-date-range/dist/styles.css";
@@ -21,6 +22,8 @@ export type Progetto = {
     priorita: Priorita | null;
     cliente: Cliente | null;
     membri: Utente[];
+    note?: string | null; // ✅ aggiungi questa riga
+
 };
 
 // Filtro attivo
@@ -42,6 +45,7 @@ type Props = {
 export default function FiltriProgettoAvanzati({ progetti, onChange }: Props) {
     const [dropdownAperto, setDropdownAperto] = useState(false);
     const [mostraCalendario, setMostraCalendario] = useState(false);
+    const calendarioRef = useRef<HTMLDivElement>(null);
 
     const [rangeSelezionato, setRangeSelezionato] = useState<Range[]>([{
         startDate: undefined,
@@ -82,6 +86,20 @@ export default function FiltriProgettoAvanzati({ progetti, onChange }: Props) {
         document.addEventListener("click", chiudi);
         return () => document.removeEventListener("click", chiudi);
     }, []);
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (
+                mostraCalendario &&
+                calendarioRef.current &&
+                !calendarioRef.current.contains(e.target as Node)
+            ) {
+                setMostraCalendario(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [mostraCalendario]);
 
     const progettiFiltrati = useMemo(() => {
         return progetti.filter((p) => {
@@ -231,7 +249,10 @@ export default function FiltriProgettoAvanzati({ progetti, onChange }: Props) {
                         : "Filtra per intervallo"}
                 </button>
                 {mostraCalendario && (
-                    <div className="absolute z-20 mt-2 popup-panel shadow-xl rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1f2937]">
+                    <div
+                        ref={calendarioRef}
+                        className="absolute z-20 mt-2 popup-panel shadow-xl rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1f2937]"
+                    >
                         <DateRange
                             editableDateInputs
                             onChange={item => {

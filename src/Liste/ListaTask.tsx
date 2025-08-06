@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen, faTasks, faUser } from "@fortawesome/free-solid-svg-icons";
+import { faPen, faTasks, faCheckCircle, faLink } from "@fortawesome/free-solid-svg-icons";
 import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
 import FiltriTaskAvanzati, { ordinaTaskClientSide } from "../supporto/FiltriTaskAvanzati";
-import type { FiltroAvanzato, Task } from "../supporto/tipi";
+import type { Commento, FiltroAvanzato, Task } from "../supporto/tipi";
 import { useNavigate } from "react-router-dom";
-
+import RenderSottoTask from "../supporto/SottoTask";
+import RenderCommento from "../supporto/RenderCommento";
 
 export default function ListaTask() {
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -15,8 +16,23 @@ export default function ListaTask() {
     const [soloMie, setSoloMie] = useState(false);
     const [utenteId, setUtenteId] = useState<string | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [soloCompletate, setSoloCompletate] = useState(false);
+    const tasksFiltrate = tasks.filter(t => !soloCompletate || t.fine_task !== null);
+    const [commenti, setCommenti] = useState<Commento[]>([]);
+
     const [taskDaModificareId, setTaskDaModificareId] = useState<string | null>(null);
     const [taskEspansaId, setTaskEspansaId] = useState<string | null>(null);
+    const [sottoTaskEspansa, setSottoTaskEspansa] = useState<Set<string>>(new Set());
+
+    const toggleSottoTaskEspansa = (taskId: string) => {
+        setSottoTaskEspansa(prev => {
+            const nuovo = new Set(prev);
+            nuovo.has(taskId) ? nuovo.delete(taskId) : nuovo.add(taskId);
+            return nuovo;
+        });
+    };
+
+
     const [filtroAvanzato, setFiltroAvanzato] = useState<FiltroAvanzato>({
         progetto: null,
         utente: null,
@@ -26,8 +42,7 @@ export default function ListaTask() {
         dataFine: null,
         ordine: null,
     });
- const navigate = useNavigate();
-
+    const navigate = useNavigate();
 
     useEffect(() => {
         const fetchUtente = async () => {
@@ -39,12 +54,49 @@ export default function ListaTask() {
         };
         fetchUtente();
     }, []);
+    useEffect(() => {
+        const caricaCommenti = async () => {
+            const { data, error } = await supabase
+                .from("commenti")
+                .select(`
+                id,
+                utente_id,
+                task_id,
+                parent_id,
+                descrizione,
+                created_at,
+                modified_at,
+                deleted_at,
+                utente:utente_id (
+                    id,
+                    nome,
+                    cognome
+                )
+            `)
+                .is("deleted_at", null);
+
+            if (error) {
+                console.error("Errore nel caricamento commenti:", error);
+                return;
+            }
+
+            if (data) {
+                // Fix utente[] vs utente
+                const commentiPuliti: Commento[] = data.map((c: any) => ({
+                    ...c,
+                    utente: Array.isArray(c.utente) ? c.utente[0] : c.utente,
+                }));
+                setCommenti(commentiPuliti);
+            }
+        };
+
+        caricaCommenti();
+    }, []);
 
     useEffect(() => {
         const caricaTasks = async () => {
             setLoading(true);
             let taskIds: string[] = [];
-
 
             if ((soloMie || filtroAvanzato.utente) && utenteId) {
                 const idFiltro = filtroAvanzato.utente || utenteId;
@@ -80,11 +132,10 @@ export default function ListaTask() {
                     : taskIdsProgetto;
             }
 
-
             const query = supabase
                 .from("tasks")
                 .select(`
-                    id, nome, note, consegna, tempo_stimato, created_at, modified_at,
+                    id, nome, note, consegna, tempo_stimato, created_at, modified_at, fine_task, parent_id,
                     stato:stato_id (id, nome, colore),
                     priorita:priorita_id (id, nome),
                     progetti_task:progetti_task ( progetti ( id, nome ) ),
@@ -92,14 +143,11 @@ export default function ListaTask() {
                 `)
                 .is("deleted_at", null);
 
-            if (taskIds.length > 0)
-                query.in("id", taskIds);
-
+            if (taskIds.length > 0) query.in("id", taskIds);
             if (filtroAvanzato.stato) query.eq("stato_id", filtroAvanzato.stato);
             if (filtroAvanzato.priorita) query.eq("priorita_id", filtroAvanzato.priorita);
             if (filtroAvanzato.dataInizio) query.gte("consegna", filtroAvanzato.dataInizio);
             if (filtroAvanzato.dataFine) query.lte("consegna", filtroAvanzato.dataFine);
-
 
             const { data } = await query;
             if (data) {
@@ -111,6 +159,8 @@ export default function ListaTask() {
                     tempo_stimato: item.tempo_stimato,
                     created_at: item.created_at,
                     modified_at: item.modified_at,
+                    fine_task: item.fine_task,
+                    parent_id: item.parent_id,
                     stato: item.stato,
                     priorita: item.priorita,
                     progetto: item.progetti_task?.[0]?.progetti ?? null,
@@ -120,6 +170,7 @@ export default function ListaTask() {
             }
             setLoading(false);
         };
+
 
         const caricaTaskAssegnate = async () => {
             if (!utenteId) return;
@@ -133,6 +184,9 @@ export default function ListaTask() {
         }
     }, [soloMie, filtroAvanzato, utenteId]);
 
+
+    const sottoTask = (taskId: string) => tasks.filter(t => t.parent_id === taskId);
+
     return (
         <div className="p-4 sm:p-6">
             <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
@@ -140,25 +194,26 @@ export default function ListaTask() {
                     <FontAwesomeIcon icon={faTasks} className="text-green-500 mr-2" />
                     Lista Task
                 </h1>
-                <div className="flex items-center gap-2">
-                    <FontAwesomeIcon icon={faUser} className="w-5 h-5 icon-color" />
-                    <span className="text-theme font-medium">Mie</span>
-                    <div
-                        onClick={() => setSoloMie(v => !v)}
-                        className={`toggle-theme ${soloMie ? "active" : ""}`}
-                    >
-                        <div className={`toggle-thumb ${soloMie ? "translate" : ""}`} />
+                <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex items-center gap-2">
+                        <FontAwesomeIcon icon={faLink} className="w-5 h-5 text-blue-600" />
+                        <span className="text-theme font-medium">Mie</span>
+                        <div onClick={() => setSoloMie(v => !v)} className={`toggle-theme ${soloMie ? "active" : ""}`}>
+                            <div className={`toggle-thumb ${soloMie ? "translate" : ""}`} />
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <FontAwesomeIcon icon={faCheckCircle} className="w-5 h-5 text-green-600" />
+                        <span className="text-theme font-medium">Completate</span>
+                        <div onClick={() => setSoloCompletate(v => !v)} className={`toggle-theme ${soloCompletate ? "active" : ""}`}>
+                            <div className={`toggle-thumb ${soloCompletate ? "translate" : ""}`} />
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div className="mb-6">
-                <FiltriTaskAvanzati
-                    tasks={tasks}
-                    isAdmin={isAdmin}
-                    soloMie={soloMie}
-                    onChange={setFiltroAvanzato}
-                />
+                <FiltriTaskAvanzati tasks={tasks} isAdmin={isAdmin} soloMie={soloMie} onChange={setFiltroAvanzato} />
             </div>
 
             {loading ? (
@@ -166,6 +221,7 @@ export default function ListaTask() {
             ) : (
                 <div className="rounded-xl overflow-hidden shadow-md card-theme">
                     <div className="hidden lg:flex px-4 py-2 text-xs font-semibold text-theme border-b border-gray-300 dark:border-gray-600">
+                        <div className="w-10 shrink-0" />
                         <div className="flex-1">Nome</div>
                         <div className="w-40">Consegna</div>
                         <div className="w-32">Stato</div>
@@ -173,80 +229,90 @@ export default function ListaTask() {
                         <div className="w-20 text-center">Azioni</div>
                     </div>
 
-                    {tasks.map(task => {
+                    {tasksFiltrate.filter(t => !t.parent_id).map(task => {
                         const isAssegnata = taskAssegnate.has(task.id);
+                        const isCompletata = task.fine_task !== null;
                         const isOpen = taskEspansaId === task.id;
+                        const children = sottoTask(task.id);
 
                         return (
                             <div key={task.id} className="border-t border-gray-200 dark:border-gray-700 hover-bg-theme">
-                                <div
-                                    className="flex items-center px-4 py-3 text-sm text-theme cursor-pointer"
-                                    onClick={() => setTaskEspansaId(isOpen ? null : task.id)}
-                                >
-                                    <div className="flex-1 font-medium flex items-center gap-2">
-                                        {isAssegnata && (
-                                            <span className="text-xs text-white bg-violet-600 px-2 py-1 rounded shadow">🧠</span>
-                                        )}
-                                        {task.nome}
+                                <div className="flex items-center px-4 py-3 text-sm text-theme cursor-pointer" onClick={() => setTaskEspansaId(isOpen ? null : task.id)}>
+                                    <div className="w-8 shrink-0 flex justify-start items-center">
+                                        <div className="flex flex-col items-center gap-1">
+                                            {isAssegnata && (
+                                                <FontAwesomeIcon icon={faLink} className="w-4 h-4 text-blue-600" title="Assegnata a te" />
+                                            )}
+                                            {isCompletata && (
+                                                <FontAwesomeIcon icon={faCheckCircle} className="w-4 h-4 text-green-600" title="Completata" />
+                                            )}
+                                        </div>
                                     </div>
 
+                                    <div className="flex-1 font-medium truncate">{task.nome}</div>
                                     <div className="hidden lg:block w-40">{task.consegna ? new Date(task.consegna).toLocaleDateString() : "—"}</div>
                                     <div className="hidden lg:block w-32">{task.stato?.nome ?? "—"}</div>
                                     <div className="hidden lg:block w-32">{task.priorita?.nome ?? "—"}</div>
 
                                     <div className="w-20 flex justify-end items-center gap-3">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setTaskDaModificareId(task.id);
-                                            }}
-                                            className="icon-color hover:text-blue-600"
-                                            title="Modifica"
-                                        >
+                                        <button onClick={e => { e.stopPropagation(); setTaskDaModificareId(task.id); }} className="icon-color hover:text-blue-600" title="Modifica">
                                             <FontAwesomeIcon icon={faPen} />
                                         </button>
-
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                navigate(`/tasks/${task.id}`);
-                                            }}
-                                            className="icon-color hover:text-green-600"
-                                            title="Vai al dettaglio"
-                                        >
+                                        <button onClick={e => { e.stopPropagation(); navigate(`/tasks/${task.id}`); }} className="icon-color hover:text-green-600" title="Vai al dettaglio">
                                             <FontAwesomeIcon icon={faTasks} />
                                         </button>
-
-
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setTaskEspansaId(isOpen ? null : task.id);
-                                            }}
-                                            className="text-theme text-xl font-bold"
-                                            title={isOpen ? "Chiudi dettagli" : "Apri dettagli"}
-                                        >
+                                        <button onClick={e => { e.stopPropagation(); setTaskEspansaId(isOpen ? null : task.id); }} className="text-theme text-xl font-bold">
                                             {isOpen ? "−" : "+"}
                                         </button>
                                     </div>
                                 </div>
 
                                 {isOpen && (
-                                    <div className="animate-scale-fade px-6 pb-4 text-sm text-theme space-y-1">
-                                        {/* Da md in giù: mostra tutti i campi */}
+                                    <div className="animate-scale-fade px-6 pb-4 text-sm text-theme space-y-2">
                                         <div className="block lg:hidden space-y-1">
                                             <p>📅 Consegna: {task.consegna ? new Date(task.consegna).toLocaleDateString() : "—"}</p>
                                             <p>📊 Stato: {task.stato?.nome ?? "—"}</p>
                                             <p>⏫ Priorità: {task.priorita?.nome ?? "—"}</p>
                                         </div>
-
-                                        {/* Sempre visibili */}
-                                        {task.note && <p>🗒️ {task.note}</p>}
                                         {task.progetto?.nome && <p>📁 Progetto: {task.progetto.nome}</p>}
                                         {task.tempo_stimato && <p>⏱️ Tempo stimato: {task.tempo_stimato}</p>}
                                         {task.assegnatari?.length > 0 && (
                                             <p>👥 Assegnata a: {task.assegnatari.map(u => `${u.nome} ${u.cognome || ""}`).join(", ")}</p>
                                         )}
+                                        {task.note && <p>🗒️ {task.note}</p>}
+
+                                        {children.length > 0 && (
+                                            <div className="mt-4">
+                                                <div
+                                                    onClick={() => toggleSottoTaskEspansa(task.id)}
+                                                    className="cursor-pointer rounded-md px-0 py-2 text-sm text-theme hover-bg-theme "
+                                                >
+                                                    📎 Sotto-task
+                                                </div>
+
+                                                {sottoTaskEspansa.has(task.id) && (
+                                                    <div className="mt-2 space-y-2">
+                                                        {children.map(sotto => (
+                                                            <RenderSottoTask key={sotto.id} task={sotto} allTasks={tasks} livello={1} />
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {commenti.some(c => c.task_id === task.id && !c.parent_id) && (
+                                                    <div className="mt-4">
+                                                        <h4 className="text-theme font-semibold mb-2">💬 Commenti</h4>
+                                                        <div className="space-y-3">
+                                                            {commenti.filter(c => c.task_id === task.id && !c.parent_id).map(c => (
+                                                                <RenderCommento key={c.id} commento={c} allCommenti={commenti} livello={1} />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                            </div>
+                                        )}
+
+
+
                                     </div>
                                 )}
                             </div>
@@ -256,11 +322,10 @@ export default function ListaTask() {
             )}
 
             {taskDaModificareId && (
-                <MiniTaskEditorModal
-                    taskId={taskDaModificareId}
-                    onClose={() => setTaskDaModificareId(null)}
-                />
+                <MiniTaskEditorModal taskId={taskDaModificareId} onClose={() => setTaskDaModificareId(null)} />
             )}
         </div>
     );
 }
+
+

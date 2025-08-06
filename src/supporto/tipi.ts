@@ -4,12 +4,28 @@ export type Task = {
     note?: string | null;
     consegna?: string | null;
     tempo_stimato?: string | null;
+    fine_task?: string | null;
     created_at: string;
     modified_at: string;
-    stato?: { id: number; nome: string; colore?: string | null } | null;
-    priorita?: { id: number; nome: string } | null;
-    progetto?: { id: string; nome: string } | null;
-    assegnatari: { id: string; nome: string; cognome?: string | null }[];
+    parent_id?: string | null; // ✅ Campo aggiunto per indicare se è una sotto-task
+    stato?: {
+        id: number;
+        nome: string;
+        colore?: string | null;
+    } | null;
+    priorita?: {
+        id: number;
+        nome: string;
+    } | null;
+    progetto?: {
+        id: string;
+        nome: string;
+    } | null;
+    assegnatari: {
+        id: string;
+        nome: string;
+        cognome?: string | null;
+    }[];
 };
 
 export type FiltroAvanzato = {
@@ -20,4 +36,19 @@ export type FiltroAvanzato = {
     dataInizio?: string | null;
     dataFine?: string | null;
     ordine?: string | null;
+};
+export type Commento = {
+    id: string;
+    utente_id: string;
+    task_id: string;
+    parent_id: string | null;
+    descrizione: string;
+    created_at: string;
+    modified_at: string;
+    deleted_at?: string | null;
+    utente: {
+        id: string;
+        nome: string;
+        cognome: string | null;
+    }; // <-- oggetto singolo
 };
