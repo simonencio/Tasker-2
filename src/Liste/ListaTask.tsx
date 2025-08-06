@@ -22,11 +22,11 @@ export default function ListaTask() {
         utente: null,
         stato: null,
         priorita: null,
-        consegna: null,
+        dataInizio: null,
+        dataFine: null,
         ordine: null,
     });
-
-    const navigate = useNavigate();
+ const navigate = useNavigate();
 
 
     useEffect(() => {
@@ -45,16 +45,41 @@ export default function ListaTask() {
             setLoading(true);
             let taskIds: string[] = [];
 
+
             if ((soloMie || filtroAvanzato.utente) && utenteId) {
                 const idFiltro = filtroAvanzato.utente || utenteId;
-                const { data } = await supabase.from("utenti_task").select("task_id").eq("utente_id", idFiltro);
-                if (!data || data.length === 0) {
+                const { data: dataUtente } = await supabase
+                    .from("utenti_task")
+                    .select("task_id")
+                    .eq("utente_id", idFiltro);
+
+                if (!dataUtente || dataUtente.length === 0) {
                     setTasks([]);
                     setLoading(false);
                     return;
                 }
-                taskIds = data.map(t => t.task_id);
+
+                taskIds = dataUtente.map(t => t.task_id);
             }
+
+            if (filtroAvanzato.progetto) {
+                const { data: dataProgetto } = await supabase
+                    .from("progetti_task")
+                    .select("task_id")
+                    .eq("progetti_id", filtroAvanzato.progetto);
+
+                if (!dataProgetto || dataProgetto.length === 0) {
+                    setTasks([]);
+                    setLoading(false);
+                    return;
+                }
+
+                const taskIdsProgetto = dataProgetto.map(r => r.task_id);
+                taskIds = taskIds.length > 0
+                    ? taskIds.filter(id => taskIdsProgetto.includes(id))
+                    : taskIdsProgetto;
+            }
+
 
             const query = supabase
                 .from("tasks")
@@ -67,10 +92,14 @@ export default function ListaTask() {
                 `)
                 .is("deleted_at", null);
 
-            if ((soloMie || filtroAvanzato.utente) && taskIds.length > 0) query.in("id", taskIds);
+            if (taskIds.length > 0)
+                query.in("id", taskIds);
+
             if (filtroAvanzato.stato) query.eq("stato_id", filtroAvanzato.stato);
             if (filtroAvanzato.priorita) query.eq("priorita_id", filtroAvanzato.priorita);
-            if (filtroAvanzato.consegna) query.eq("consegna", filtroAvanzato.consegna);
+            if (filtroAvanzato.dataInizio) query.gte("consegna", filtroAvanzato.dataInizio);
+            if (filtroAvanzato.dataFine) query.lte("consegna", filtroAvanzato.dataFine);
+
 
             const { data } = await query;
             if (data) {
