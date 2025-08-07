@@ -3,7 +3,7 @@ import { Toast } from "toaster-js";
 import "../App.css";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlay, faStop, faTasks, faCheckCircle, faLink, faPen,faUser } from "@fortawesome/free-solid-svg-icons";
+import { faPlay, faStop, faTasks, faCheckCircle, faLink } from "@fortawesome/free-solid-svg-icons";
 
 import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
 import FiltriTaskAvanzati, { ordinaTaskClientSide } from "../supporto/FiltriTaskAvanzati";
@@ -13,29 +13,6 @@ import RenderSottoTask from "../supporto/SottoTask";
 import RenderCommento from "../supporto/RenderCommento";
 
 
-const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
-    // Memorizza il messaggio per il MutationObserver
-    (window as any).lastToastMessage = message;
-    (window as any).lastToastType = type;
-
-    // Mappa i tipi ai tipi della libreria toaster-js
-    let toasterType;
-    switch (type) {
-        case 'success':
-            toasterType = Toast.TYPE_DONE;
-            break;
-        case 'error':
-            toasterType = Toast.TYPE_ERROR;
-            break;
-        case 'warning':
-            toasterType = Toast.TYPE_ERROR; // toaster-js non ha warning, usa error
-            break;
-        default:
-            toasterType = Toast.TYPE_DONE;
-    }
-
-    new Toast(message, toasterType, Toast.TIME_SHORT);
-};
 
 export default function ListaTask() {
     const [tasks, setTasks] = useState<Task[]>([]);
