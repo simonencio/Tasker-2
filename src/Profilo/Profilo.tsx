@@ -1,4 +1,7 @@
 import NotificationPreferencesSelector from "../Notifiche/NotificationPreferencesSelector";
+import ModificaEmail from "./ModificaEmail";
+import ModificaPassword from "./ModificaPassword";
+import ModificaImmagineProfilo from "./ModificaImmagineProfilo";
 
 export default function Profilo() {
     return (
@@ -6,14 +9,21 @@ export default function Profilo() {
             <div className="max-w-4xl mx-auto space-y-8">
                 <h1 className="text-3xl font-bold text-theme">Il tuo Profilo</h1>
 
-                {/* Sezione notifiche */}
                 <section>
                     <NotificationPreferencesSelector />
                 </section>
 
-                {/* Aggiungi altre sezioni qui in futuro */}
-                {/* <section> <ModificaPassword /> </section> */}
-                {/* <section> <ImpostazioniAccount /> </section> */}
+                <section>
+                    <ModificaEmail />
+                </section>
+
+                <section>
+                    <ModificaPassword />
+                </section>
+
+                <section>
+                    <ModificaImmagineProfilo />
+                </section>
             </div>
         </div>
     );
