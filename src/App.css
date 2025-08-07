@@ -4,8 +4,15 @@
 
 
 
-/* Toast base - stile moderno e giovane */
-[class*="toast"], .toast {
+/* Reset completo per tutti gli elementi toast */
+.toast,
+.toast * {
+  box-sizing: border-box !important;
+}
+
+/* Stili base per il toast */
+.toast {
+  /* Posizionamento */
   position: fixed !important;
   bottom: 24px !important;
   right: 24px !important;
@@ -14,14 +21,16 @@
   transform: none !important;
   z-index: 9999 !important;
   
-  /* Layout e dimensioni */
+  /* Layout */
   display: flex !important;
   align-items: center !important;
   padding: 16px 20px !important;
   min-width: 280px !important;
   max-width: 400px !important;
+  width: auto !important;
+  height: auto !important;
   
-  /* Stile moderno */
+  /* Stile visuale */
   background-color: #ffffff !important;
   color: #1f2937 !important;
   border: 1px solid #e5e7eb !important;
@@ -36,16 +45,25 @@
   font-size: 15px !important;
   font-weight: 500 !important;
   line-height: 1.4 !important;
+  text-align: left !important;
   
-  /* Animazione */
-  animation: toastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  /* Visibilità */
   visibility: visible !important;
   opacity: 1 !important;
   pointer-events: auto !important;
   
-  /* Backdrop blur effect */
+  /* Animazione */
+  animation: toastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  transition: all 0.3s ease !important;
+  
+  /* Backdrop blur */
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
+}
+
+/* Nascondi tutti gli elementi figli originali della libreria */
+.toast > *:not(.toast-content) {
+  display: none !important;
 }
 
 /* Contenuto del toast */
@@ -54,6 +72,8 @@
   align-items: center !important;
   gap: 12px !important;
   width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 /* Icone del toast */
@@ -61,6 +81,8 @@
   width: 20px !important;
   height: 20px !important;
   flex-shrink: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 .toast-icon-success {
@@ -73,11 +95,20 @@
   filter: drop-shadow(0 1px 2px rgba(239, 68, 68, 0.2)) !important;
 }
 
+.toast-icon-warning {
+  color: #f59e0b !important;
+  filter: drop-shadow(0 1px 2px rgba(245, 158, 11, 0.2)) !important;
+}
+
 /* Messaggio del toast */
 .toast-message {
   flex: 1 !important;
   font-weight: 500 !important;
   color: inherit !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
 }
 
 /* Varianti colore per tipi di toast */
@@ -101,7 +132,27 @@
     0 0 0 1px rgba(239, 68, 68, 0.05) inset !important;
 }
 
-/* Animazioni moderne */
+.toast.warning {
+  background-color: #ffffff !important;
+  color: #92400e !important;
+  border-color: #f59e0b !important;
+  box-shadow: 
+    0 10px 25px -5px rgba(245, 158, 11, 0.15),
+    0 8px 10px -6px rgba(245, 158, 11, 0.1),
+    0 0 0 1px rgba(245, 158, 11, 0.05) inset !important;
+}
+
+.toast.info {
+  background-color: #ffffff !important;
+  color: #1e40af !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 
+    0 10px 25px -5px rgba(59, 130, 246, 0.15),
+    0 8px 10px -6px rgba(59, 130, 246, 0.1),
+    0 0 0 1px rgba(59, 130, 246, 0.05) inset !important;
+}
+
+/* Animazioni */
 @keyframes toastSlideIn {
   0% {
     opacity: 0;
@@ -117,12 +168,9 @@
   }
 }
 
-/* Hover effect per interattività */
-[class*="toast"]:hover, .toast:hover {
-  transform: translateY(-2px) !important;
-  box-shadow: 
-    0 12px 30px -5px rgba(0, 0, 0, 0.12),
-    0 10px 15px -6px rgba(0, 0, 0, 0.12) !important;
+/* Hover effect */
+.toast:hover {
+  transform: translateY(-2px) scale(1.02) !important;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
@@ -138,9 +186,21 @@
     0 10px 15px -6px rgba(239, 68, 68, 0.15) !important;
 }
 
+.toast.warning:hover {
+  box-shadow: 
+    0 12px 30px -5px rgba(245, 158, 11, 0.18),
+    0 10px 15px -6px rgba(245, 158, 11, 0.15) !important;
+}
+
+.toast.info:hover {
+  box-shadow: 
+    0 12px 30px -5px rgba(59, 130, 246, 0.18),
+    0 10px 15px -6px rgba(59, 130, 246, 0.15) !important;
+}
+
 /* Responsiveness */
 @media (max-width: 480px) {
-  [class*="toast"], .toast {
+  .toast {
     right: 16px !important;
     bottom: 16px !important;
     left: 16px !important;
@@ -149,9 +209,9 @@
   }
 }
 
-/* Dark mode support (opzionale) */
+/* Dark mode support */
 @media (prefers-color-scheme: dark) {
-  [class*="toast"], .toast {
+  .toast {
     background-color: #1f2937 !important;
     color: #f9fafb !important;
     border-color: #374151 !important;
@@ -160,20 +220,48 @@
   .toast.success {
     background-color: #1f2937 !important;
     color: #6ee7b7 !important;
+    border-color: #10b981 !important;
   }
   
   .toast.error {
     background-color: #1f2937 !important;
     color: #fca5a5 !important;
+    border-color: #ef4444 !important;
+  }
+  
+  .toast.warning {
+    background-color: #1f2937 !important;
+    color: #fcd34d !important;
+    border-color: #f59e0b !important;
+  }
+  
+  .toast.info {
+    background-color: #1f2937 !important;
+    color: #93c5fd !important;
+    border-color: #3b82f6 !important;
   }
 }
 
-/* Nascondi contenitori originali della libreria */
-.toast-container {
+/* Nascondi completamente i contenitori originali della libreria */
+.toast-container,
+[class*="toaster"],
+[class*="Toaster"] {
   background: transparent !important;
   box-shadow: none !important;
   border: none !important;
   position: static !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Override specifici per elementi non desiderati */
+.toast-container .toast-container {
+  display: none !important;
+}
+
+/* Previeni elementi multipli */
+.toast[data-styled="true"] ~ .toast:not([data-styled]) {
+  display: none !important;
 }
 
 
