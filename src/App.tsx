@@ -182,7 +182,7 @@ function AppContent() {
                                 <Route path="/profilo" element={<Profilo />} />
                                 <Route path="/progetti/:id" element={<DettaglioProgetto />} />
                                 <Route path="/progetti/:id/calendario" element={<CalendarioProgetto />} />
-                                <Route path="/progetti/:id/bacheca" element={<BachecaProgetto />} /> 
+                                <Route path="/progetti/:id/bacheca" element={<BachecaProgetto />} />
                                 <Route path="/tasks/:id" element={<DettaglioTask />} />
                             </Routes>
                         </div>

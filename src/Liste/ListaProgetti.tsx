@@ -8,22 +8,9 @@ import { faLink, faPen, faProjectDiagram } from "@fortawesome/free-solid-svg-ico
 import MiniProjectEditorModal from "../Modifica/MiniProjectEditorModal";
 import FiltriProgettoAvanzati, { ordinaProgettiClientSide, type FiltroAvanzatoProgetto } from "../supporto/FiltriProgettoAvanzati";
 import { faCheckCircle } from "@fortawesome/free-solid-svg-icons";
+import type { Progetto, Utente } from "../supporto/tipi";
 
-type Utente = { id: string; nome: string; cognome: string | null };
-type Cliente = { id: string; nome: string };
-type Stato = { id: number; nome: string; colore: string | null };
-type Priorita = { id: number; nome: string };
 
-export type Progetto = {
-    id: string;
-    nome: string;
-    consegna: string | null;
-    stato: Stato | null;
-    priorita: Priorita | null;
-    cliente: Cliente | null;
-    membri: Utente[];
-    note?: string | null; // ✅ aggiungi questa riga
-};
 
 
 type TaskBreve = {
@@ -43,6 +30,7 @@ export default function ListaProgetti() {
     const [, setIsAdmin] = useState(false);
     const [progettiCompletati, setProgettiCompletati] = useState<Set<string>>(new Set());
     const [soloCompletati, setSoloCompletati] = useState(false);
+    const [durateProgettoUtente, setDurateProgettoUtente] = useState<Record<string, { utente: Utente; durata: number }[]>>({});
 
     const [filtroAvanzato, setFiltroAvanzato] = useState<FiltroAvanzatoProgetto>({
         membri: [],
@@ -89,11 +77,12 @@ export default function ListaProgetti() {
             const query = supabase
                 .from("progetti")
                 .select(`
-      id, nome, consegna, note,
-      stato:stato_id ( id, nome, colore ),
-      priorita:priorita_id ( id, nome ),
-      cliente:cliente_id ( id, nome )
-  `)
+        id, nome, consegna, note, tempo_stimato,
+        stato:stato_id ( id, nome, colore ),
+        priorita:priorita_id ( id, nome ),
+        cliente:cliente_id ( id, nome )
+    `)
+
 
                 .is("deleted_at", null)
                 .order("created_at", { ascending: false });
@@ -119,12 +108,14 @@ export default function ListaProgetti() {
                 id: p.id,
                 nome: p.nome,
                 consegna: p.consegna,
-                note: p.note, // ✅ qui
+                note: p.note,
                 stato: Array.isArray(p.stato) ? p.stato[0] : p.stato,
                 priorita: Array.isArray(p.priorita) ? p.priorita[0] : p.priorita,
                 cliente: Array.isArray(p.cliente) ? p.cliente[0] : p.cliente,
                 membri: membriPerProgetto[p.id] || [],
+                tempo_stimato: p.tempo_stimato, // ✅ AGGIUNGI QUESTA RIGA
             }));
+
 
 
             setProgetti(progettiConMembri);
@@ -164,6 +155,30 @@ export default function ListaProgetti() {
             }
 
             setTaskPerProgetto(taskMap);
+            // carica durate per progetto
+            const { data: timeEntries } = await supabase
+                .from("time_entries")
+                .select("progetto_id, utente_id, durata, utenti:utente_id (id, nome, cognome)")
+                .in("progetto_id", ids);
+
+            const mappaDurate: Record<string, { utente: Utente; durata: number }[]> = {};
+
+            for (const entry of timeEntries || []) {
+                const progettoId = entry.progetto_id;
+                const utente = Array.isArray(entry.utenti) ? entry.utenti[0] : entry.utenti;
+                if (!progettoId || !utente) continue;
+
+                if (!mappaDurate[progettoId]) mappaDurate[progettoId] = [];
+                const esiste = mappaDurate[progettoId].find(d => d.utente.id === utente.id);
+                if (esiste) {
+                    esiste.durata += entry.durata;
+                } else {
+                    mappaDurate[progettoId].push({ utente, durata: entry.durata });
+                }
+            }
+
+            setDurateProgettoUtente(mappaDurate);
+
             setProgettiCompletati(completati);
         };
 
@@ -207,7 +222,8 @@ export default function ListaProgetti() {
     }, [progetti, filtroAvanzato, soloCompletati, progettiCompletati]);
 
     return (
-        <div className="p-4 sm:p-6">
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto w-full">
+
             <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
                 <h1 className="text-2xl font-bold text-theme">
                     <FontAwesomeIcon icon={faProjectDiagram} className="text-blue-500 mr-2" />
@@ -239,7 +255,8 @@ export default function ListaProgetti() {
             {loading ? (
                 <p className="text-center text-theme text-lg">Caricamento...</p>
             ) : (
-                <div className="rounded-xl overflow-hidden shadow-md card-theme">
+                <div className="rounded-xl overflow-hidden shadow-md card-theme max-w-7xl mx-auto">
+
                     <div className="hidden lg:flex px-4 py-2 text-xs font-semibold text-theme border-b border-gray-300 dark:border-gray-600">
                         <div className="w-10 shrink-0" /> {/* spazio per le icone */}
                         <div className="flex-1">Nome</div>
@@ -310,7 +327,36 @@ export default function ListaProgetti() {
                                         </div>
                                         {proj.cliente?.nome && <p>👤 Cliente: {proj.cliente.nome}</p>}
                                         {proj.membri.length > 0 && <p>👥 Membri: {proj.membri.map(m => `${m.nome} ${m.cognome ?? ""}`).join(", ")}</p>}
+                                        {proj.tempo_stimato && (
+                                            <p>⏱️ Tempo stimato: {
+                                                (() => {
+                                                    const match = proj.tempo_stimato?.match(/(\d+):(\d+)/);
+                                                    if (!match) return proj.tempo_stimato;
+                                                    const ore = parseInt(match[1], 10);
+                                                    const minuti = parseInt(match[2], 10);
+                                                    return `${ore > 0 ? `${ore}h ` : ""}${minuti}m`;
+                                                })()
+                                            }</p>
+                                        )}
                                         {proj.note && <p>🗒️ Note: {proj.note}</p>}
+
+                                        {durateProgettoUtente[proj.id]?.length > 0 && (
+                                            <div className="pt-2">
+                                                <p className="font-semibold mb-1">🕒 Tempo registrato:</p>
+                                                <ul className="list-disc ml-5 space-y-1">
+                                                    {durateProgettoUtente[proj.id].map(({ utente, durata }) => {
+                                                        const ore = Math.floor(durata / 3600);
+                                                        const minuti = Math.floor((durata % 3600) / 60);
+                                                        return (
+                                                            <li key={utente.id}>
+                                                                {utente.nome} {utente.cognome ?? ""}: {ore > 0 ? `${ore}h ` : ""}{minuti}m
+                                                            </li>
+                                                        );
+                                                    })}
+                                                </ul>
+                                            </div>
+                                        )}
+
                                         <div className="pt-2">
                                             <p className="font-semibold mb-1">📌 Task assegnate:</p>
                                             <ul className="list-disc ml-5 space-y-1">

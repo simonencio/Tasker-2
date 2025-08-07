@@ -3,7 +3,8 @@ import { Toast } from "toaster-js";
 import "../App.css";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen, faPlay, faStop, faTasks, faUser, faCheckCircle, faLink } from "@fortawesome/free-solid-svg-icons";
+import { faPlay, faStop, faTasks, faCheckCircle, faLink, faPen,faUser } from "@fortawesome/free-solid-svg-icons";
+
 import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
 import FiltriTaskAvanzati, { ordinaTaskClientSide } from "../supporto/FiltriTaskAvanzati";
 import type { Commento, FiltroAvanzato, Task } from "../supporto/tipi";
@@ -46,6 +47,15 @@ export default function ListaTask() {
     const [soloCompletate, setSoloCompletate] = useState(false);
     const tasksFiltrate = tasks.filter(t => !soloCompletate || t.fine_task !== null);
     const [commenti, setCommenti] = useState<Commento[]>([]);
+    const [commentiEspansi, setCommentiEspansi] = useState<Set<string>>(new Set());
+    const toggleCommentiEspansi = (taskId: string) => {
+        setCommentiEspansi(prev => {
+            const nuovo = new Set(prev);
+            nuovo.has(taskId) ? nuovo.delete(taskId) : nuovo.add(taskId);
+            return nuovo;
+        });
+    };
+    const [durateTaskUtente, setDurateTaskUtente] = useState<Record<string, Record<string, number>>>({});
 
     const [taskDaModificareId, setTaskDaModificareId] = useState<string | null>(null);
     const [taskEspansaId, setTaskEspansaId] = useState<string | null>(null);
@@ -74,7 +84,7 @@ export default function ListaTask() {
     //Timer
     const [activeTimer, setActiveTimer] = useState<{ taskId: string; startTime: Date } | null>(null);
 
-    const [elapsed, setElapsed] = useState<number>(0);
+    const [, setElapsed] = useState<number>(0);
 
 
 
@@ -82,7 +92,7 @@ export default function ListaTask() {
         setActiveTimer({ taskId, startTime: new Date() });
     };
 
-    const handleStopTimer = async (task: Task) => {
+    const handleStopTimer = async (_task: Task) => {
         if (!activeTimer || !utenteId) {
             setActiveTimer(null);
             return;
@@ -282,6 +292,28 @@ export default function ListaTask() {
         }
     }, [soloMie, filtroAvanzato, utenteId]);
 
+    const caricaDurateTaskUtente = async (task: Task) => {
+        if (!task.id || !task.assegnatari?.length) return;
+
+        const tutteTaskId = [task.id, ...trovaTutteLeFiglie(task.id)];
+        const { data, error } = await supabase
+            .from("time_entries")
+            .select("utente_id, durata")
+            .in("task_id", tutteTaskId);
+
+        if (error) {
+            console.error("Errore caricamento durate:", error);
+            return;
+        }
+
+        const duratePerUtente: Record<string, number> = {};
+        for (const entry of data || []) {
+            if (!entry.utente_id || !entry.durata) continue;
+            duratePerUtente[entry.utente_id] = (duratePerUtente[entry.utente_id] || 0) + entry.durata;
+        }
+
+        setDurateTaskUtente(prev => ({ ...prev, [task.id]: duratePerUtente }));
+    };
 
     useEffect(() => {
         const observer = new MutationObserver((mutations) => {
@@ -362,9 +394,14 @@ export default function ListaTask() {
 
 
     const sottoTask = (taskId: string) => tasks.filter(t => t.parent_id === taskId);
+    const trovaTutteLeFiglie = (taskId: string): string[] => {
+        const figliDiretti = tasks.filter(t => t.parent_id === taskId);
+        const ids = figliDiretti.map(f => f.id);
+        return ids.flatMap(id => [id, ...trovaTutteLeFiglie(id)]);
+    };
 
     return (
-        <div className="p-4 sm:p-6">
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto w-full">
             <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
                 <h1 className="text-2xl font-bold text-theme">
                     <FontAwesomeIcon icon={faTasks} className="text-green-500 mr-2" />
@@ -395,7 +432,8 @@ export default function ListaTask() {
             {loading ? (
                 <p className="text-theme text-center text-lg">Caricamento...</p>
             ) : (
-                <div className="rounded-xl overflow-hidden shadow-md card-theme">
+                <div className="rounded-xl overflow-hidden shadow-md card-theme max-w-7xl mx-auto">
+
                     <div className="hidden lg:flex px-4 py-2 text-xs font-semibold text-theme border-b border-gray-300 dark:border-gray-600">
                         <div className="w-10 shrink-0" />
                         <div className="flex-1">Nome</div>
@@ -413,7 +451,11 @@ export default function ListaTask() {
 
                         return (
                             <div key={task.id} className="border-t border-gray-200 dark:border-gray-700 hover-bg-theme">
-                                <div className="flex items-center px-4 py-3 text-sm text-theme cursor-pointer" onClick={() => setTaskEspansaId(isOpen ? null : task.id)}>
+                                <div className="flex items-center px-4 py-3 text-sm text-theme cursor-pointer" onClick={() => {
+                                    setTaskEspansaId(isOpen ? null : task.id);
+                                    if (!isOpen) caricaDurateTaskUtente(task);
+                                }}
+                                >
                                     <div className="w-8 shrink-0 flex justify-start items-center">
                                         <div className="flex flex-col items-center gap-1">
                                             {isAssegnata && (
@@ -459,6 +501,7 @@ export default function ListaTask() {
                                             }}
                                             className="icon-color hover:text-blue-600"
                                             title="Modifica"
+
                                         />
 
                                         <button onClick={e => { e.stopPropagation(); navigate(`/tasks/${task.id}`); }} className="icon-color hover:text-green-600" title="Vai al dettaglio">
@@ -483,6 +526,23 @@ export default function ListaTask() {
                                             <p>👥 Assegnata a: {task.assegnatari.map(u => `${u.nome} ${u.cognome || ""}`).join(", ")}</p>
                                         )}
                                         {task.note && <p>🗒️ {task.note}</p>}
+                                        {durateTaskUtente[task.id] && (
+                                            <div className="pt-2">
+                                                <p className="font-semibold">🕒 Tempo registrato:</p>
+                                                <ul className="list-disc list-inside text-sm space-y-1">
+                                                    {task.assegnatari.map(utente => {
+                                                        const durata = durateTaskUtente[task.id][utente.id] || 0;
+                                                        const ore = Math.floor(durata / 3600);
+                                                        const minuti = Math.floor((durata % 3600) / 60);
+                                                        return (
+                                                            <li key={utente.id}>
+                                                                {utente.nome} {utente.cognome || ""}: {ore > 0 ? `${ore}h ` : ""}{minuti}m
+                                                            </li>
+                                                        );
+                                                    })}
+                                                </ul>
+                                            </div>
+                                        )}
 
                                         {children.length > 0 && (
                                             <div className="mt-4">
@@ -502,14 +562,25 @@ export default function ListaTask() {
                                                 )}
                                                 {commenti.some(c => c.task_id === task.id && !c.parent_id) && (
                                                     <div className="mt-4">
-                                                        <h4 className="text-theme font-semibold mb-2">💬 Commenti</h4>
-                                                        <div className="space-y-3">
-                                                            {commenti.filter(c => c.task_id === task.id && !c.parent_id).map(c => (
-                                                                <RenderCommento key={c.id} commento={c} allCommenti={commenti} livello={1} />
-                                                            ))}
+                                                        <div
+                                                            onClick={() => toggleCommentiEspansi(task.id)}
+                                                            className="cursor-pointer rounded-md px-0 py-2 text-sm text-theme hover-bg-theme font-semibold"
+                                                        >
+                                                            💬 Commenti
                                                         </div>
+
+                                                        {commentiEspansi.has(task.id) && (
+                                                            <div className="space-y-3 mt-2">
+                                                                {commenti
+                                                                    .filter(c => c.task_id === task.id && !c.parent_id)
+                                                                    .map(c => (
+                                                                        <RenderCommento key={c.id} commento={c} allCommenti={commenti} livello={1} />
+                                                                    ))}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
+
 
                                             </div>
                                         )}

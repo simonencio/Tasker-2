@@ -6,25 +6,8 @@ import { useRef } from "react"; // aggiungi se manca
 import { format } from "date-fns";
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
+import type { Progetto } from "./tipi";
 
-// Tipi base
-export type Utente = { id: string; nome: string; cognome: string | null };
-export type Cliente = { id: string; nome: string };
-export type Stato = { id: number; nome: string };
-export type Priorita = { id: number; nome: string };
-
-// Progetto completo
-export type Progetto = {
-    id: string;
-    nome: string;
-    consegna: string | null;
-    stato: Stato | null;
-    priorita: Priorita | null;
-    cliente: Cliente | null;
-    membri: Utente[];
-    note?: string | null; // ✅ aggiungi questa riga
-
-};
 
 // Filtro attivo
 export type FiltroAvanzatoProgetto = {
@@ -161,9 +144,10 @@ export default function FiltriProgettoAvanzati({ progetti, onChange }: Props) {
     }, [progettiFiltrati]);
 
     return (
-        <div className="flex flex-col gap-3 mb-6 md:grid md:grid-cols-3 md:gap-4 xl:flex xl:flex-row xl:flex-wrap xl:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4 mb-6 w-full">
+
             {/* Membri */}
-            <div className="relative membri-dropdown w-full xl:w-auto xl:max-w-[220px]">
+            <div className="relative membri-dropdown">
                 <button
                     type="button"
                     className="input-style w-full text-left"
@@ -203,7 +187,7 @@ export default function FiltriProgettoAvanzati({ progetti, onChange }: Props) {
 
             {/* Cliente */}
             <select
-                className="input-style w-full xl:w-auto xl:max-w-[220px]"
+                className="input-style"
                 value={filtro.cliente || ""}
                 onChange={(e) => setFiltro(prev => ({ ...prev, cliente: e.target.value || null }))}
             >
@@ -215,7 +199,7 @@ export default function FiltriProgettoAvanzati({ progetti, onChange }: Props) {
 
             {/* Stato */}
             <select
-                className="input-style w-full xl:w-auto xl:max-w-[220px]"
+                className="input-style"
                 value={filtro.stato || ""}
                 onChange={(e) => setFiltro(prev => ({ ...prev, stato: Number(e.target.value) || null }))}
             >
@@ -227,7 +211,7 @@ export default function FiltriProgettoAvanzati({ progetti, onChange }: Props) {
 
             {/* Priorità */}
             <select
-                className="input-style w-full xl:w-auto xl:max-w-[220px]"
+                className="input-style"
                 value={filtro.priorita || ""}
                 onChange={(e) => setFiltro(prev => ({ ...prev, priorita: Number(e.target.value) || null }))}
             >
@@ -238,7 +222,7 @@ export default function FiltriProgettoAvanzati({ progetti, onChange }: Props) {
             </select>
 
             {/* Range date */}
-            <div className="relative w-full xl:w-auto">
+            <div className="relative">
                 <button
                     type="button"
                     onClick={() => setMostraCalendario(prev => !prev)}
@@ -265,13 +249,11 @@ export default function FiltriProgettoAvanzati({ progetti, onChange }: Props) {
                                 }));
                             }}
                             moveRangeOnFirstSelection={false}
-                            ranges={[
-                                {
-                                    startDate: rangeSelezionato[0].startDate ?? new Date(),
-                                    endDate: rangeSelezionato[0].endDate ?? new Date(),
-                                    key: "selection"
-                                }
-                            ]}
+                            ranges={[{
+                                startDate: rangeSelezionato[0].startDate ?? new Date(),
+                                endDate: rangeSelezionato[0].endDate ?? new Date(),
+                                key: "selection"
+                            }]}
                             showDateDisplay={false}
                             rangeColors={
                                 rangeSelezionato[0].startDate && rangeSelezionato[0].endDate
@@ -280,10 +262,6 @@ export default function FiltriProgettoAvanzati({ progetti, onChange }: Props) {
                             }
                             className="popup-panel text-theme border rounded shadow-xl"
                         />
-
-
-
-
                         <div className="flex justify-end px-4 py-2">
                             <button
                                 className="text-sm text-red-600 hover:underline"
@@ -298,13 +276,11 @@ export default function FiltriProgettoAvanzati({ progetti, onChange }: Props) {
                         </div>
                     </div>
                 )}
-
-
             </div>
 
             {/* Ordina */}
             <select
-                className="input-style w-full xl:w-auto xl:max-w-[220px]"
+                className="input-style"
                 value={filtro.ordine || ""}
                 onChange={(e) => setFiltro(prev => ({ ...prev, ordine: e.target.value || null }))}
             >
@@ -319,6 +295,7 @@ export default function FiltriProgettoAvanzati({ progetti, onChange }: Props) {
                 <option value="nome_za">🔡 Nome Z-A</option>
             </select>
         </div>
+
     );
 }
 

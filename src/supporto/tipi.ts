@@ -52,3 +52,22 @@ export type Commento = {
         cognome: string | null;
     }; // <-- oggetto singolo
 };
+
+
+// supporto/tipi.ts
+export type Utente = { id: string; nome: string; cognome: string | null };
+export type Cliente = { id: string; nome: string };
+export type Stato = { id: number; nome: string; colore?: string | null };
+export type Priorita = { id: number; nome: string };
+
+export type Progetto = {
+    id: string;
+    nome: string;
+    consegna: string | null;
+    stato: Stato | null;
+    priorita: Priorita | null;
+    cliente: Cliente | null;
+    membri: Utente[];
+    note?: string | null;
+    tempo_stimato?: string | null;
+};
