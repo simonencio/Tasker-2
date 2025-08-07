@@ -1,4 +1,3 @@
-// src/supporto/notificheUtils.ts
 import { supabase } from "../supporto/supabaseClient";
 import { inviaEmailNotifica } from "./emailUtils";
 import { generaContenutoEmail } from "./emailTemplates";
@@ -13,6 +12,7 @@ export type Notifica = {
     task_nome?: string;
     progetto_nome?: string;
     creatore_nome?: string;
+    tipo_codice?: string; // aggiunto per logica formattazione
 };
 
 // ✅ Recupera notifiche visibili per l'utente corrente
@@ -25,6 +25,8 @@ export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
             visualizzato,
             notifica_id,
             notifiche (
+                id,
+                tipo: tipo_id ( codice ),
                 messaggio,
                 data_creazione,
                 tasks ( nome ),
@@ -42,19 +44,51 @@ export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
         return [];
     }
 
-    return data.map((row: any) => ({
-        id: String(row.id),
-        letto: row.letto,
-        visualizzato: row.visualizzato,
-        notifica_id: row.notifica_id,
-        messaggio: row.notifiche?.messaggio ?? "(nessun messaggio)",
-        data_creazione: row.notifiche?.data_creazione ?? "",
-        task_nome: row.notifiche?.tasks?.nome ?? undefined,
-        progetto_nome: row.notifiche?.progetti?.nome ?? undefined,
-        creatore_nome: row.notifiche?.creatore
-            ? `${row.notifiche.creatore.nome} ${row.notifiche.creatore.cognome}`
-            : undefined,
-    }));
+    return data.map((row: any) => {
+        const notifica = row.notifiche;
+
+        // Se è notifica commento, formattala diversamente
+        if (notifica?.tipo?.codice === "commento_task") {
+            const contenuto = notifica.messaggio ?? "(nessun commento)";
+            const dataOra = notifica.data_creazione
+                ? new Date(notifica.data_creazione).toLocaleString()
+                : "";
+
+            const messaggioFormattato =
+                `💬 Nuovo commento:\n` +
+                `"${contenuto}"\n` +
+                `🕒 ${dataOra}`;
+
+            return {
+                id: String(row.id),
+                letto: row.letto,
+                visualizzato: row.visualizzato,
+                notifica_id: row.notifica_id,
+                messaggio: messaggioFormattato,
+                data_creazione: notifica.data_creazione ?? "",
+                task_nome: notifica.tasks?.nome,
+                progetto_nome: notifica.progetti?.nome,
+                creatore_nome: undefined,
+                tipo_codice: notifica.tipo.codice,
+            };
+        }
+
+        // Altri tipi di notifiche mantengono formattazione standard
+        return {
+            id: String(row.id),
+            letto: row.letto,
+            visualizzato: row.visualizzato,
+            notifica_id: row.notifica_id,
+            messaggio: notifica?.messaggio ?? "(nessun messaggio)",
+            data_creazione: notifica?.data_creazione ?? "",
+            task_nome: notifica?.tasks?.nome ?? undefined,
+            progetto_nome: notifica?.progetti?.nome ?? undefined,
+            creatore_nome: notifica?.creatore
+                ? `${notifica.creatore.nome} ${notifica.creatore.cognome}`
+                : undefined,
+            tipo_codice: notifica?.tipo?.codice,
+        };
+    });
 }
 
 // ✅ Crea una nuova notifica per destinatari con controllo invio mail
