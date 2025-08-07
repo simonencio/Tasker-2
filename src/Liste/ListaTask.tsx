@@ -3,7 +3,7 @@ import { Toast } from "toaster-js";
 import "../App.css";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlay, faStop, faTasks, faCheckCircle, faLink, faPen,faUser } from "@fortawesome/free-solid-svg-icons";
+import { faPlay, faStop, faTasks, faCheckCircle, faLink } from "@fortawesome/free-solid-svg-icons";
 
 import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
 import FiltriTaskAvanzati, { ordinaTaskClientSide } from "../supporto/FiltriTaskAvanzati";
@@ -11,8 +11,8 @@ import type { Commento, FiltroAvanzato, Task } from "../supporto/tipi";
 import { useNavigate } from "react-router-dom";
 import RenderSottoTask from "../supporto/SottoTask";
 import RenderCommento from "../supporto/RenderCommento";
-
 import { useToast } from '../supporto/useToast'
+
 
 export default function ListaTask() {
     const toast = useToast();

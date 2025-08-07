@@ -2,60 +2,110 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheckCircle, faPen, faThumbtack, faPlay, faStop } from "@fortawesome/free-solid-svg-icons";
-import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
+import { faPlay, faStop, faCheckCircle } from "@fortawesome/free-solid-svg-icons";
 import { Toast } from "toaster-js";
-import type { Task, Utente, Stato, Priorita } from "../supporto/tipi";
+import RenderSottoTask from "../supporto/SottoTask";
+import RenderCommento from "../supporto/RenderCommento";
 
-function formatIntervalToHM(interval: string | null | undefined): string {
-    if (!interval) return "—";
-    const match = interval.match(/(\d+):(\d+):(\d+)/);
-    if (!match) return interval;
-    const ore = parseInt(match[1], 10);
-    const minuti = parseInt(match[2], 10);
-    return `${ore > 0 ? `${ore}h ` : ""}${minuti}m`;
-}
+// Tipi locali per evitare errori
+type Assegnatario = {
+    id: string;
+    nome: string;
+    cognome?: string | null;
+};
+
+type Stato = {
+    id: number;
+    nome: string;
+    colore?: string | null;
+};
+
+type Priorita = {
+    id: number;
+    nome: string;
+};
+
+type Progetto = {
+    id: string;
+    nome: string;
+};
+
+type Task = {
+    id: string;
+    nome: string;
+    note?: string | null;
+    consegna?: string | null;
+    tempo_stimato?: string | null;
+    fine_task?: string | null;
+    created_at: string;
+    modified_at: string;
+    parent_id?: string | null;
+    stato?: Stato | null;
+    priorita?: Priorita | null;
+    progetto?: Progetto | null;
+    assegnatari: Assegnatario[];
+};
+
+type Commento = {
+    id: string;
+    utente_id: string;
+    task_id: string;
+    parent_id: string | null;
+    descrizione: string;
+    created_at: string;
+    modified_at: string;
+    deleted_at?: string | null;
+    utente: {
+        id: string;
+        nome: string;
+        cognome: string | null;
+    };
+};
 
 export default function DettaglioTask() {
     const { id } = useParams<{ id: string }>();
     const [task, setTask] = useState<Task | null>(null);
-    const [modaleAperta, setModaleAperta] = useState(false);
-    const [timerAttivo, setTimerAttivo] = useState(false);
-    const [timeEntryId, setTimeEntryId] = useState<number | null>(null);
-
-    const utenteId = localStorage.getItem("user_id");
+    const [commenti, setCommenti] = useState<Commento[]>([]);
+    const [sottoTasks, setSottoTasks] = useState<Task[]>([]);
+    const [utenteId, setUtenteId] = useState<string | null>(null);
+    const [activeTimer, setActiveTimer] = useState<{ taskId: string; startTime: Date } | null>(null);
+    const [, setElapsed] = useState<number>(0);
+    const [durate, setDurate] = useState<Record<string, number>>({});
+    const [commentiEspansi, setCommentiEspansi] = useState(false);
+    const [sottoTaskEspansi, setSottoTaskEspansi] = useState(false);
 
     useEffect(() => {
-        const caricaTask = async () => {
-            if (!id) return;
+        const getUser = async () => {
+            const { data } = await supabase.auth.getSession();
+            setUtenteId(data.session?.user.id || null);
+        };
+        getUser();
+    }, []);
 
+    useEffect(() => {
+        if (!id) return;
+        const caricaTask = async () => {
             const { data, error } = await supabase
                 .from("tasks")
                 .select(`
-                    id, nome, note, consegna, tempo_stimato, created_at, modified_at, fine_task, parent_id,
-                    stato:stato_id (id, nome, colore),
-                    priorita:priorita_id (id, nome),
+                    id, nome, note, consegna, tempo_stimato, fine_task, created_at, modified_at, parent_id,
+                    stato:stato_id ( id, nome, colore ),
+                    priorita:priorita_id ( id, nome ),
+                    progetti_task ( progetti ( id, nome ) ),
                     utenti_task ( utenti ( id, nome, cognome ) )
                 `)
                 .eq("id", id)
-                .is("deleted_at", null)
                 .single();
 
-            if (error || !data) {
-                console.error("Errore caricamento task:", error);
-                return;
-            }
+            if (error || !data) return;
 
-            const assegnatari: Utente[] =
-                data.utenti_task?.map((u: any) => u.utenti) ?? [];
+            const assegnatari = data.utenti_task.map((u: any) => u.utenti);
 
-            const stato: Stato | null = Array.isArray(data.stato)
-                ? data.stato[0]
-                : data.stato ?? null;
-
-            const priorita: Priorita | null = Array.isArray(data.priorita)
-                ? data.priorita[0]
-                : data.priorita ?? null;
+            const statoPulito = Array.isArray(data.stato) ? data.stato[0] : data.stato;
+            const prioritaPulita = Array.isArray(data.priorita) ? data.priorita[0] : data.priorita;
+            const progettoPulito = Array.isArray(data.progetti_task?.[0]?.progetti)
+                ? data.progetti_task?.[0]?.progetti[0]
+                : data.progetti_task?.[0]?.progetti ?? null;
 
             setTask({
                 id: data.id,
@@ -63,133 +113,194 @@ export default function DettaglioTask() {
                 note: data.note,
                 consegna: data.consegna,
                 tempo_stimato: data.tempo_stimato,
+                fine_task: data.fine_task,
                 created_at: data.created_at,
                 modified_at: data.modified_at,
-                fine_task: data.fine_task,
                 parent_id: data.parent_id,
-                stato,
-                priorita,
-                progetto: null,
+                stato: statoPulito,
+                priorita: prioritaPulita,
+                progetto: progettoPulito,
                 assegnatari,
             });
-        };
 
+
+        };
         caricaTask();
     }, [id]);
 
-    const avviaTimer = async () => {
-        if (!id || !utenteId) return;
+    useEffect(() => {
+        if (!id) return;
+        const caricaSottoTask = async () => {
+            const { data } = await supabase
+                .from("tasks")
+                .select("*")
+                .eq("parent_id", id);
+            setSottoTasks(data || []);
+        };
+        caricaSottoTask();
+    }, [id]);
 
-        const { data, error } = await supabase.from("time_entries").insert({
+    useEffect(() => {
+        const caricaCommenti = async () => {
+            const { data } = await supabase
+                .from("commenti")
+                .select(`
+                    id, utente_id, task_id, parent_id, descrizione, created_at, modified_at, deleted_at,
+                    utente:utente_id ( id, nome, cognome )
+                `)
+                .eq("task_id", id)
+                .is("deleted_at", null);
+            if (data) {
+                const formattati = data.map((c: any) => ({
+                    ...c,
+                    utente: Array.isArray(c.utente) ? c.utente[0] : c.utente,
+                }));
+                setCommenti(formattati);
+            }
+        };
+        caricaCommenti();
+    }, [id]);
+
+    useEffect(() => {
+        if (!task) return;
+        const caricaDurate = async () => {
+            const ids = [task.id, ...sottoTasks.map(t => t.id)];
+            const { data } = await supabase
+                .from("time_entries")
+                .select("utente_id, durata")
+                .in("task_id", ids);
+
+            const mappa: Record<string, number> = {};
+            for (const r of data || []) {
+                if (!r.utente_id || !r.durata) continue;
+                mappa[r.utente_id] = (mappa[r.utente_id] || 0) + r.durata;
+            }
+            setDurate(mappa);
+        };
+        caricaDurate();
+    }, [task, sottoTasks]);
+
+    useEffect(() => {
+        let interval: NodeJS.Timeout | null = null;
+        if (activeTimer) {
+            interval = setInterval(() => {
+                setElapsed(Math.floor((Date.now() - activeTimer.startTime.getTime()) / 1000));
+            }, 1000);
+        } else {
+            setElapsed(0);
+        }
+        return () => { if (interval) clearInterval(interval); };
+    }, [activeTimer]);
+
+    const handleStartTimer = () => {
+        if (!task) return;
+        setActiveTimer({ taskId: task.id, startTime: new Date() });
+    };
+
+    const handleStopTimer = async () => {
+        if (!task || !utenteId || !activeTimer) return;
+
+        const fine = new Date();
+        const durata = Math.floor((fine.getTime() - activeTimer.startTime.getTime()) / 1000);
+
+        const { error } = await supabase.from("time_entries").insert({
             utente_id: utenteId,
-            task_id: id,
-            progetto_id: task?.progetto?.id ?? null,
-            data_inizio: new Date().toISOString(),
-            data_fine: null,
-            durata: 0,
-        }).select("id").single();
+            progetto_id: task.progetto?.id,
+            task_id: task.id,
+            nome: task.nome,
+            data_inizio: activeTimer.startTime.toISOString(),
+            data_fine: fine.toISOString(),
+            durata,
+        });
 
-        if (error || !data) {
-            new Toast("Errore nell'avvio del timer", Toast.TYPE_ERROR);
-            return;
-        }
+        if (error) new Toast("Errore nel salvataggio", Toast.TYPE_ERROR);
+        else new Toast("Tempo salvato", Toast.TYPE_DONE);
 
-        setTimeEntryId(data.id);
-        setTimerAttivo(true);
+        setActiveTimer(null);
     };
 
-    const fermaTimer = async () => {
-        if (!timeEntryId) return;
+    if (!task) return <div className="p-6 text-theme">Caricamento task...</div>;
 
-        const { error } = await supabase
-            .from("time_entries")
-            .update({
-                data_fine: new Date().toISOString(),
-                durata: null, // valorizzato da trigger/DB o aggiornalo tu dopo
-            })
-            .eq("id", timeEntryId);
-
-
-        if (error) {
-            new Toast("Errore nel salvataggio del timer", Toast.TYPE_ERROR);
-            return;
-        }
-
-        setTimeEntryId(null);
-        setTimerAttivo(false);
+    const durataUtente = (utenteId: string) => {
+        const tot = durate[utenteId] || 0;
+        const h = Math.floor(tot / 3600);
+        const m = Math.floor((tot % 3600) / 60);
+        return `${h > 0 ? `${h}h ` : ""}${m}m`;
     };
-
-    if (!task) return <div className="p-6 text-theme">Task non trovata</div>;
 
     return (
-        <div className="p-6 max-w-4xl mx-auto text-theme">
-            <h1 className="text-2xl font-bold mb-4 flex items-center gap-3">
-                <FontAwesomeIcon
-                    icon={task.fine_task ? faCheckCircle : faThumbtack}
-                    className={`w-5 h-5 ${task.fine_task ? "text-green-500" : "text-gray-500"}`}
-                />
-                {task.nome}
+        <div className="p-6 max-w-3xl mx-auto space-y-4 text-theme">
+            <h1 className="text-2xl font-bold">{task.nome}</h1>
 
+            {task.fine_task && (
+                <p className="flex items-center gap-2 text-green-600">
+                    <FontAwesomeIcon icon={faCheckCircle} /> Completata
+                </p>
+            )}
+
+            {task.consegna && <p>📅 Consegna: {new Date(task.consegna).toLocaleDateString()}</p>}
+            {task.tempo_stimato && <p>⏱️ Tempo stimato: {task.tempo_stimato}</p>}
+            {task.stato?.nome && <p>📊 Stato: {task.stato.nome}</p>}
+            {task.priorita?.nome && <p>⏫ Priorità: {task.priorita.nome}</p>}
+            {task.note && <p>🗒️ Note: {task.note}</p>}
+
+            {task.assegnatari.length > 0 && (
+                <div>
+                    <p>👥 Assegnata a:</p>
+                    <ul className="list-disc ml-6">
+                        {task.assegnatari.map(u => (
+                            <li key={u.id}>
+                                {u.nome} {u.cognome || ""} – {durataUtente(u.id)}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {task.assegnatari.length > 0 && (
                 <button
-                    onClick={() => setModaleAperta(true)}
-                    className="text-yellow-500 hover:text-yellow-600 transition"
-                    aria-label="Modifica task"
+                    onClick={activeTimer ? handleStopTimer : handleStartTimer}
+                    className={`px-4 py-2 rounded text-white ${activeTimer ? "bg-red-600" : "bg-green-600"}`}
                 >
-                    <FontAwesomeIcon icon={faPen} className="w-4 h-4" />
+                    <FontAwesomeIcon icon={activeTimer ? faStop : faPlay} className="mr-2" />
+                    {activeTimer ? "Ferma timer" : "Avvia timer"}
                 </button>
+            )}
 
-                {timerAttivo ? (
-                    <button
-                        onClick={fermaTimer}
-                        className="text-red-500 hover:text-red-600 transition"
-                        aria-label="Ferma timer"
+            {sottoTasks.length > 0 && (
+                <div>
+                    <p
+                        onClick={() => setSottoTaskEspansi(e => !e)}
+                        className="cursor-pointer font-semibold hover:underline"
                     >
-                        <FontAwesomeIcon icon={faStop} className="w-4 h-4" />
-                    </button>
-                ) : (
-                    <button
-                        onClick={avviaTimer}
-                        className="text-green-500 hover:text-green-600 transition"
-                        aria-label="Avvia timer"
-                    >
-                        <FontAwesomeIcon icon={faPlay} className="w-4 h-4" />
-                    </button>
-                )}
-            </h1>
-
-            <div className="space-y-2 text-[15px]">
-                {task.consegna && (
-                    <p><span className="font-semibold">Consegna:</span> {new Date(task.consegna).toLocaleDateString()}</p>
-                )}
-                {task.stato?.nome && (
-                    <p><span className="font-semibold">Stato:</span> {task.stato.nome}</p>
-                )}
-                {task.priorita?.nome && (
-                    <p><span className="font-semibold">Priorità:</span> {task.priorita.nome}</p>
-                )}
-                {task.tempo_stimato && (
-                    <p><span className="font-semibold">Tempo stimato:</span> {formatIntervalToHM(task.tempo_stimato)}</p>
-                )}
-                {task.assegnatari.length > 0 && (
-                    <div>
-                        <p className="font-semibold">Assegnata a:</p>
-                        <ul className="ml-5 list-disc">
-                            {task.assegnatari.map(u => (
-                                <li key={u.id}>{u.nome} {u.cognome || ''}</li>
+                        📎 Sotto-task
+                    </p>
+                    {sottoTaskEspansi && (
+                        <div className="mt-2 space-y-2">
+                            {sottoTasks.map(st => (
+                                <RenderSottoTask key={st.id} task={st} allTasks={sottoTasks} livello={1} />
                             ))}
-                        </ul>
-                    </div>
-                )}
-                {task.note && (
-                    <p><span className="font-semibold">Note:</span> {task.note}</p>
-                )}
-            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
-            {modaleAperta && (
-                <MiniTaskEditorModal
-                    taskId={task.id}
-                    onClose={() => setModaleAperta(false)}
-                />
+            {commenti.length > 0 && (
+                <div>
+                    <p
+                        onClick={() => setCommentiEspansi(e => !e)}
+                        className="cursor-pointer font-semibold hover:underline"
+                    >
+                        💬 Commenti
+                    </p>
+                    {commentiEspansi && (
+                        <div className="mt-2 space-y-2">
+                            {commenti.filter(c => !c.parent_id).map(c => (
+                                <RenderCommento key={c.id} commento={c} allCommenti={commenti} livello={1} />
+                            ))}
+                        </div>
+                    )}
+                </div>
             )}
         </div>
     );
