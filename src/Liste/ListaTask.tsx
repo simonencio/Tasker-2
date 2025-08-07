@@ -1,15 +1,40 @@
 import { useEffect, useState } from "react";
+import { Toast } from "toaster-js";
+import "../App.css";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen, faPlay, faStop, faTasks, faUser, faCheckCircle, faLink} from "@fortawesome/free-solid-svg-icons";
+import { faPen, faPlay, faStop, faTasks, faUser, faCheckCircle, faLink } from "@fortawesome/free-solid-svg-icons";
 import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
 import FiltriTaskAvanzati, { ordinaTaskClientSide } from "../supporto/FiltriTaskAvanzati";
 import type { Commento, FiltroAvanzato, Task } from "../supporto/tipi";
 import { useNavigate } from "react-router-dom";
-
-import { Toast } from "toaster-js";
 import RenderSottoTask from "../supporto/SottoTask";
 import RenderCommento from "../supporto/RenderCommento";
+
+
+const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    // Memorizza il messaggio per il MutationObserver
+    (window as any).lastToastMessage = message;
+    (window as any).lastToastType = type;
+
+    // Mappa i tipi ai tipi della libreria toaster-js
+    let toasterType;
+    switch (type) {
+        case 'success':
+            toasterType = Toast.TYPE_DONE;
+            break;
+        case 'error':
+            toasterType = Toast.TYPE_ERROR;
+            break;
+        case 'warning':
+            toasterType = Toast.TYPE_ERROR; // toaster-js non ha warning, usa error
+            break;
+        default:
+            toasterType = Toast.TYPE_DONE;
+    }
+
+    new Toast(message, toasterType, Toast.TIME_SHORT);
+};
 
 export default function ListaTask() {
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -46,7 +71,7 @@ export default function ListaTask() {
     });
     const navigate = useNavigate();
 
-  //Timer
+    //Timer
     const [activeTimer, setActiveTimer] = useState<{ taskId: string; startTime: Date } | null>(null);
 
     const [elapsed, setElapsed] = useState<number>(0);
@@ -84,12 +109,17 @@ export default function ListaTask() {
         });
 
         if (error) {
-            new Toast("Errore nel salvataggio del tempo", Toast.TYPE_ERROR, Toast.TIME_SHORT);
+            const message = "Errore nel salvataggio del tempo";
+            (window as any).lastToastMessage = message;
+            (window as any).lastToastType = 'error';
+            new Toast(message, Toast.TYPE_ERROR, Toast.TIME_SHORT);
             console.error(error);
         } else {
-            new Toast("Tempo salvato con successo", Toast.TYPE_DONE, Toast.TIME_SHORT);
+            const message = "Tempo salvato con successo";
+            (window as any).lastToastMessage = message;
+            (window as any).lastToastType = 'success';
+            new Toast(message, Toast.TYPE_DONE, Toast.TIME_SHORT);
         }
-
         setActiveTimer(null);
     };
 
@@ -253,6 +283,84 @@ export default function ListaTask() {
     }, [soloMie, filtroAvanzato, utenteId]);
 
 
+    useEffect(() => {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node instanceof HTMLElement) {
+                            const toast = node.classList?.contains('toast') ? node : node.querySelector?.('.toast');
+
+                            if (toast instanceof HTMLElement) {
+                                // Usa il messaggio memorizzato globalmente
+                                const savedMessage = (window as any).lastToastMessage;
+                                const savedType = (window as any).lastToastType;
+
+                                if (savedMessage) {
+                                    // Aggiungi icona in base al tipo
+                                    let icon = '';
+                                    if (savedType === 'success') {
+                                        icon = '<svg class="toast-icon toast-icon-success" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>';
+                                        toast.classList.add('success');
+                                    } else if (savedType === 'error') {
+                                        icon = '<svg class="toast-icon toast-icon-error" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>';
+                                        toast.classList.add('error');
+                                    }
+
+                                    // Imposta il contenuto con icona e messaggio
+                                    toast.innerHTML = `
+                                    <div class="toast-content">
+                                        ${icon}
+                                        <span class="toast-message">${savedMessage}</span>
+                                    </div>
+                                `;
+
+                                    // Rimuovi classi problematiche e applica stili
+                                    toast.classList.remove('deleted');
+                                    toast.classList.add('displayed');
+                                    toast.removeAttribute('style');
+
+                                    const styles = {
+                                        position: 'fixed',
+                                        bottom: '20px',
+                                        right: '20px',
+                                        left: 'auto',
+                                        top: 'auto',
+                                        transform: 'none',
+                                        zIndex: '9999',
+                                        display: 'flex',
+                                        visibility: 'visible',
+                                        opacity: '1',
+                                        pointerEvents: 'auto'
+                                    };
+
+                                    Object.entries(styles).forEach(([property, value]) => {
+                                        toast.style.setProperty(property, value, 'important');
+                                    });
+
+                                    // Pulisci le variabili globali
+                                    delete (window as any).lastToastMessage;
+                                    delete (window as any).lastToastType;
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+
+        return () => observer.disconnect();
+    }, []);
+
+
+
+
+
     const sottoTask = (taskId: string) => tasks.filter(t => t.parent_id === taskId);
 
     return (
@@ -324,7 +432,7 @@ export default function ListaTask() {
 
                                     <div className="w-20 flex justify-end items-center gap-3">
 
-        {task.progetto?.id && task.assegnatari?.length > 0 && ( 
+                                        {task.progetto?.id && task.assegnatari?.length > 0 && (
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -339,7 +447,7 @@ export default function ListaTask() {
                                             >
                                                 <FontAwesomeIcon icon={activeTimer?.taskId === task.id ? faStop : faPlay} />
                                             </button>
-                                         )} 
+                                        )}
 
 
 
@@ -351,8 +459,8 @@ export default function ListaTask() {
                                             }}
                                             className="icon-color hover:text-blue-600"
                                             title="Modifica"
-                                        >
-                                        
+                                        />
+
                                         <button onClick={e => { e.stopPropagation(); navigate(`/tasks/${task.id}`); }} className="icon-color hover:text-green-600" title="Vai al dettaglio">
                                             <FontAwesomeIcon icon={faTasks} />
                                         </button>
