@@ -35,8 +35,9 @@ export default function IntestazioneProgetto({ id }: Props) {
     <div className="bg-theme px-6 py-4 flex items-center justify-between flex-wrap gap-4">
       {/* 🔙 Bottone torna indietro a sinistra */}
       <button
-        onClick={() => navigate('/progetti')}
-        title="Torna ai progetti"
+
+        onClick={() => navigate('/task')}
+        title="Torna alle task"
         className="text-theme hover:text-blue-500"
       >
         <FontAwesomeIcon icon={faArrowLeft} className="icon-color w-5 h-5" />
