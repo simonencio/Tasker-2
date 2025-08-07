@@ -113,9 +113,11 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
     }, [taskFiltrate]);
 
     return (
-        <div className="flex flex-col gap-3 mb-6 md:grid md:grid-cols-3 md:gap-4 xl:flex xl:flex-row xl:flex-wrap xl:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4 mb-6 w-full">
+
+            {/* Progetto */}
             <select
-                className="input-style w-full xl:w-auto xl:max-w-[220px]"
+                className="input-style"
                 value={filtro.progetto || ""}
                 onChange={(e) => setFiltro((prev) => ({ ...prev, progetto: e.target.value || null }))}
             >
@@ -125,9 +127,10 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
                 ))}
             </select>
 
+            {/* Utente (solo se admin e non soloMie) */}
             {isAdmin && !soloMie ? (
                 <select
-                    className="input-style w-full xl:w-auto xl:max-w-[220px]"
+                    className="input-style"
                     value={filtro.utente || ""}
                     onChange={(e) => setFiltro((prev) => ({ ...prev, utente: e.target.value || null }))}
                 >
@@ -140,8 +143,9 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
                 <div className="hidden md:block" />
             )}
 
+            {/* Stato */}
             <select
-                className="input-style w-full xl:w-auto xl:max-w-[220px]"
+                className="input-style"
                 value={filtro.stato || ""}
                 onChange={(e) => setFiltro((prev) => ({ ...prev, stato: Number(e.target.value) || null }))}
             >
@@ -151,8 +155,9 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
                 ))}
             </select>
 
+            {/* Priorità */}
             <select
-                className="input-style w-full xl:w-auto xl:max-w-[220px]"
+                className="input-style"
                 value={filtro.priorita || ""}
                 onChange={(e) => setFiltro((prev) => ({ ...prev, priorita: Number(e.target.value) || null }))}
             >
@@ -162,8 +167,8 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
                 ))}
             </select>
 
-            {/* Intervallo Date */}
-            <div className="relative w-full xl:w-auto">
+            {/* Intervallo date */}
+            <div className="relative">
                 <button
                     type="button"
                     onClick={() => setMostraCalendario(prev => !prev)}
@@ -178,7 +183,6 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
                         ref={calendarioRef}
                         className="absolute z-20 mt-2 popup-panel shadow-xl rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#1f2937]"
                     >
-
                         <DateRange
                             editableDateInputs
                             onChange={item => {
@@ -220,8 +224,9 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
                 )}
             </div>
 
+            {/* Ordina */}
             <select
-                className="input-style w-full xl:w-auto xl:max-w-[220px]"
+                className="input-style"
                 value={filtro.ordine || ""}
                 onChange={(e) => setFiltro((prev) => ({ ...prev, ordine: e.target.value || null }))}
             >
@@ -236,6 +241,7 @@ export default function FiltriTaskAvanzati({ tasks, isAdmin, soloMie, onChange }
                 <option value="nome_za">🔡 Nome Z-A</option>
             </select>
         </div>
+
     );
 }
 
