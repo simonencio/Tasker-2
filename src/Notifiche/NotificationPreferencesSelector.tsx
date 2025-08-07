@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheck } from "@fortawesome/free-solid-svg-icons";
+import { faChevronDown, faChevronUp, faCheck } from "@fortawesome/free-solid-svg-icons";
 
 type NotificaTipo = {
     id: number;
@@ -14,6 +14,9 @@ export default function NotificationPreferencesSelector() {
     const [preferenze, setPreferenze] = useState<Record<number, boolean>>({});
     const [utenteId, setUtenteId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+
+    const [aperto, setAperto] = useState(false);
+    const toggleAperto = () => setAperto(!aperto);
 
     useEffect(() => {
         supabase.auth.getUser().then(({ data: { user } }) => {
@@ -103,30 +106,41 @@ export default function NotificationPreferencesSelector() {
     if (!utenteId) return <p className="text-theme">Effettua l’accesso per gestire le preferenze.</p>;
 
     return (
-        <div className="modal-container max-w-xl mx-auto rounded-xl shadow space-y-4 p-4">
-            <h2 className="text-xl font-semibold text-theme">Preferenze Notifiche Email</h2>
-            <ul className="space-y-2">
-                {tipi.map((tipo) => (
-                    <li key={tipo.id} className="flex items-center justify-between text-theme">
-                        <span>{tipo.descrizione}</span>
-                        <label className="checkbox-theme-wrapper">
-                            <input
-                                type="checkbox"
-                                checked={preferenze[tipo.id] ?? false}
-                                onChange={() => handleToggle(tipo.id)}
-                                className="checkbox-theme"
-                            />
-                            <FontAwesomeIcon icon={faCheck} className="checkbox-icon" />
-                        </label>
-                    </li>
-                ))}
-            </ul>
+        <div className="modal-container max-w-xl mx-auto rounded-xl shadow p-4 space-y-4">
             <button
-                onClick={handleSalva}
-                className="mt-4 px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+                onClick={toggleAperto}
+                className="w-full flex justify-between items-center text-theme font-semibold text-xl focus:outline-none"
             >
-                Salva Preferenze
+                <span>Preferenze Notifiche Email</span>
+                <FontAwesomeIcon icon={aperto ? faChevronUp : faChevronDown} className="text-lg" />
             </button>
+
+            {aperto && (
+                <>
+                    <ul className="space-y-2">
+                        {tipi.map((tipo) => (
+                            <li key={tipo.id} className="flex items-center justify-between text-theme">
+                                <span>{tipo.descrizione}</span>
+                                <label className="checkbox-theme-wrapper">
+                                    <input
+                                        type="checkbox"
+                                        checked={preferenze[tipo.id] ?? false}
+                                        onChange={() => handleToggle(tipo.id)}
+                                        className="checkbox-theme"
+                                    />
+                                    <FontAwesomeIcon icon={faCheck} className="checkbox-icon" />
+                                </label>
+                            </li>
+                        ))}
+                    </ul>
+                    <button
+                        onClick={handleSalva}
+                        className="mt-4 px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+                    >
+                        Salva Preferenze
+                    </button>
+                </>
+            )}
         </div>
     );
 }
