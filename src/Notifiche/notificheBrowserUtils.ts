@@ -1,5 +1,3 @@
-// src/Notifiche/notificheBrowserUtils.ts
-
 export async function richiediPermessoNotificheBrowser() {
     if (!("Notification" in window)) {
         console.warn("Questo browser non supporta le notifiche desktop.");
@@ -22,6 +20,15 @@ export async function richiediPermessoNotificheBrowser() {
 
 export function mostraNotificaBrowser(titolo: string, opzioni?: NotificationOptions) {
     if (Notification.permission === "granted") {
-        new Notification(titolo, opzioni);
+        const body = opzioni?.body
+            ? opzioni.body.length > 150
+                ? opzioni.body.slice(0, 150) + "..."
+                : opzioni.body
+            : undefined;
+
+        new Notification(titolo, {
+            ...opzioni,
+            body,
+        });
     }
 }
