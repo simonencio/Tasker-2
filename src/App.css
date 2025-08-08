@@ -852,3 +852,114 @@ html.dark .input-date-native {
 html.dark .link {
   @apply dark:text-violet-300
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* 💬 ChatCommentiModal — palette blu contrastata con Tailwind */
+
+/* Badge icona "💬" nell'header */
+.bg-chat-icon {
+  @apply bg-blue-600 text-white;
+}
+html.dark .bg-chat-icon {
+  @apply bg-blue-500 text-white;
+}
+
+/* Bolla dei miei messaggi */
+.bg-bolla-mio {
+  @apply bg-blue-600 text-white;
+}
+html.dark .bg-bolla-mio {
+  @apply bg-blue-700 text-white;
+}
+
+/* Badge destinatari (mio messaggio) */
+.badge-dest-mio {
+  @apply bg-white/10 border border-white/20 text-white;
+}
+
+/* Badge destinatari (altri messaggi) */
+.badge-dest-altri {
+  @apply bg-blue-50 border border-blue-500 text-blue-800;
+}
+html.dark .badge-dest-altri {
+  @apply bg-blue-900/30 border border-blue-400 text-blue-200;
+}
+
+/* Box risposta (quote) */
+.bg-quote {
+  @apply bg-blue-200 border border-blue-500;
+}
+html.dark .bg-quote {
+  @apply bg-blue-900/25 border border-blue-400;
+}
+.text-quote {
+  @apply text-black;
+}
+html.dark .text-quote {
+  @apply text-white;
+}
+
+/* Se il commento è mio → testo sempre bianco */
+.bg-bolla-mio .text-quote {
+  @apply text-white;
+}
+html.dark .bg-bolla-mio .text-quote {
+  @apply text-white;
+}
+
+/* Link "Mostra tutto/Comprimi" nella quote */
+.link-quote {
+  @apply text-blue-600 hover:underline;
+}
+html.dark .link-quote {
+  @apply text-blue-300;
+}
+
+/* Badge destinatari multipli (sotto input) */
+.badge-dest-multiplo {
+  @apply bg-blue-100 border border-blue-500 text-blue-800;
+}
+html.dark .badge-dest-multiplo {
+  @apply bg-blue-900/35 border border-blue-400 text-blue-200;
+}
+
+/* Bottone invio attivo */
+.btn-invia {
+  @apply bg-blue-600 text-white;
+}
+.btn-invia:hover {
+  @apply bg-blue-700;
+}
+html.dark .btn-invia {
+  @apply bg-blue-500;
+}
+html.dark .btn-invia:hover {
+  @apply bg-blue-600;
+}

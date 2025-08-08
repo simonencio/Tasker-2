@@ -72,7 +72,7 @@ export default function DettaglioTask() {
 
     const [taskChatCommenti, setTaskChatCommenti] = useState<Task | null>(null);
     const [commentiChat, setCommentiChat] = useState<Commento[]>([]);
-
+    const [utentiProgetto, setUtentiProgetto] = useState<Assegnatario[]>([]);
 
     useEffect(() => {
         const getUser = async () => {
@@ -123,6 +123,25 @@ export default function DettaglioTask() {
                 progetto: progettoPulito,
                 assegnatari,
             });
+            // ⬇️ CARICA GLI UTENTI COLLEGATI AL PROGETTO (utenti_progetti)
+            if (progettoPulito?.id) {
+                const { data: membri, error: errMembri } = await supabase
+                    .from("utenti_progetti")
+                    .select(`utenti ( id, nome, cognome, avatar_url )`)
+                    .eq("progetto_id", progettoPulito.id);
+
+                if (!errMembri && Array.isArray(membri)) {
+                    setUtentiProgetto(
+                        membri
+                            .map((r: any) => r.utenti)
+                            .filter(Boolean)
+                    );
+                } else {
+                    setUtentiProgetto([]);
+                }
+            } else {
+                setUtentiProgetto([]);
+            }
         };
         caricaTask();
     }, [id]);
@@ -551,7 +570,7 @@ export default function DettaglioTask() {
                     commenti={commentiChat}
                     utenteId={utenteId}
                     taskId={task.id}
-                    assegnatari={task.assegnatari}
+                    utentiProgetto={utentiProgetto}   // ⬅️ INVECE di "assegnatari"
                     onClose={() => {
                         setTaskChatCommenti(null);
                         setCommentiChat([]);
@@ -559,6 +578,8 @@ export default function DettaglioTask() {
                     onNuovoCommento={() => apriChatCommentiPerTask(task)}
                 />
             )}
+
+
 
 
 
