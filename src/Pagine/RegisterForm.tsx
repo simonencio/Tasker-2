@@ -62,7 +62,7 @@ export default function RegisterForm() {
 
             const { error: insertUserError } = await supabase.from("utenti").insert({
                 id: userId, email: form.email, nome: form.nome, cognome: form.cognome,
-                avatar: form.avatar || null, ruolo: 1,
+                avatar_url: form.avatar || null, ruolo: 1,
             });
 
             if (insertUserError) throw insertUserError;
