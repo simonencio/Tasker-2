@@ -1,3 +1,4 @@
+// notificheUtils.ts
 import { supabase } from "../supporto/supabaseClient";
 import { inviaEmailNotifica } from "./emailUtils";
 import { generaContenutoEmail } from "./emailTemplates";
@@ -12,7 +13,15 @@ export type Notifica = {
     task_nome?: string;
     progetto_nome?: string;
     creatore_nome?: string;
-    tipo_codice?: string; // aggiunto per logica formattazione
+    tipo_codice?: string; // per logica formattazione
+};
+
+// opzionale: se vuoi riusare il tipo anche altrove
+export type NotificaExtra = {
+    progetto_id?: string;
+    task_id?: string;
+    commento_id?: string;
+    parent_id?: string;
 };
 
 // ✅ Recupera notifiche visibili per l'utente corrente
@@ -20,20 +29,20 @@ export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
     const { data, error } = await supabase
         .from("notifiche_utenti")
         .select(`
-            id,
-            letto,
-            visualizzato,
-            notifica_id,
-            notifiche (
-                id,
-                tipo: tipo_id ( codice ),
-                messaggio,
-                data_creazione,
-                tasks ( nome ),
-                progetti ( nome ),
-                creatore: creatore_id ( nome, cognome )
-            )
-        `)
+      id,
+      letto,
+      visualizzato,
+      notifica_id,
+      notifiche (
+        id,
+        tipo: tipo_id ( codice ),
+        messaggio,
+        data_creazione,
+        tasks ( nome ),
+        progetti ( nome ),
+        creatore: creatore_id ( nome, cognome )
+      )
+    `)
         .eq("utente_id", userId)
         .is("deleted_at", null)
         .order("id", { ascending: false })
@@ -47,7 +56,7 @@ export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
     return data.map((row: any) => {
         const notifica = row.notifiche;
 
-        // Se è notifica commento, formattala diversamente
+        // Formattazione speciale per commenti
         if (notifica?.tipo?.codice === "commento_task") {
             const contenuto = notifica.messaggio ?? "(nessun commento)";
             const dataOra = notifica.data_creazione
@@ -73,7 +82,7 @@ export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
             };
         }
 
-        // Altri tipi di notifiche mantengono formattazione standard
+        // Default
         return {
             id: String(row.id),
             letto: row.letto,
@@ -97,8 +106,9 @@ export async function inviaNotifica(
     destinatari: string[],
     messaggio: string,
     creatore_id?: string,
-    contesto?: { progetto_id?: string; task_id?: string }
+    contesto?: NotificaExtra // <-- ora include commento_id e parent_id
 ): Promise<void> {
+    // 1) trova tipo_id dal codice
     const { data: tipo, error: tipoError } = await supabase
         .from("notifiche_tipi")
         .select("id")
@@ -106,12 +116,13 @@ export async function inviaNotifica(
         .single();
 
     if (tipoError || !tipo) {
-        console.error("Tipo notifica non trovato:", tipo_codice);
+        console.error("Tipo notifica non trovato:", tipo_codice, tipoError);
         return;
     }
 
     const tipo_id = tipo.id;
 
+    // 2) inserisci notifica principale
     const { data: nuovaNotifica, error: notificaError } = await supabase
         .from("notifiche")
         .insert({
@@ -120,6 +131,9 @@ export async function inviaNotifica(
             creatore_id: creatore_id || null,
             progetto_id: contesto?.progetto_id || null,
             task_id: contesto?.task_id || null,
+            // campi extra collegati ai commenti/risposte
+            commento_id: contesto?.commento_id || null,
+            parent_id: contesto?.parent_id || null,
         })
         .select()
         .single();
@@ -131,17 +145,31 @@ export async function inviaNotifica(
 
     const notifica_id = nuovaNotifica.id;
 
-    for (const userId of destinatari) {
-        const { data: pref } = await supabase
+    // 3) deduplica destinatari ed escludi il creatore (niente auto-notifica)
+    const destUnici = Array.from(new Set(destinatari)).filter(
+        (u) => !!u && u !== creatore_id
+    );
+
+    if (destUnici.length === 0) return;
+
+    // 4) per ciascun destinatario, crea riga notifiche_utenti e invia eventuale email
+    for (const userId of destUnici) {
+        // preferenze per questo tipo
+        const { data: pref, error: prefErr } = await supabase
             .from("notifiche_preferenze")
             .select("invia_email")
             .eq("utente_id", userId)
             .eq("tipo_id", tipo_id)
             .maybeSingle();
 
+        if (prefErr) {
+            console.warn("Preferenze notifica non disponibili:", prefErr);
+        }
+
         const inviaEmail = pref?.invia_email === true;
 
-        await supabase.from("notifiche_utenti").insert({
+        // inserisci assegnazione all'utente
+        const { error: insUtenteErr } = await supabase.from("notifiche_utenti").insert({
             notifica_id,
             utente_id: userId,
             inviato: inviaEmail,
@@ -150,18 +178,25 @@ export async function inviaNotifica(
             visualizzato_al: null,
         });
 
-        if (inviaEmail) {
-            const { data: user } = await supabase
-                .from("utenti")
-                .select("email, nome, cognome")
-                .eq("id", userId)
-                .maybeSingle();
+        if (insUtenteErr) {
+            console.error("Errore inserimento notifiche_utenti:", insUtenteErr);
+            continue;
+        }
 
-            const { data: tipoDett } = await supabase
-                .from("notifiche_tipi")
-                .select("descrizione")
-                .eq("id", tipo_id)
-                .maybeSingle();
+        // email (se preferenze lo consentono)
+        if (inviaEmail) {
+            const [{ data: user }, { data: tipoDett }] = await Promise.all([
+                supabase
+                    .from("utenti")
+                    .select("email, nome, cognome")
+                    .eq("id", userId)
+                    .maybeSingle(),
+                supabase
+                    .from("notifiche_tipi")
+                    .select("descrizione")
+                    .eq("id", tipo_id)
+                    .maybeSingle(),
+            ]);
 
             if (user?.email && tipoDett?.descrizione) {
                 const { subject, body } = generaContenutoEmail({
@@ -170,11 +205,15 @@ export async function inviaNotifica(
                     messaggio,
                 });
 
-                await inviaEmailNotifica({
-                    to: user.email,
-                    subject,
-                    body,
-                });
+                try {
+                    await inviaEmailNotifica({
+                        to: user.email,
+                        subject,
+                        body,
+                    });
+                } catch (e) {
+                    console.error("Invio email fallito:", e);
+                }
             }
         }
     }
