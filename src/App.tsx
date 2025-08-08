@@ -32,6 +32,8 @@ import MiniClientCreatorModal from "./Creazione/MiniClientCreatorModal";
 import MiniUserCreatorModal from "./Creazione/MiniUserCreatorModal";
 import DettaglioTask from "./GestioneTask/DettaglioTask";
 
+
+
 type ModalType = "project" | "task" | "client" | "user";
 
 function AppContent() {
