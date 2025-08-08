@@ -12,13 +12,17 @@ import {
 import { Toast } from "toaster-js";
 import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
 import { faCommentDots } from "@fortawesome/free-solid-svg-icons";
-import ChatCommentiModal, { type Commento } from "./ChatCommentiModal";
+import { type Commento } from "../supporto/chatCommentiUtils";
+import ChatCommentiModal from "./ChatCommentiModal";
+
 // Tipi locali
 type Assegnatario = {
     id: string;
     nome: string;
     cognome?: string | null;
+    avatar_url?: string | null; // 👈 aggiungi questo
 };
+
 
 type Stato = {
     id: number;
@@ -84,15 +88,16 @@ export default function DettaglioTask() {
             const { data, error } = await supabase
                 .from("tasks")
                 .select(`
-                    id, nome, note, consegna, tempo_stimato, fine_task,
-                    created_at, modified_at, parent_id,
-                    stato:stato_id ( id, nome, colore ),
-                    priorita:priorita_id ( id, nome ),
-                    progetti_task ( progetti ( id, nome ) ),
-                    utenti_task ( utenti ( id, nome, cognome ) )
-                `)
+    id, nome, note, consegna, tempo_stimato, fine_task,
+    created_at, modified_at, parent_id,
+    stato:stato_id ( id, nome, colore ),
+    priorita:priorita_id ( id, nome ),
+    progetti_task ( progetti ( id, nome ) ),
+    utenti_task ( utenti ( id, nome, cognome, avatar_url ) )
+  `)
                 .eq("id", id)
                 .single();
+
 
             if (error || !data) return;
 
@@ -125,12 +130,13 @@ export default function DettaglioTask() {
         const { data, error } = await supabase
             .from("tasks")
             .select(`
-            id, nome, note, consegna, tempo_stimato, fine_task,
-            created_at, modified_at, parent_id,
-            stato:stato_id ( id, nome, colore ),
-            priorita:priorita_id ( id, nome ),
-            utenti_task ( utenti ( id, nome, cognome ) )
-        `)
+    id, nome, note, consegna, tempo_stimato, fine_task,
+    created_at, modified_at, parent_id,
+    stato:stato_id ( id, nome, colore ),
+    priorita:priorita_id ( id, nome ),
+    utenti_task ( utenti ( id, nome, cognome, avatar_url ) )
+      `)
+
             .is("deleted_at", null);
 
         if (error || !data) {
@@ -163,12 +169,14 @@ export default function DettaglioTask() {
             const { data, error } = await supabase
                 .from("commenti")
                 .select(`
-        id, parent_id, descrizione, created_at,
-        utenti ( nome, cognome )
-      `)
+    id, parent_id, descrizione, created_at,
+    utente:utenti!commenti_utente_id_fkey ( id, nome, cognome, avatar_url )
+  `)
                 .eq("task_id", id)
                 .is("deleted_at", null)
                 .order("created_at", { ascending: true });
+
+
 
             if (!error && data) {
                 const commentiPuliti: Commento[] = data.map((c: any) => ({
@@ -176,7 +184,8 @@ export default function DettaglioTask() {
                     parent_id: c.parent_id,
                     descrizione: c.descrizione,
                     created_at: c.created_at,
-                    utente: c.utenti || null,
+                    utente: c.utente || null,  // 👈 usa l'alias "utente"
+
                 }));
                 setCommenti(commentiPuliti);
             }
@@ -255,13 +264,17 @@ export default function DettaglioTask() {
         const { data, error } = await supabase
             .from("commenti")
             .select(`
-    id, parent_id, descrizione, created_at,
-    utente:utente_id ( id, nome, cognome )
-`)
-
+    id,
+    parent_id,
+    descrizione,
+    created_at,
+    utente:utenti!commenti_utente_id_fkey ( id, nome, cognome, avatar_url )
+  `)
             .eq("task_id", t.id)
             .is("deleted_at", null)
             .order("created_at", { ascending: true });
+
+
 
         if (!error && data) {
             const commentiPuliti: Commento[] = data.map((c: any) => ({
