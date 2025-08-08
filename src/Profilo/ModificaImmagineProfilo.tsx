@@ -6,6 +6,7 @@ import { faChevronDown, faChevronUp } from "@fortawesome/free-solid-svg-icons";
 import "toaster-js/default.css";
 import "../App.css";
 import { useToast } from '../supporto/useToast'
+import { AVATAR_BASE_URL } from '../supporto/supabaseClient'
 
 export default function ModificaImmagineProfilo() {
     const toast = useToast();
@@ -43,16 +44,17 @@ export default function ModificaImmagineProfilo() {
         }
 
         const path = `avatars/${selezionata}`;
+        const fullUrl = `${AVATAR_BASE_URL}${selezionata}`;
         const user = (await supabase.auth.getUser()).data.user;
         if (!user) return;
 
         const { error: authError } = await supabase.auth.updateUser({
-            data: { avatar_url: path },
+            data: { avatar_url: fullUrl },
         });
 
         const { error: utentiError } = await supabase
             .from("utenti")
-            .update({ avatar_url: path })
+            .update({ avatar_url: fullUrl })
             .eq("id", user.id);
 
         if (authError || utentiError) {
