@@ -1,82 +1,17 @@
 // src/components/ChatCommentiModal.tsx
-import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "../supporto/supabaseClient";
-import { inviaNotifica } from "../Notifiche/notificheUtils";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTimes, faPaperPlane, faPaperclip, faSmile, faXmark } from "@fortawesome/free-solid-svg-icons";
-import "emoji-picker-element";
+import { faTimes, faPaperPlane, faXmark, faReply } from "@fortawesome/free-solid-svg-icons";
 
-import {
-    PREVIEW_LEN,
-    fullName,
-    sameDay,
-    tronca,
-    isUuid,
-    detectMention,
-    buildMentionSuggestions,
-    removeMentionEverywhere,
-    computeCommentiEnriched,
-    sortCommentiByDate,
-    validateFK,
-    insertCommento,
-    insertDestinatari,
-    computeDestinatariNotifica,
-    type Commento,
-    type Utente,
-} from "../supporto/chatCommentiUtils";
+import { sameDay, useAutosize, useAutoScroll, formatDay, urlForAvatar, getInitials, PREVIEW_LEN, tronca, fullName, } from "./useChatCommenti";
 
-import {
-    useAutosize,
-    useAutoScroll,
-    DayDivider,
-    Avatar,
-    ReplyPreview,
-    MentionMenu,
-    MessageMeta,
-} from "./ChatCommentiParts";
+import { useChatCommenti } from "./useChatCommenti";
+import type { Commento, Props, Utente } from "./tipi";
 
-type Props = {
-    commenti: Commento[];
-    utenteId: string;
-    taskId: string;
-    utentiProgetto: Utente[];     // platea = utenti del progetto
-    onClose: () => void;
-    onNuovoCommento: () => void;
-};
 
-/** Rileva device con input “nativo” (evita falsi positivi sui 2-in-1) */
-function usePreferNativeEmoji() {
-    const [prefer, setPrefer] = useState(false);
-    useEffect(() => {
-        if (typeof window === "undefined" || !window.matchMedia) return;
-        const coarse = window.matchMedia("(any-pointer: coarse)");
-        const noHover = window.matchMedia("(any-hover: none)");
-        const update = () => setPrefer(coarse.matches && noHover.matches);
-        update();
-        coarse.addEventListener?.("change", update);
-        noHover.addEventListener?.("change", update);
-        return () => {
-            coarse.removeEventListener?.("change", update);
-            noHover.removeEventListener?.("change", update);
-        };
-    }, []);
-    return prefer;
-}
 
-/** Small screen detector (default: < 1024px) */
-function useIsSmallScreen(maxWidthPx = 1024) {
-    const [small, setSmall] = useState(false);
-    useEffect(() => {
-        if (typeof window === "undefined" || !window.matchMedia) return;
-        const mq = window.matchMedia(`(max-width: ${maxWidthPx - 1}px)`);
-        const update = () => setSmall(mq.matches);
-        update();
-        mq.addEventListener?.("change", update);
-        return () => mq.removeEventListener?.("change", update);
-    }, [maxWidthPx]);
-    return small;
-}
-
+/* ---------------------------------------------------------------------------------------
+   Modale Chat Commenti – UI “slim” con logica delegata all’hook
+--------------------------------------------------------------------------------------- */
 export default function ChatCommentiModal({
     commenti,
     utenteId,
@@ -85,289 +20,45 @@ export default function ChatCommentiModal({
     onClose,
     onNuovoCommento,
 }: Props) {
-    const [testo, setTesto] = useState("");
-    const [parentId, setParentId] = useState<string | null>(null);
+    // Hook: tutta la logica è qui
+    const {
+        testo, inputRef, bodyRef,
+        parentId, setParentId,
+        destinatarioIds,
+        mentionActive, mentionSuggestions, mentionIndex, setMentionIndex, insertMention,
+        isExpanded, toggleExpanded,
+        commentiOrdinati, mappaById, utentiById,
+        handleChange, handleKeyDown, handleInvia, canSend, removeDestinatario,
+        troncaSafeGraphemes, cx, fullName, PREVIEW_LEN,
+    } = useChatCommenti({ commenti, utentiProgetto, utenteId, taskId, onNuovoCommento, onClose });
 
-    // Emoji picker
-    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-    const pickerRef = useRef<any>(null);
-    const preferNativeEmoji = usePreferNativeEmoji();
-    const isSmallScreen = useIsSmallScreen(1024);
-    const hideEmojiUI = preferNativeEmoji && isSmallScreen;
-
-    useEffect(() => {
-        if (hideEmojiUI && showEmojiPicker) setShowEmojiPicker(false);
-    }, [hideEmojiUI, showEmojiPicker]);
-
-    // Input/mentions
-    const [destinatarioIds, setDestinatarioIds] = useState<string[]>([]);
-    const utentiById = useMemo(() => new Map(utentiProgetto.map((u) => [u.id, u])), [utentiProgetto]);
-
-    const [expandedAnteprime, setExpandedAnteprime] = useState<Record<string, boolean>>({});
-    const isExpanded = (id?: string | null) => !!(id && expandedAnteprime[id!]);
-    const toggleExpanded = (id?: string | null) => id && setExpandedAnteprime((p) => ({ ...p, [id]: !p[id] }));
-
-    const inputRef = useRef<HTMLTextAreaElement | null>(null);
-    const [mentionActive, setMentionActive] = useState(false);
-    const [mentionQuery, setMentionQuery] = useState("");
-    const [mentionStart, setMentionStart] = useState<number | null>(null);
-    const [mentionIndex, setMentionIndex] = useState(0);
-
-    // FILES (allegati)
-    const fileRef = useRef<HTMLInputElement | null>(null);
-    const [filesSelezionati, setFilesSelezionati] = useState<File[]>([]);
-
-    // Suggestions = utenti del progetto
-    const mentionSuggestions = useMemo(
-        () => (mentionActive ? buildMentionSuggestions(utentiProgetto, mentionQuery) : []),
-        [mentionActive, mentionQuery, utentiProgetto]
-    );
-
-    const bodyRef = useRef<HTMLDivElement | null>(null);
+    // Auto-scroll elenco e auto-size textarea (solo UI)
     useAutoScroll(bodyRef, commenti.length);
     useAutosize(inputRef, testo);
 
-    const commentiEnriched = useMemo(
-        () => computeCommentiEnriched(commenti, utentiById),
-        [commenti, utentiById]
-    );
-    const commentiOrdinati = useMemo(() => sortCommentiByDate(commentiEnriched), [commentiEnriched]);
-    const mappaById = useMemo(() => new Map(commentiEnriched.map((c) => [c.id, c])), [commentiEnriched]);
-
-    useEffect(() => {
-        const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [onClose]);
-
-    const handleDetectMention = (value: string, caret: number) => {
-        const { active, query, start } = detectMention(value, caret);
-        setMentionActive(active);
-        setMentionQuery(query);
-        setMentionStart(start);
-        if (!active) setMentionIndex(0);
-    };
-
-    const insertMention = (user: Utente) => {
-        if (mentionStart == null || !inputRef.current) return;
-        const el = inputRef.current;
-        const caret = el.selectionStart || testo.length;
-        const before = testo.slice(0, mentionStart);
-        const after = testo.slice(caret);
-        const label = "@" + fullName(user);
-        setDestinatarioIds((prev) => (prev.includes(user.id) ? prev : [...prev, user.id]));
-        const next = before + label + " " + after;
-        setTesto(next);
-        setMentionActive(false);
-        setMentionQuery("");
-        setMentionStart(null);
-        setMentionIndex(0);
-        const pos = (before + label + " ").length;
-        requestAnimationFrame(() => {
-            el.focus();
-            el.setSelectionRange(pos, pos);
-        });
-    };
-
-    // Upload allegati (Storage -> metadati -> link)
-    async function uploadAllegatiPerCommento(opts: {
-        files: File[];
-        taskId: string;
-        commentoId: string;
-        utenteId: string;
-    }) {
-        const { files, taskId, commentoId, utenteId } = opts;
-        for (const f of files) {
-            const key = `${crypto.randomUUID()}_${f.name.replace(/\s+/g, "_")}`;
-            const storage_path = `task/${taskId}/commento/${commentoId}/${key}`;
-
-            // 1) upload binario nello Storage
-            const up = await supabase.storage.from("allegati").upload(storage_path, f, { upsert: false });
-            if (up.error) throw up.error;
-
-            // 2) metadati in public.allegati
-            const meta = await supabase
-                .from("allegati")
-                .insert({
-                    bucket: "allegati",
-                    storage_path,
-                    file_name: f.name,
-                    mime_type: f.type || "application/octet-stream",
-                    byte_size: f.size,
-                    uploaded_by: utenteId,
-                })
-                .select("id")
-                .single();
-            if (meta.error) throw meta.error;
-
-            // 3) link al commento
-            const link = await supabase
-                .from("commenti_allegati")
-                .insert({ commento_id: commentoId, allegato_id: meta.data.id });
-            if (link.error) throw link.error;
-        }
-    }
-
-    const handleInvia = async () => {
-        const t = testo.trim();
-        if (!t && filesSelezionati.length === 0) return; // niente testo e nessun file => non inviare
-        if (!isUuid(taskId) || !isUuid(utenteId)) return;
-
-        const parent = parentId && isUuid(parentId) ? parentId : null;
-        const ok = await validateFK(supabase, taskId, utenteId);
-        if (!ok) return;
-
-        // Se non c'è testo ma ci sono file, creiamo un commento "vuoto" con un carattere invisibile per coerenza (o stringa vuota, se il tuo DB lo consente)
-        const descr = t || " ";
-
-        const commentoId = await insertCommento(supabase, { taskId, utenteId, descrizione: descr, parentId: parent });
-        if (!commentoId) return;
-
-        const menzionatiValidi = destinatarioIds.filter(isUuid);
-        await insertDestinatari(supabase, commentoId, menzionatiValidi);
-
-        // Upload allegati se presenti
-        if (filesSelezionati.length > 0) {
-            try {
-                await uploadAllegatiPerCommento({
-                    files: filesSelezionati,
-                    taskId,
-                    commentoId,
-                    utenteId,
-                });
-            } catch (err) {
-                console.error("Upload allegati fallito:", err);
-                // puoi mostrare un toast qui
-            }
-        }
-
-        // Platea = utenti progetto (come deciso)
-        const destinatariNotifica = computeDestinatariNotifica({
-            assegnatari: utentiProgetto,
-            utenteId,
-            parentId: parent,
-            mappaById,
-            menzionati: menzionatiValidi,
-        });
-
-        if (destinatariNotifica.length > 0) {
-            await inviaNotifica("commento_task", destinatariNotifica, t, utenteId, {
-                task_id: taskId,
-                commento_id: commentoId,
-                parent_id: parent ?? undefined,
-            });
-        }
-
-        // reset UI
-        setTesto("");
-        setParentId(null);
-        setDestinatarioIds([]);
-        setFilesSelezionati([]);
-        onNuovoCommento();
-
-        // chiudi la textarea se si era allungata
-        requestAnimationFrame(() => {
-            const el = inputRef.current;
-            if (el) {
-                el.style.height = "0px";
-                el.style.height = Math.min(el.scrollHeight, 120) + "px";
-            }
-            const body = bodyRef.current;
-            if (body) body.scrollTop = body.scrollHeight;
-        });
-        inputRef.current?.focus();
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (mentionActive && mentionSuggestions.length > 0) {
-            if (e.key === "ArrowDown") {
-                e.preventDefault();
-                setMentionIndex((i) => (i + 1) % mentionSuggestions.length);
-                return;
-            }
-            if (e.key === "ArrowUp") {
-                e.preventDefault();
-                setMentionIndex((i) => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length);
-                return;
-            }
-            if (e.key === "Enter") {
-                e.preventDefault();
-                insertMention(mentionSuggestions[mentionIndex]);
-                return;
-            }
-            if (e.key === "Escape") {
-                setMentionActive(false);
-                return;
-            }
-        }
-        if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
-            e.preventDefault();
-            handleInvia();
-        }
-    };
-
-    const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        const value = e.target.value;
-        setTesto(value);
-        const caret = e.target.selectionStart || value.length;
-        handleDetectMention(value, caret);
-    };
-
-    // Gestione click su emoji del web component
-    useEffect(() => {
-        const el = pickerRef.current as HTMLElement | null;
-        if (!el) return;
-        const onClick = (e: any) => {
-            const unicode = e?.detail?.unicode;
-            if (!unicode) return;
-            setTesto((prev) => prev + unicode);
-            setShowEmojiPicker(false);
-            requestAnimationFrame(() => inputRef.current?.focus());
-        };
-        el.addEventListener("emoji-click", onClick);
-        return () => el.removeEventListener("emoji-click", onClick);
-    }, [pickerRef]);
+    // Evita chiusura cliccando sul backdrop interno
+    const stop = (e: React.MouseEvent) => e.stopPropagation();
 
     return (
         <div
-            className="
-        fixed inset-0 bg-black/40
-        flex justify-center items-center
-        z-50
-        px-4 xs:px-5 sm:px-8 md:px-12 lg:px-16
-        py-2
-        overflow-y-auto
-      "
+            className="fixed inset-0 bg-black/40 flex justify-center items-center z-50 px-4 xs:px-5 sm:px-8 md:px-12 lg:px-16 py-2 overflow-y-auto"
             onClick={onClose}
             role="dialog"
             aria-modal="true"
         >
             <div
-                className="
-          w-full mx-auto
-          max-w-full xs:max-w-xl sm:max-w-3xl md:max-w-4xl lg:max-w-5xl
-          max-h-[70vh]
-          rounded-2xl shadow-xl overflow-hidden flex flex-col
-          modal-container animate-scale-fade
-          bg-theme text-theme
-        "
-                onClick={(e) => e.stopPropagation()}
+                className="w-full mx-auto max-w-full xs:max-w-xl sm:max-w-3xl md:max-w-4xl lg:max-w-5xl max-h-[70vh] rounded-2xl shadow-xl overflow-hidden flex flex-col modal-container animate-scale-fade bg-theme text-theme"
+                onClick={stop}
             >
                 {/* Header */}
                 <div className="flex items-center justify-between px-3 sm:px-5 py-2.5 sm:py-3">
                     <div className="flex items-center gap-2.5 sm:gap-3">
-                        <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full grid place-items-center font-semibold bg-chat-icon text-sm sm:text-base">
-                            💬
-                        </div>
+                        <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full grid place-items-center font-semibold bg-chat-icon text-sm sm:text-base">CM</div>
                         <div className="leading-tight">
                             <div className="font-bold text-base sm:text-lg md:text-xl text-theme">Commenti</div>
                         </div>
                     </div>
-                    <button
-                        className="p-1.5 sm:p-2 icon-color hover-bg-theme rounded-md"
-                        onClick={onClose}
-                        aria-label="Chiudi finestra commenti"
-                    >
+                    <button className="p-1.5 sm:p-2 icon-color hover-bg-theme rounded-md" onClick={onClose} aria-label="Chiudi finestra commenti">
                         <FontAwesomeIcon icon={faTimes} className="text-lg sm:text-xl" />
                     </button>
                 </div>
@@ -377,13 +68,7 @@ export default function ChatCommentiModal({
                 {/* Corpo */}
                 <div
                     ref={bodyRef}
-                    className="
-            flex-1 overflow-y-auto hide-scrollbar
-            p-2.5 sm:p-4
-            bg-theme text-theme
-            text-[13px] sm:text-sm md:text-[15px]
-            overscroll-contain
-          "
+                    className="flex-1 overflow-y-auto hide-scrollbar p-2.5 sm:p-4 bg-theme text-theme text-[13px] sm:text-sm md:text-[15px] overscroll-contain"
                 >
                     {commentiOrdinati.length === 0 ? (
                         <div className="text-sm sm:text-base opacity-70 text-center mt-6 sm:mt-8">Nessun messaggio</div>
@@ -399,8 +84,8 @@ export default function ChatCommentiModal({
                                 const prevSameUser = prev?.utente?.id === c.utente?.id && sameDay(prev.created_at, c.created_at);
 
                                 const radiusBase = "rounded-2xl";
-                                const radiusMine = [!prevSameUser ? "rounded-tr-md" : "", !nextSameUser ? "rounded-br-md" : ""].join(" ");
-                                const radiusOther = [!prevSameUser ? "rounded-tl-md" : "", !nextSameUser ? "rounded-bl-md" : ""].join(" ");
+                                const radiusMine = cx(!prevSameUser && "rounded-tr-md", !nextSameUser && "rounded-br-md");
+                                const radiusOther = cx(!prevSameUser && "rounded-tl-md", !nextSameUser && "rounded-bl-md");
 
                                 const ageMs = Date.now() - new Date(c.created_at).getTime();
                                 const justSent = isMio && ageMs < 2000;
@@ -410,7 +95,7 @@ export default function ChatCommentiModal({
                                     <div key={c.id} className="w-full">
                                         {showDay && <DayDivider iso={c.created_at} />}
 
-                                        <div className={`w-full flex ${isMio ? "justify-end" : "justify-start"} items-end gap-1.5 sm:gap-2`}>
+                                        <div className={cx("w-full flex items-end gap-1.5 sm:gap-2", isMio ? "justify-end" : "justify-start")}>
                                             {!isMio && (
                                                 <div className="flex flex-col items-center max-w-[60px]">
                                                     <Avatar u={c.utente || undefined} />
@@ -421,13 +106,13 @@ export default function ChatCommentiModal({
                                             )}
 
                                             <div
-                                                className={[
+                                                className={cx(
                                                     "max-w-[92%] xs:max-w-[88%] sm:max-w-[76%] md:max-w-[70%] lg:max-w-[60%]",
                                                     "px-3 sm:px-4 py-2.5 shadow",
                                                     radiusBase,
                                                     isMio ? "bg-bolla-mio" : "bg-theme text-theme border border-black/10",
-                                                    isMio ? radiusMine : radiusOther,
-                                                ].join(" ")}
+                                                    isMio ? radiusMine : radiusOther
+                                                )}
                                             >
                                                 {c.parent_id && (
                                                     <ReplyPreview
@@ -436,10 +121,8 @@ export default function ChatCommentiModal({
                                                         onToggle={() => toggleExpanded(c.parent_id)}
                                                     />
                                                 )}
-                                                <div className="whitespace-pre-line break-words leading-relaxed">{c.descrizione}</div>
 
-                                                {/* Allegati: lista semplice, lazy signed url */}
-                                                <AllegatiList commentoId={c.id} />
+                                                <div className="whitespace-pre-line break-words leading-relaxed">{c.descrizione}</div>
 
                                                 <MessageMeta
                                                     created_at={c.created_at}
@@ -457,12 +140,9 @@ export default function ChatCommentiModal({
                                                 />
 
                                                 {Array.isArray(c.destinatari) && c.destinatari.length > 0 && (
-                                                    <div className={`mt-1.5 flex flex-wrap gap-1 text-[11px] sm:text-xs ${isMio ? "justify-end" : "justify-start"}`}>
+                                                    <div className={cx("mt-1.5 flex flex-wrap gap-1 text-[11px] sm:text-xs", isMio ? "justify-end" : "justify-start")}>
                                                         {c.destinatari.map((d) => (
-                                                            <span
-                                                                key={d.id}
-                                                                className={isMio ? "badge-dest-mio px-2 py-0.5 rounded-full" : "badge-dest-altri px-2 py-0.5 rounded-full"}
-                                                            >
+                                                            <span key={d.id} className={cx("px-2 py-0.5 rounded-full", isMio ? "badge-dest-mio" : "badge-dest-altri")}>
                                                                 A: {d.nome} {d.cognome || ""}
                                                             </span>
                                                         ))}
@@ -479,7 +159,6 @@ export default function ChatCommentiModal({
                                                 </div>
                                             )}
                                         </div>
-
                                     </div>
                                 );
                             })}
@@ -491,57 +170,53 @@ export default function ChatCommentiModal({
 
                 {/* Footer */}
                 <div className="p-2 sm:p-3 bg-theme text-theme">
-                    {parentId &&
-                        (() => {
-                            const parent = mappaById.get(parentId || "");
-                            return parent ? (
-                                <div className="mb-2 px-3 py-2 rounded-xl bg-quote max-w-full min-w-0 overflow-hidden">
-                                    <div className="text-xs sm:text-sm text-quote truncate">
-                                        Rispondendo a <strong>{parent.utente?.nome} {parent.utente?.cognome || ""}</strong>
-                                    </div>
-
-                                    <div
-                                        className={`whitespace-pre-wrap break-words break-all text-xs sm:text-sm mt-1 overflow-hidden ${isExpanded(parent.id) ? "max-h-20 overflow-y-auto hide-scrollbar" : ""
-                                            }`}
-                                    >
-                                        {isExpanded(parent.id) ? parent.descrizione : tronca(parent.descrizione || "")}
-                                        {(parent.descrizione?.length || 0) > PREVIEW_LEN && (
-                                            <button
-                                                className="ml-2 text-[11px] sm:text-xs link-quote align-baseline"
-                                                onClick={() => toggleExpanded(parent.id)}
-                                            >
-                                                {isExpanded(parent.id) ? "Comprimi" : "Mostra tutto"}
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    <button
-                                        className="text-xs sm:text-sm text-red-600 hover:underline mt-1"
-                                        onClick={() => setParentId(null)}
-                                    >
-                                        Annulla risposta
-                                    </button>
+                    {/* Barra “Rispondendo a …” */}
+                    {parentId && (() => {
+                        const parent = mappaById.get(parentId || "");
+                        return parent ? (
+                            <div className="mb-2 px-3 py-2 rounded-xl bg-quote max-w-full min-w-0 overflow-hidden">
+                                <div className="text-xs sm:text-sm text-quote truncate">
+                                    Rispondendo a <strong>{parent.utente?.nome} {parent.utente?.cognome || ""}</strong>
                                 </div>
-                            ) : null;
-                        })()}
 
+                                <div
+                                    className={cx(
+                                        "whitespace-pre-wrap break-words break-all text-xs sm:text-sm mt-1 overflow-hidden font-emoji",
+                                        isExpanded(parent.id) && "max-h-20 overflow-y-auto hide-scrollbar"
+                                    )}
+                                >
+                                    {isExpanded(parent.id) ? parent.descrizione : troncaSafeGraphemes(parent.descrizione || "")}
+                                    {(parent.descrizione?.length || 0) > PREVIEW_LEN && (
+                                        <button
+                                            className="ml-2 text-[11px] sm:text-xs link-quote align-baseline"
+                                            onClick={() => toggleExpanded(parent.id)}
+                                        >
+                                            {isExpanded(parent.id) ? "Comprimi" : "Mostra tutto"}
+                                        </button>
+                                    )}
+                                </div>
+
+                                <button className="text-xs sm:text-sm text-red-600 hover:underline mt-1" onClick={() => setParentId(null)}>
+                                    Annulla risposta
+                                </button>
+                            </div>
+                        ) : null;
+                    })()}
+
+                    {/* Badge destinatari menzionati */}
                     {destinatarioIds.length > 0 && (
                         <div className="mb-2 flex flex-wrap items-center gap-1.5 sm:gap-2">
                             {destinatarioIds.map((id) => {
                                 const u = utentiById.get(id);
                                 if (!u) return null;
+                                const nomeCompleto = fullName(u);
                                 return (
                                     <div key={id} className="flex items-center gap-1.5 sm:gap-2">
-                                        <div className="text-[11px] sm:text-xs px-2 py-1 rounded-full badge-dest-multiplo">
-                                            A: {fullName(u)}
-                                        </div>
+                                        <div className="text-[11px] sm:text-xs px-2 py-1 rounded-full badge-dest-multiplo">A: {nomeCompleto}</div>
                                         <button
                                             className="text-[11px] sm:text-xs text-red-600 hover:underline flex items-center gap-1"
-                                            onClick={() => {
-                                                setDestinatarioIds((prev) => prev.filter((x) => x !== id));
-                                                setTesto((prev) => removeMentionEverywhere(prev, u));
-                                            }}
-                                            title={`Rimuovi ${fullName(u)}`}
+                                            onClick={() => removeDestinatario(u)}
+                                            title={`Rimuovi ${nomeCompleto}`}
                                         >
                                             <FontAwesomeIcon icon={faXmark} className="text-base sm:text-lg align-middle" />
                                             Rimuovi
@@ -552,40 +227,10 @@ export default function ChatCommentiModal({
                         </div>
                     )}
 
-                    {/* FILE INPUT HIDDEN */}
-                    <input
-                        ref={fileRef}
-                        type="file"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => {
-                            const list = Array.from(e.target.files || []);
-                            if (list.length) setFilesSelezionati((prev) => [...prev, ...list]);
-                            e.currentTarget.value = "";
-                        }}
-                    />
-
-                    {/* Chips anteprima allegati */}
-                    {filesSelezionati.length > 0 && (
-                        <div className="mb-2 flex flex-wrap items-center gap-2">
-                            {filesSelezionati.map((f, i) => (
-                                <div key={i} className="px-2 py-1 rounded-full text-xs bg-black/5 dark:bg-white/10 flex items-center gap-2">
-                                    <span className="truncate max-w-[160px]">{f.name}</span>
-                                    <button
-                                        className="opacity-70 hover:opacity-100"
-                                        onClick={() => setFilesSelezionati((prev) => prev.filter((_, idx) => idx !== i))}
-                                        title="Rimuovi"
-                                    >
-                                        ✕
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
+                    {/* Input + invio */}
                     <div className="relative">
                         <div className="flex items-center justify-between min-w-0 overflow-hidden flex-nowrap gap-2">
-                            {/* Input */}
+                            {/* Textarea */}
                             <div className="flex-1 min-w-0">
                                 <textarea
                                     ref={inputRef}
@@ -593,66 +238,34 @@ export default function ChatCommentiModal({
                                     onChange={handleChange}
                                     onKeyDown={handleKeyDown}
                                     placeholder="Scrivi"
-                                    className="
-                    block w-full max-w-full
-                    input-style resize-none hide-scrollbar
-                    text-[13px] sm:text-[14px] leading-[1.15]
-                    py-0.5 sm:py-1
-                    min-h-0 max-h-[120px]
-                  "
+                                    className="block w-full max-w-full input-style resize-none hide-scrollbar text-[13px] sm:text-[14px] leading-[1.15] py-0.5 sm:py-1 min-h-0 max-h-[120px] font-emoji"
+                                    inputMode="text"
+                                    autoComplete="on"
+                                    autoCorrect="on"
+                                    autoCapitalize="sentences"
+                                    enterKeyHint="send"
                                     rows={1}
+                                    aria-label="Scrivi un commento"
                                 />
 
+                                {/* Menu mentions */}
                                 <MentionMenu
                                     visible={mentionActive}
                                     suggestions={mentionSuggestions}
                                     activeIndex={mentionIndex}
                                     alreadyHas={(id) => destinatarioIds.includes(id)}
                                     onPick={insertMention}
+                                    onActiveIndexChange={setMentionIndex}
                                 />
                             </div>
 
-                            {/* Icone */}
+                            {/* Invia */}
                             <div className="flex items-center shrink-0">
-                                {/* Emoji */}
-                                {!hideEmojiUI && (
-                                    <>
-                                        <button
-                                            type="button"
-                                            className="p-0 m-0 mr-1.5 sm:mr-2 bg-transparent border-0 inline-flex items-center justify-center"
-                                            title="Emoji"
-                                            aria-label="Emoji"
-                                            onClick={() => setShowEmojiPicker((v) => !v)}
-                                        >
-                                            <FontAwesomeIcon icon={faSmile} className="text-base sm:text-lg cursor-pointer hover:opacity-80" />
-                                        </button>
-
-                                        {showEmojiPicker && (
-                                            <div className="absolute bottom-full right-10 mb-2 z-50">
-                                                {/* @ts-ignore: custom element */}
-                                                <emoji-picker ref={pickerRef} class="max-h-[360px] overflow-auto"></emoji-picker>
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-
-                                {/* Allega */}
-                                <button
-                                    type="button"
-                                    className="p-0 m-0 mr-1.5 sm:mr-2 bg-transparent border-0 inline-flex items-center justify-center"
-                                    title="Allega"
-                                    aria-label="Allega"
-                                    onClick={() => fileRef.current?.click()}
-                                >
-                                    <FontAwesomeIcon icon={faPaperclip} className="text-base sm:text-lg cursor-pointer hover:opacity-80" />
-                                </button>
-
-                                {/* Invia */}
                                 <button
                                     onClick={handleInvia}
-                                    className={`p-0 m-0 bg-transparent border-0 inline-flex items-center justify-center ${(testo.trim() || filesSelezionati.length > 0) ? "" : "opacity-50 cursor-not-allowed"}`}
-                                    aria-label="Invia"
-                                    disabled={!testo.trim() && filesSelezionati.length === 0}
+                                    className={cx("p-0 m-0 bg-transparent border-0 inline-flex items-center justify-center", !canSend && "opacity-50 cursor-not-allowed")}
+                                    aria-label="Invia messaggio"
+                                    disabled={!canSend}
                                 >
                                     <FontAwesomeIcon icon={faPaperPlane} className="text-base sm:text-lg cursor-pointer hover:opacity-80" />
                                 </button>
@@ -665,54 +278,230 @@ export default function ChatCommentiModal({
     );
 }
 
-/** Lista allegati per commento (signed URL alla pressione) */
-function AllegatiList({ commentoId }: { commentoId: string }) {
-    const [files, setFiles] = useState<Array<{
-        commento_id: string;
-        allegato_id: string;
-        file_name: string;
-        mime_type: string;
-        byte_size: number;
-        bucket: string;
-        storage_path: string;
-        uploaded_by: string;
-        created_at: string;
-    }>>([]);
 
-    useEffect(() => {
-        let alive = true;
-        (async () => {
-            const q = await supabase
-                .from("v_commenti_allegati")
-                .select("*")
-                .eq("commento_id", commentoId)
-                .order("created_at", { ascending: true });
-            if (!q.error && alive) setFiles(q.data || []);
-        })();
-        return () => { alive = false; };
-    }, [commentoId]);
+//------------------------------------------------------------------//
+//---------------------parti della modale---------------------------//
+//------------------------------------------------------------------//
+/**
+ * Auto-resize della textarea con limite massimo (px).
+ * Se il testo è vuoto, la riporta all’altezza minima.
+ */
 
-    if (files.length === 0) return null;
+/**
+ * Divisore giorno con tipografia e spaziature responsive.
+ */
+export function DayDivider({ iso }: { iso: string }) {
+    return (
+        <div className="my-2.5 sm:my-3 md:my-4 flex items-center gap-2 sm:gap-3 md:gap-4">
+            <div className="h-px bg-black/10 dark:bg-white/10 flex-1" />
+            <div className="text-[11px] sm:text-[12px] md:text-sm text-theme opacity-70">
+                {formatDay(iso)}
+            </div>
+            <div className="h-px bg-black/10 dark:bg-white/10 flex-1" />
+        </div>
+    );
+}
+
+/**
+ * Avatar con fallback iniziali. Dimensioni responsive di default.
+ */
+export function Avatar({
+    u,
+    className = "h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-9",
+}: {
+    u?: Utente | null;
+    className?: string;
+}) {
+    const src = urlForAvatar(u?.avatar_url);
+    const title = `${u?.nome || ""} ${u?.cognome || ""}`.trim();
+    return src ? (
+        <img
+            src={src}
+            alt={title || "Avatar"}
+            className={`${className} rounded-full object-cover shadow-sm select-none`}
+            title={title}
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            decoding="async"
+        />
+    ) : (
+        <div
+            className={`${className} rounded-full grid place-items-center text-[10px] sm:text-[11px] md:text-sm font-semibold bg-chat-icon text-white shadow-sm select-none`}
+            title={title}
+        >
+            {getInitials(u?.nome, u?.cognome)}
+        </div>
+    );
+}
+
+/**
+ * Anteprima risposta (quote) con controlli responsive.
+ */
+export function ReplyPreview({
+    parent,
+    expanded,
+    onToggle,
+}: {
+    parent?: Commento | null;
+    expanded: boolean;
+    onToggle: () => void;
+}) {
+    if (!parent) return null;
+    const full = parent.descrizione || "";
+    const showToggle = full.length > PREVIEW_LEN;
 
     return (
-        <div className="mt-2 flex flex-col gap-1">
-            {files.map((f) => (
-                <button
-                    key={f.allegato_id}
-                    className="text-[12px] sm:text-[13px] md:text-sm underline hover:opacity-80 text-theme text-left"
-                    onClick={async () => {
-                        const { data, error } = await supabase.storage
-                            .from("allegati")
-                            .createSignedUrl(f.storage_path, 600);
-                        if (!error && data?.signedUrl) {
-                            window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-                        }
-                    }}
-                    title={`${f.file_name} (${Math.round(f.byte_size / 1024)} KB)`}
+        <div className="mb-2 text-[12px] sm:text-[13px] md:text-sm rounded-xl pl-3 pr-2 py-2 sm:pl-4 sm:pr-3 sm:py-2 bg-quote/90 border-l-[3px] sm:border-l-4">
+            <div className="font-semibold mb-1 text-quote leading-tight">
+                {parent?.utente?.nome} {parent?.utente?.cognome || ""}
+            </div>
+
+            <div
+                className={`whitespace-pre-line text-[12px] sm:text-[13px] md:text-sm text-quote leading-relaxed break-words break-all ${expanded ? "max-h-20 overflow-y-auto hide-scrollbar" : ""
+                    }`}
+            >
+                {expanded ? full : tronca(full)}
+                {showToggle && (
+                    <button
+                        type="button"
+                        className="ml-2 text-[11px] sm:text-[12px] md:text-sm text-quote hover:underline align-baseline"
+                        onClick={onToggle}
+                    >
+                        {expanded ? "Comprimi" : "Mostra tutto"}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
+
+/**
+ * Menu menzioni: posizionamento/dimensioni responsive, scroll e width adattiva.
+ * Aggiunta prop opzionale onActiveIndexChange per sincronizzare l’indice attivo (hover).
+ */
+export function MentionMenu({
+    visible,
+    suggestions,
+    activeIndex,
+    alreadyHas,
+    onPick,
+    onActiveIndexChange, // <-- nuova prop opzionale
+}: {
+    visible: boolean;
+    suggestions: Utente[];
+    activeIndex: number;
+    alreadyHas: (id: string) => boolean;
+    onPick: (u: Utente) => void;
+    onActiveIndexChange?: (i: number) => void;
+}) {
+    if (!visible || suggestions.length === 0) return null;
+
+    return (
+        <div className="absolute left-0 sm:left-2 bottom-full mb-2 max-h-56 sm:max-h-64 overflow-auto rounded-xl popup-panel shadow-lg w-[min(88vw,22rem)] sm:w-72 md:w-80 z-10">
+            {suggestions.map((u, idx) => {
+                const active = idx === activeIndex;
+                const already = alreadyHas(u.id);
+                const avatar = u.avatar_url && urlForAvatar(u.avatar_url);
+
+                return (
+                    <button
+                        type="button"
+                        key={u.id}
+                        onMouseDown={(e) => e.preventDefault()} // evita blur della textarea
+                        onMouseEnter={() => onActiveIndexChange?.(idx)} // <-- aggiorna indice attivo
+                        onClick={() => !already && onPick(u)}
+                        className={`w-full text-left px-3 py-2 text-[12px] sm:text-[13px] md:text-sm flex items-center gap-2 ${active ? "selected-panel" : "hover-bg-theme"
+                            }`}
+                        title={`Menziona @${fullName(u)}`}
+                        disabled={already}
+                    >
+                        <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full overflow-hidden shrink-0">
+                            {avatar ? (
+                                <img
+                                    src={avatar}
+                                    alt={`${u.nome} ${u.cognome || ""}`}
+                                    className="h-full w-full object-cover"
+                                    referrerPolicy="no-referrer"
+                                    loading="lazy"
+                                    decoding="async"
+                                />
+                            ) : (
+                                <div className="h-full w-full grid place-items-center text-[10px] sm:text-[11px] font-semibold bg-chat-icon text-white">
+                                    {getInitials(u.nome, u.cognome)}
+                                </div>
+                            )}
+                        </div>
+
+                        <span className="text-theme truncate">@{fullName(u)}</span>
+
+                        {already && (
+                            <span className="ml-auto text-[10px] sm:text-[11px] md:text-xs opacity-80">
+                                già aggiunto
+                            </span>
+                        )}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+/**
+ * Metadati messaggio: orario, ticks simulati e tasto Rispondi.
+ * Tipografia/allineamenti responsive. Colori adattivi.
+ */
+export function MessageMeta({
+    created_at,
+    isMine,
+    justSent,
+    ticks,
+    onReply,
+    replyTint = { mine: "text-white/90", other: "text-quote" },
+    timeTint = { mine: "text-white/80", other: "text-theme/70" },
+}: {
+    created_at: string;
+    isMine: boolean;
+    justSent: boolean;
+    ticks: string;
+    onReply: () => void;
+    replyTint?: { mine: string; other: string };
+    timeTint?: { mine: string; other: string };
+}) {
+    const time = new Date(created_at).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+
+    return (
+        <div
+            className={[
+                "mt-1.5 text-[11px] sm:text-[12px] md:text-[13px] opacity-80 flex items-center gap-2.5 sm:gap-3",
+                isMine ? "justify-end" : "justify-start",
+            ].join(" ")}
+        >
+            <button
+                className={`ml-1 text-[11px] sm:text-[12px] md:text-[13px] ${isMine ? replyTint.mine : replyTint.other
+                    } hover:underline inline-flex items-center gap-1`}
+                onClick={onReply}
+                title="Rispondi"
+            >
+                <FontAwesomeIcon icon={faReply} className="text-[11px] sm:text-[12px] md:text-sm" />
+                <span>Rispondi</span>
+            </button>
+
+            <span className={`tabular-nums ${isMine ? timeTint.mine : timeTint.other}`}>
+                {time}
+            </span>
+
+            {isMine ? (
+                <span
+                    className={`select-none tabular-nums ${justSent ? "opacity-70" : "opacity-100"
+                        } ${justSent ? "" : "font-semibold"}`}
+                    title={justSent ? "Inviato" : "Consegnato (simulato)"}
                 >
-                    📎 {f.file_name}
-                </button>
-            ))}
+                    {ticks}
+                </span>
+            ) : null}
         </div>
     );
 }
