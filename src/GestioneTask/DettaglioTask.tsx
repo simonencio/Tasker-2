@@ -12,7 +12,7 @@ import {
 import { Toast } from "toaster-js";
 import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
 import { faCommentDots } from "@fortawesome/free-solid-svg-icons";
-import { type Commento } from "../supporto/chatCommentiUtils";
+import { type Commento } from "./tipi";
 import ChatCommentiModal from "./ChatCommentiModal";
 
 // Tipi locali

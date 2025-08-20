@@ -963,3 +963,25 @@ html.dark .btn-invia {
 html.dark .btn-invia:hover {
   @apply bg-blue-600;
 }
+
+
+
+
+
+@layer utilities {
+  .font-emoji {
+    font-family:
+      ui-sans-serif,
+      "Apple Color Emoji",
+      "Segoe UI Emoji",
+      "Noto Color Emoji",
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      Roboto,
+      "Helvetica Neue",
+      Arial,
+      "Twemoji Mozilla",
+      sans-serif;
+  }
+}
