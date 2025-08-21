@@ -9,7 +9,7 @@ export const AVATAR_BASE_URL = `${supabaseUrl}/storage/v1/object/public/avatars/
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
-        storage: localStorage,
+        storage: sessionStorage,
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,

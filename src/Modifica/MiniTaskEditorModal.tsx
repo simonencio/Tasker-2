@@ -1,3 +1,4 @@
+// src/Modifica/MiniTaskEditorModal.tsx
 import { useEffect, useState } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -13,6 +14,7 @@ type Utente = { id: string; nome: string; cognome: string };
 type Stato = { id: number; nome: string };
 type Priorita = { id: number; nome: string };
 type Progetto = { id: string; nome: string };
+type Task = { id: string; nome: string; parent_id: string | null };
 
 // 🔹 Aggiorna progetto ricorsivamente
 const aggiornaProgettoTaskERicorsivi = async (taskId: string, nuovoProgettoId: string) => {
@@ -60,11 +62,13 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
     const [, setAssegnatiPrecedenti] = useState<string[]>([]);
     const [stati, setStati] = useState<Stato[]>([]);
     const [priorita, setPriorita] = useState<Priorita[]>([]);
-
-    const [popupOpen, setPopupOpen] = useState(false);
-
     const [progetti, setProgetti] = useState<Progetto[]>([]);
     const [progettoId, setProgettoId] = useState<string | null>(null);
+
+    const [tutteLeTask, setTutteLeTask] = useState<Task[]>([]);
+    const [parentId, setParentId] = useState<string | null>(null);
+
+    const [popupOpen, setPopupOpen] = useState(false);
 
     useEffect(() => {
         Promise.all([
@@ -74,8 +78,9 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
             supabase.from("stati").select("id, nome").is("deleted_at", null),
             supabase.from("priorita").select("id, nome").is("deleted_at", null),
             supabase.from("progetti").select("id, nome").is("deleted_at", null),
-            supabase.from("progetti_task").select("progetti_id").eq("task_id", taskId).maybeSingle()
-        ]).then(([taskRes, assegnatiRes, utentiRes, statiRes, prioritaRes, progettiRes, progettoTaskRes]) => {
+            supabase.from("progetti_task").select("progetti_id").eq("task_id", taskId).maybeSingle(),
+            supabase.from("tasks").select("id, nome, parent_id").is("deleted_at", null)
+        ]).then(([taskRes, assegnatiRes, utentiRes, statiRes, prioritaRes, progettiRes, progettoTaskRes, allTasksRes]) => {
             const task = taskRes.data;
             if (task) {
                 setNome(task.nome || "");
@@ -85,6 +90,7 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                 setConsegna(task.consegna || "");
                 setTempoStimato(task.tempo_stimato || "");
                 setSlug(task.slug || "");
+                setParentId(task.parent_id ?? null);
             }
             if (assegnatiRes.data) {
                 const ids = assegnatiRes.data.map((r: any) => r.utente_id);
@@ -96,6 +102,7 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
             if (prioritaRes.data) setPriorita(prioritaRes.data);
             if (progettiRes.data) setProgetti(progettiRes.data);
             if (progettoTaskRes?.data) setProgettoId(progettoTaskRes.data.progetti_id);
+            if (allTasksRes.data) setTutteLeTask(allTasksRes.data);
         });
     }, [taskId]);
 
@@ -112,15 +119,25 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                 stato_id: statoId,
                 priorita_id: prioritaId,
                 slug: slug || null,
+                parent_id: parentId
             })
             .eq("id", taskId);
 
-        // 🔹 aggiorna progetto ricorsivamente
-        if (progettoId) {
+        // 🔹 aggiorna progetto
+        if (parentId) {
+            const { data: parentProgetto } = await supabase
+                .from("progetti_task")
+                .select("progetti_id")
+                .eq("task_id", parentId)
+                .maybeSingle();
+            if (parentProgetto?.progetti_id) {
+                await aggiornaProgettoTaskERicorsivi(taskId, parentProgetto.progetti_id);
+            }
+        } else if (progettoId) {
             await aggiornaProgettoTaskERicorsivi(taskId, progettoId);
         }
 
-        // 🔹 aggiorna consegna e tempo stimato ricorsivamente
+        // 🔹 aggiorna consegna e tempo stimato
         await aggiornaTaskConsegnaTempoRicorsivi(taskId, {
             consegna,
             tempo_stimato: tempoStimato || null,
@@ -169,7 +186,7 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                     </button>
                 </div>
 
-                {/* campi base */}
+                {/* nome e slug */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <div>
                         <label className="text-sm font-semibold text-theme mb-1 block">Nome</label>
@@ -181,8 +198,8 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                     </div>
                 </div>
 
+                {/* progetto e assegnatari */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                    {/* 🔹 dropdown progetto */}
                     <div>
                         <label className="text-sm font-semibold text-theme mb-1 block">Progetto</label>
                         <select
@@ -192,20 +209,13 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                         >
                             <option value="">Seleziona progetto</option>
                             {progetti.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                    {p.nome}
-                                </option>
+                                <option key={p.id} value={p.id}>{p.nome}</option>
                             ))}
                         </select>
                     </div>
-
-                    {/* 🔹 popup assegnatari */}
                     <div className="relative">
                         <label className="text-sm font-semibold text-theme mb-1 block">Assegnatari</label>
-                        <div
-                            onClick={() => setPopupOpen(!popupOpen)}
-                            className="cursor-pointer input-style text-sm"
-                        >
+                        <div onClick={() => setPopupOpen(!popupOpen)} className="cursor-pointer input-style text-sm">
                             {assegnati.length > 0 ? `${assegnati.length} assegnati` : "Seleziona utenti"}
                         </div>
                         {popupOpen && (
@@ -223,10 +233,7 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                                             <div
                                                 key={u.id}
                                                 onClick={() => toggleAssegnato(u.id)}
-                                                className={`cursor-pointer px-2 py-1 rounded border text-sm ${selected
-                                                    ? "selected-panel font-semibold"
-                                                    : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
-                                                    }`}
+                                                className={`cursor-pointer px-2 py-1 rounded border text-sm ${selected ? "selected-panel font-semibold" : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"}`}
                                             >
                                                 {u.nome} {u.cognome}
                                             </div>
@@ -238,7 +245,26 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                     </div>
                 </div>
 
-                {/* stato, priorità */}
+                {/* parent (mostrato solo se la task è figlia) */}
+                {parentId !== null && (
+                    <div className="mb-4">
+                        <label className="text-sm font-semibold text-theme mb-1 block">Task padre</label>
+                        <select
+                            value={parentId ?? ""}
+                            onChange={(e) => setParentId(e.target.value || null)}
+                            className="w-full input-style"
+                        >
+                            <option value="">Nessuna (task principale)</option>
+                            {tutteLeTask
+                                .filter(t => t.id !== taskId)
+                                .map(t => (
+                                    <option key={t.id} value={t.id}>{t.nome}</option>
+                                ))}
+                        </select>
+                    </div>
+                )}
+
+                {/* stato e priorità */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <div>
                         <label className="text-sm font-semibold text-theme mb-1 block">Stato</label>
@@ -256,7 +282,7 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                     </div>
                 </div>
 
-                {/* consegna, tempo stimato */}
+                {/* consegna e tempo stimato */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <div className="relative">
                         <label className="text-sm font-semibold text-theme mb-1 block">Consegna</label>
@@ -265,24 +291,14 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                     </div>
                     <div>
                         <label className="text-sm font-semibold text-theme mb-1 block">Tempo stimato</label>
-                        <input
-                            type="time"
-                            step="60"
-                            value={tempoStimato}
-                            onChange={(e) => setTempoStimato(e.target.value)}
-                            className="w-full input-style"
-                        />
+                        <input type="time" step="60" value={tempoStimato} onChange={(e) => setTempoStimato(e.target.value)} className="w-full input-style" />
                     </div>
                 </div>
 
                 {/* note */}
                 <div className="mb-4">
                     <label className="text-sm font-semibold text-theme mb-1 block">Note</label>
-                    <textarea
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        className="w-full input-style min-h-[80px]"
-                    />
+                    <textarea value={note} onChange={(e) => setNote(e.target.value)} className="w-full input-style min-h-[80px]" />
                 </div>
 
                 <button onClick={salva} className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition-all">
