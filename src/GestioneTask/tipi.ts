@@ -34,5 +34,6 @@ export type Props = {
     taskId: string;
     utentiProgetto: Utente[];
     onClose: () => void;
-    onNuovoCommento: () => void;
+    onNuovoCommento: (c: Commento) => void;
+
 };

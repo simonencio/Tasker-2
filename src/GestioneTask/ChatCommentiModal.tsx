@@ -1,11 +1,12 @@
 // src/components/ChatCommentiModal.tsx
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTimes, faPaperPlane, faXmark, faReply } from "@fortawesome/free-solid-svg-icons";
 
 import { sameDay, useAutosize, useAutoScroll, formatDay, urlForAvatar, getInitials, PREVIEW_LEN, tronca, fullName, } from "./useChatCommenti";
 
 import { useChatCommenti } from "./useChatCommenti";
 import type { Commento, Props, Utente } from "./tipi";
+// src/components/ChatCommentiModal.tsx
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faTimes, faPaperPlane, faXmark, faReply, faFolderOpen } from "@fortawesome/free-solid-svg-icons";
 
 
 
@@ -260,7 +261,16 @@ export default function ChatCommentiModal({
                             </div>
 
                             {/* Invia */}
-                            <div className="flex items-center shrink-0">
+                            {/* Invia + Folder */}
+                            <div className="flex items-center shrink-0 gap-2">
+                                <button
+                                    className="p-0 m-0 bg-transparent border-0 inline-flex items-center justify-center"
+                                    aria-label="Apri cartella"
+                                    type="button"
+                                >
+                                    <FontAwesomeIcon icon={faFolderOpen} className="text-base sm:text-lg cursor-pointer hover:opacity-80" />
+                                </button>
+
                                 <button
                                     onClick={handleInvia}
                                     className={cx("p-0 m-0 bg-transparent border-0 inline-flex items-center justify-center", !canSend && "opacity-50 cursor-not-allowed")}
@@ -270,6 +280,7 @@ export default function ChatCommentiModal({
                                     <FontAwesomeIcon icon={faPaperPlane} className="text-base sm:text-lg cursor-pointer hover:opacity-80" />
                                 </button>
                             </div>
+
                         </div>
                     </div>
                 </div>

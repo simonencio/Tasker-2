@@ -9,6 +9,14 @@ import { inviaNotifica } from "../Notifiche/notificheUtils";
 import type { Cliente, Utente, Stato, Priorita, PopupType, MiniProjectModalProps } from "../supporto/types";
 
 type Props = MiniProjectModalProps & { offsetIndex?: number };
+// helper in cima al file (fuori dal componente)
+function generaSlug(nome: string) {
+    return nome
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")   // sostituisci spazi e caratteri speciali
+        .replace(/^-+|-+$/g, "");      // rimuovi trattini iniziali/finali
+}
 
 export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Props) {
     const [nome, setNome] = useState("");
@@ -98,7 +106,10 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
         const { data: created, error } = await supabase
             .from("progetti")
             .insert({
-                nome, note: note || null, cliente_id: clienteId,
+                nome,
+                slug: generaSlug(nome),            // 👈 aggiunto
+                note: note || null,
+                cliente_id: clienteId,
                 stato_id: statoId ? +statoId : null,
                 priorita_id: prioritaId ? +prioritaId : null,
                 consegna: consegna || null,
@@ -106,6 +117,7 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
             })
             .select()
             .single();
+
 
         if (error || !created) {
             setErrore(error?.message || "Errore");

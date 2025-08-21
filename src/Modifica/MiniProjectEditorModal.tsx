@@ -1,3 +1,4 @@
+// src/Modifica/MiniProjectEditorModal.tsx
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -18,6 +19,7 @@ type Utente = { id: string; nome: string; cognome: string };
 export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
     const [nome, setNome] = useState("");
     const [note, setNote] = useState("");
+    const [slug, setSlug] = useState("");
     const [clienteId, setClienteId] = useState<string | null>(null);
     const [statoId, setStatoId] = useState<number | null>(null);
     const [prioritaId, setPrioritaId] = useState<number | null>(null);
@@ -46,6 +48,7 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
             if (progetto) {
                 setNome(progetto.nome || "");
                 setNote(progetto.note || "");
+                setSlug(progetto.slug || "");
                 setClienteId(progetto.cliente_id);
                 setStatoId(progetto.stato_id);
                 setPrioritaId(progetto.priorita_id);
@@ -76,6 +79,7 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
             .update({
                 nome,
                 note,
+                slug,
                 cliente_id: clienteId,
                 stato_id: statoId,
                 priorita_id: prioritaId,
@@ -149,17 +153,20 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                     </button>
                 </div>
 
-                {/* Nome & Note */}
+                {/* Nome & Slug */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <div>
                         <label className="text-sm font-semibold text-theme mb-1 block">Nome</label>
                         <input value={nome} onChange={(e) => setNome(e.target.value)} className="w-full input-style" />
                     </div>
                     <div>
-                        <label className="text-sm font-semibold text-theme mb-1 block">Note</label>
-                        <textarea value={note} onChange={(e) => setNote(e.target.value)} className="w-full input-style h-[38px]" />
+                        <label className="text-sm font-semibold text-theme mb-1 block">Slug</label>
+                        <input value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full input-style" />
+                        <p className="text-xs opacity-70 mt-1">URL: /progetti/{slug || "<vuoto>"}</p>
                     </div>
                 </div>
+
+
 
                 {/* Cliente & Stato */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
@@ -235,7 +242,6 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                                 }}
                                 className="absolute top-full mt-2 w-full input-date-native z-50"
                             />
-
                         )}
                     </div>
                 </div>
@@ -286,6 +292,11 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                             </div>
                         )}
                     </div>
+                </div>
+                {/* Note */}
+                <div className="mb-4">
+                    <label className="text-sm font-semibold text-theme mb-1 block">Note</label>
+                    <textarea value={note} onChange={(e) => setNote(e.target.value)} className="w-full input-style h-[38px]" />
                 </div>
 
                 <button
