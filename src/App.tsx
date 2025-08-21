@@ -73,12 +73,11 @@ function RedirectTaskById() {
 
 function AppContent() {
     const [loggedIn, setLoggedIn] = useState(false);
-    const [, setUserId] = useState<string | null>(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [notificheOpen, setNotificheOpen] = useState(false);
     const [activeModals, setActiveModals] = useState<ModalType[]>([]);
     const location = useLocation();
-
+    const [userId, setUserId] = useState<string | null>(null);
     const publicRoutes = ["/login", "/register", "/confirm-email", "/reset-password/"];
     const isPublic = (() => {
         if (location.pathname.startsWith("/reset-password/")) return true;
@@ -177,7 +176,7 @@ function AppContent() {
             ) : (
                 <main className="pt-16 bg-theme text-theme overflow-hidden relative">
                     {sidebarOpen && (
-                        <div className="fixed top-16 left-0 z-40 w-64 h-[calc(100vh-4rem)] bg-theme shadow-xl">
+                        <div className="fixed top-16 left-0 z-40 w-full sm:w-full md:w-64 h-[calc(100vh-4rem)] bg-theme shadow-xl">
                             <Sidebar
                                 isOpen={sidebarOpen}
                                 onClose={() => setSidebarOpen(false)}
@@ -189,11 +188,17 @@ function AppContent() {
                         </div>
                     )}
 
+
                     {notificheOpen && (
-                        <div className="fixed top-16 right-0 z-40 w-64 h-[calc(100vh-4rem)] bg-theme shadow-xl">
-                            <NotificheSidebar open={notificheOpen} onClose={() => setNotificheOpen(false)} />
+                        <div className="fixed top-16 right-0 z-40 w-full sm:w-full md:w-64 h-[calc(100vh-4rem)] bg-theme shadow-xl">
+                            <NotificheSidebar
+                                open={notificheOpen}
+                                onClose={() => setNotificheOpen(false)}
+                                userId={userId}   // ✅ aggiungi questo
+                            />
                         </div>
                     )}
+
 
                     <div className="w-full relative z-10">
                         <div className="px-6 py-6 h-[calc(100vh-4rem)] overflow-y-auto hide-scrollbar">

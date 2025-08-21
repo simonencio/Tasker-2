@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 
-import { isUtenteAdmin } from "../supporto/ruolo"; // ✅ Funzione ruolo
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
     faHome,
@@ -30,7 +29,6 @@ export default function Sidebar({
     onApriUserModal,
 }: SidebarProps) {
     const [theme, setTheme] = useState("light");
-    const [isAdmin, setIsAdmin] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -49,21 +47,14 @@ export default function Sidebar({
         return () => observer.disconnect();
     }, []);
 
-    useEffect(() => {
-        let mounted = true;
-        isUtenteAdmin().then((res) => {
-            if (mounted) setIsAdmin(res);
-        });
-        return () => {
-            mounted = false;
-        };
-    }, []);
+
 
     return (
         <aside
-            className={`absolute top-0 left-0 h-full w-64 sidebar-theme text-theme transition-transform duration-300 z-40 ${isOpen ? "translate-x-0 sidebar-shadow-open" : "-translate-x-full"
+            className={`absolute top-0 left-0 h-full w-full md:w-70 sidebar-theme text-theme transition-transform duration-300 z-40 ${isOpen ? "translate-x-0 sidebar-shadow-open" : "-translate-x-full"
                 }`}
         >
+
             <nav className="flex flex-col p-4 gap-4 h-full items-center">
                 <button
                     onClick={() => {
@@ -148,63 +139,60 @@ export default function Sidebar({
                         </button>
                     </NavLink>
 
-                    {/* ✅ CLIENTI - Solo admin */}
-                    {isAdmin && (
-                        <NavLink
-                            to="/clienti"
-                            onClick={onClose}
-                            className={({ isActive }) =>
-                                `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-2 rounded"
-                                }`
-                            }
+                    {/* ✅ CLIENTI - Sempre visibile */}
+                    <NavLink
+                        to="/clienti"
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                            `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-2 rounded"
+                            }`
+                        }
+                    >
+                        <div className="flex items-center gap-2">
+                            <FontAwesomeIcon icon={faUserTie} className="icon-color" />
+                            Clienti
+                        </div>
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onApriClientModal();
+                            }}
+                            className="icon-color hover:text-red-400 transition"
+                            title="Nuovo cliente"
                         >
-                            <div className="flex items-center gap-2">
-                                <FontAwesomeIcon icon={faUserTie} className="icon-color" />
-                                Clienti
-                            </div>
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    onApriClientModal();
-                                }}
-                                className="icon-color hover:text-red-400 transition"
-                                title="Nuovo cliente"
-                            >
-                                <FontAwesomeIcon icon={faPlus} size="sm" />
-                            </button>
-                        </NavLink>
-                    )}
+                            <FontAwesomeIcon icon={faPlus} size="sm" />
+                        </button>
+                    </NavLink>
 
-                    {/* ✅ UTENTI - Solo admin con + per creare */}
-                    {isAdmin && (
-                        <NavLink
-                            to="/utenti"
-                            onClick={onClose}
-                            className={({ isActive }) =>
-                                `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-2 rounded"
-                                }`
-                            }
+                    {/* ✅ UTENTI - Sempre visibile */}
+                    <NavLink
+                        to="/utenti"
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                            `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-2 rounded"
+                            }`
+                        }
+                    >
+                        <div className="flex items-center gap-2">
+                            <FontAwesomeIcon icon={faUser} className="icon-color" />
+                            Utenti
+                        </div>
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onApriUserModal();
+                            }}
+                            className="icon-color hover:text-indigo-400 transition"
+                            title="Nuovo utente"
                         >
-                            <div className="flex items-center gap-2">
-                                <FontAwesomeIcon icon={faUser} className="icon-color" />
-                                Utenti
-                            </div>
-                            <button
-                                type="button"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    onApriUserModal();
-                                }}
-                                className="icon-color hover:text-indigo-400 transition"
-                                title="Nuovo utente"
-                            >
-                                <FontAwesomeIcon icon={faPlus} size="sm" />
-                            </button>
-                        </NavLink>
-                    )}
+                            <FontAwesomeIcon icon={faPlus} size="sm" />
+                        </button>
+                    </NavLink>
+
                 </div>
             </nav>
         </aside>

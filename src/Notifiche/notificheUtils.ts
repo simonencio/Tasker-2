@@ -1,7 +1,6 @@
 // notificheUtils.ts
 import { supabase } from "../supporto/supabaseClient";
-import { inviaEmailNotifica } from "./emailUtils";
-import { generaContenutoEmail } from "./emailTemplates";
+
 
 export type Notifica = {
     id: string;
@@ -145,10 +144,8 @@ export async function inviaNotifica(
 
     const notifica_id = nuovaNotifica.id;
 
-    // 3) deduplica destinatari ed escludi il creatore (niente auto-notifica)
-    const destUnici = Array.from(new Set(destinatari)).filter(
-        (u) => !!u && u !== creatore_id
-    );
+    // 3) deduplica destinatari (NON escludere il creatore se è auto-assegnato)
+    const destUnici = Array.from(new Set(destinatari)).filter((u) => !!u);
 
     if (destUnici.length === 0) return;
 
@@ -216,5 +213,99 @@ export async function inviaNotifica(
                 }
             }
         }
+    }
+}
+export async function inviaEmailNotifica({
+    to,
+    subject,
+    body,
+}: {
+    to: string;
+    subject: string;
+    body: string;
+}) {
+    const response = await fetch("https://kieyhhmxinmdsnfdglrm.supabase.co/functions/v1/sendEmail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: to, subject, body }),
+    });
+
+    const text = await response.text();
+    if (!response.ok) {
+        console.error("❌ Errore invio email:", text);
+    } else {
+        console.log("✅ Email inviata:", text);
+    }
+}
+
+
+export function generaContenutoEmail({
+    nomeUtente,
+    descrizioneTipo,
+    messaggio,
+}: {
+    nomeUtente: string;
+    descrizioneTipo: string;
+    messaggio: string;
+}): { subject: string; body: string } {
+    const subject = `📢 ${descrizioneTipo}`;
+
+    const body = `
+Ciao ${nomeUtente},
+
+Hai ricevuto una nuova notifica sulla piattaforma *Tasker*:
+
+──────────────────────────────
+📌 Tipo: ${descrizioneTipo}
+💬 Messaggio: ${messaggio}
+──────────────────────────────
+
+🔗 Puoi accedere a Tasker per maggiori dettagli al seguente link:
+http://localhost:5173/home
+
+Se non desideri ricevere queste email, puoi aggiornare le tue preferenze di notifica direttamente dal tuo profilo utente.
+
+Grazie per utilizzare Tasker!
+
+—
+Questa email è stata inviata automaticamente in base alle tue impostazioni di notifica.
+  `.trim();
+
+    return { subject, body };
+}
+
+
+export async function richiediPermessoNotificheBrowser() {
+    if (!("Notification" in window)) {
+        console.warn("Questo browser non supporta le notifiche desktop.");
+        return;
+    }
+
+    if (Notification.permission === "default") {
+        try {
+            const permission = await Notification.requestPermission();
+            if (permission === "granted") {
+                console.log("Permesso notifiche concesso.");
+            } else if (permission === "denied") {
+                console.warn("Permesso notifiche negato dall'utente.");
+            }
+        } catch (error) {
+            console.error("Errore nella richiesta di permesso per le notifiche:", error);
+        }
+    }
+}
+
+export function mostraNotificaBrowser(titolo: string, opzioni?: NotificationOptions) {
+    if (Notification.permission === "granted") {
+        const body = opzioni?.body
+            ? opzioni.body.length > 150
+                ? opzioni.body.slice(0, 150) + "..."
+                : opzioni.body
+            : undefined;
+
+        new Notification(titolo, {
+            ...opzioni,
+            body,
+        });
     }
 }

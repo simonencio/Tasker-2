@@ -1,4 +1,4 @@
-import NotificationPreferencesSelector from "../Notifiche/NotificationPreferencesSelector";
+import NotificationPreferencesSelector from "./NotificationPreferencesSelector";
 import ModificaEmail from "./ModificaEmail";
 import ModificaPassword from "./ModificaPassword";
 import ModificaImmagineProfilo from "./ModificaImmagineProfilo";

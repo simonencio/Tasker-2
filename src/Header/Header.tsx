@@ -15,8 +15,7 @@ import { supabase } from "../supporto/supabaseClient";
 import {
     richiediPermessoNotificheBrowser,
     mostraNotificaBrowser,
-} from "../Notifiche/notificheBrowserUtils";
-import { isUtenteAdmin } from "../supporto/ruolo";
+} from "../Notifiche/notificheUtils";
 
 type NotificaUtenteRecord = {
     notifica_id: string;
@@ -55,7 +54,6 @@ export default function Header({
     const [userId, setUserId] = useState<string | null>(null);
     const [themeDropdown, setThemeDropdown] = useState(false);
     const [, setCurrentTheme] = useState("light");
-    const [isAdmin, setIsAdmin] = useState(false);
     const [utente, setUtente] = useState<Utente | null>(null);
 
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -111,8 +109,7 @@ export default function Header({
                     .single();
                 if (data && !error) setUtente(data);
 
-                const admin = await isUtenteAdmin();
-                setIsAdmin(admin);
+
             }
         };
         getUser();
@@ -129,8 +126,7 @@ export default function Header({
                     .single()
                     .then(async ({ data }) => {
                         setUtente(data || null);
-                        const admin = await isUtenteAdmin();
-                        setIsAdmin(admin);
+
                     });
             }
         });
@@ -278,12 +274,8 @@ export default function Header({
                             <div className="dropdown-panel absolute right-0 mt-2 w-36 sm:w-40 z-50">
                                 <button onClick={() => { onApriModale("task"); setCreateOpen(false); }} className="dropdown-button">Attività</button>
                                 <button onClick={() => { onApriModale("project"); setCreateOpen(false); }} className="dropdown-button">Progetto</button>
-                                {isAdmin && (
-                                    <>
-                                        <button onClick={() => { onApriModale("client"); setCreateOpen(false); }} className="dropdown-button">Clienti</button>
-                                        <button onClick={() => { onApriModale("user"); setCreateOpen(false); }} className="dropdown-button">Utenti</button>
-                                    </>
-                                )}
+                                <button onClick={() => { onApriModale("client"); setCreateOpen(false); }} className="dropdown-button">Clienti</button>
+                                <button onClick={() => { onApriModale("user"); setCreateOpen(false); }} className="dropdown-button">Utenti</button>
                             </div>
                         )}
                     </div>
