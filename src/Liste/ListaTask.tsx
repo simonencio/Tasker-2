@@ -1,53 +1,62 @@
+// src/Liste/ListaTask.tsx
 import { useEffect, useState } from "react";
 import { Toast } from "toaster-js";
 import "../App.css";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlay, faStop, faTasks, faCheckCircle, faLink, faPen } from "@fortawesome/free-solid-svg-icons";
+import {
+    faPlay,
+    faStop,
+    faTasks,
+    faCheckCircle,
+    faLink,
+} from "@fortawesome/free-solid-svg-icons";
 
 import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
-import FiltriTaskAvanzati, { ordinaTaskClientSide } from "../supporto/FiltriTaskAvanzati";
-import type { Commento, FiltroAvanzato, Task } from "../supporto/tipi";
+import FiltriGenericiAvanzati, {
+    type FiltroAvanzatoGenerico,
+    ordinaClientSide,
+} from "../supporto/FiltriGenericiAvanzati";
+import type { Commento, Task } from "../supporto/tipi";
 import { useNavigate } from "react-router-dom";
 import RenderSottoTask from "../supporto/SottoTask";
 import RenderCommento from "../supporto/RenderCommento";
-import { useToast } from '../supporto/useToast'
+import { useToast } from "../supporto/useToast";
+import ListaGenerica from "./ListaGenerica";
 
 export default function ListaTask() {
     const toast = useToast();
-    const [durataTotaleTask, setDurataTotaleTask] = useState<Record<string, number>>({});
-    const [slugById, setSlugById] = useState<Record<string, string>>({}); // 👈 id -> slug
-
+    const [durataTotaleTask] = useState<Record<string, number>>({});
+    const [slugById, setSlugById] = useState<Record<string, string>>({});
     const [tasks, setTasks] = useState<Task[]>([]);
     const [taskAssegnate, setTaskAssegnate] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
     const [soloMie, setSoloMie] = useState(false);
     const [utenteId, setUtenteId] = useState<string | null>(null);
-    const [isAdmin, setIsAdmin] = useState(false);
     const [soloCompletate, setSoloCompletate] = useState(false);
-    const tasksFiltrate = tasks.filter(t => !soloCompletate || t.fine_task !== null);
     const [commenti, setCommenti] = useState<Commento[]>([]);
     const [commentiEspansi, setCommentiEspansi] = useState<Set<string>>(new Set());
-    const toggleCommentiEspansi = (taskId: string) => {
-        setCommentiEspansi(prev => {
-            const nuovo = new Set(prev);
-            nuovo.has(taskId) ? nuovo.delete(taskId) : nuovo.add(taskId);
-            return nuovo;
-        });
-    };
-    const [durateTaskUtente, setDurateTaskUtente] = useState<Record<string, Record<string, number>>>({});
-
-    const [taskDaModificareId, setTaskDaModificareId] = useState<string | null>(null);
-    const [taskEspansaId, setTaskEspansaId] = useState<string | null>(null);
     const [sottoTaskEspansa, setSottoTaskEspansa] = useState<Set<string>>(new Set());
+    const [filtroAvanzato, setFiltroAvanzato] = useState<FiltroAvanzatoGenerico>({});
 
-    const toggleSottoTaskEspansa = (taskId: string) => {
-        setSottoTaskEspansa(prev => {
+    const tasksFiltrate = tasks.filter((t) => !soloCompletate || t.fine_task !== null);
+    const navigate = useNavigate();
+
+    // Helpers
+    const toggleCommentiEspansi = (taskId: string) =>
+        setCommentiEspansi((prev) => {
             const nuovo = new Set(prev);
             nuovo.has(taskId) ? nuovo.delete(taskId) : nuovo.add(taskId);
             return nuovo;
         });
-    };
+
+    const toggleSottoTaskEspansa = (taskId: string) =>
+        setSottoTaskEspansa((prev) => {
+            const nuovo = new Set(prev);
+            nuovo.has(taskId) ? nuovo.delete(taskId) : nuovo.add(taskId);
+            return nuovo;
+        });
+
     const formatDurata = (value: number | string | null): string => {
         if (!value) return "0m";
         if (typeof value === "number") {
@@ -61,33 +70,29 @@ export default function ListaTask() {
             return `${secondi}s`;
         }
         if (typeof value === "string" && value.includes(":")) {
-            const parts = value.split(":").map(p => parseInt(p, 10));
-            const ore = parts[0] || 0, minuti = parts[1] || 0, secondi = parts[2] || 0;
-            if (ore > 0 && secondi > 0) return `${ore}h ${minuti}m ${secondi}s`;
-            if (ore > 0) return `${ore}h ${minuti}m`;
-            if (minuti > 0 && secondi > 0) return `${minuti}m ${secondi}s`;
-            if (minuti > 0) return `${minuti}m`;
-            return `${secondi}s`;
+            const [h, m, s] = value.split(":").map((p) => parseInt(p, 10));
+            if (h > 0 && s > 0) return `${h}h ${m}m ${s}s`;
+            if (h > 0) return `${h}h ${m}m`;
+            if (m > 0 && s > 0) return `${m}m ${s}s`;
+            if (m > 0) return `${m}m`;
+            return `${s}s`;
         }
         return "0m";
     };
-
-    const [filtroAvanzato, setFiltroAvanzato] = useState<FiltroAvanzato>({
-        progetto: null, utente: null, stato: null, priorita: null, dataInizio: null, dataFine: null, ordine: null,
-    });
-    const navigate = useNavigate();
 
     // Timer
     const [activeTimer, setActiveTimer] = useState<{ taskId: string; startTime: Date } | null>(null);
     const [, setElapsed] = useState<number>(0);
 
-    const handleStartTimer = (taskId: string) => {
+    const handleStartTimer = (taskId: string) =>
         setActiveTimer({ taskId, startTime: new Date() });
-    };
 
     const handleStopTimer = async (_task: Task) => {
-        if (!activeTimer || !utenteId) { setActiveTimer(null); return; }
-        const taskPlayed = tasks.find(t => t.id === activeTimer.taskId);
+        if (!activeTimer || !utenteId) {
+            setActiveTimer(null);
+            return;
+        }
+        const taskPlayed = tasks.find((t) => t.id === activeTimer.taskId);
         if (!taskPlayed || !taskPlayed.progetto?.id) {
             new Toast("Questa task non è collegata a nessun progetto", Toast.TYPE_ERROR, Toast.TIME_SHORT);
             setActiveTimer(null);
@@ -104,49 +109,50 @@ export default function ListaTask() {
             data_fine: endTime.toISOString(),
             durata,
         });
-        if (error) { toast("Errore nel salvataggio del tempo", 'error'); console.error(error); }
-        else { toast("Tempo salvato con successo", 'success'); }
+        if (error) {
+            toast("Errore nel salvataggio del tempo", "error");
+            console.error(error);
+        } else toast("Tempo salvato con successo", "success");
         setActiveTimer(null);
     };
 
     useEffect(() => {
-        let interval: NodeJS.Timeout | null = null;
+        let interval: NodeJS.Timeout | undefined;
         if (activeTimer) {
-            interval = setInterval(() => setElapsed(Math.floor((Date.now() - activeTimer.startTime.getTime()) / 1000)), 1000);
-        } else setElapsed(0);
-        return () => { if (interval) clearInterval(interval); };
+            interval = setInterval(
+                () => setElapsed(Math.floor((Date.now() - activeTimer.startTime.getTime()) / 1000)),
+                1000
+            );
+        } else {
+            setElapsed(0);
+        }
+        return () => {
+            if (interval) clearInterval(interval);
+        };
     }, [activeTimer]);
 
     useEffect(() => {
-        const fetchUtente = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-            setUtenteId(user.id);
-            const { data: ruoloData } = await supabase.from("utenti").select("ruolo").eq("id", user.id).single();
-            if (ruoloData?.ruolo === 1) setIsAdmin(true);
-        };
-        fetchUtente();
+        supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user) setUtenteId(user.id);
+        });
     }, []);
 
     useEffect(() => {
-        const caricaCommenti = async () => {
-            const { data, error } = await supabase
-                .from("commenti")
-                .select(`
-          id, utente_id, task_id, parent_id, descrizione, created_at, modified_at, deleted_at,
-          utente:utente_id ( id, nome, cognome )
-        `)
-                .is("deleted_at", null);
-
-            if (error) { console.error("Errore nel caricamento commenti:", error); return; }
-            if (data) {
-                const commentiPuliti: Commento[] = data.map((c: any) => ({
-                    ...c, utente: Array.isArray(c.utente) ? c.utente[0] : c.utente,
-                }));
-                setCommenti(commentiPuliti);
-            }
-        };
-        caricaCommenti();
+        supabase
+            .from("commenti")
+            .select(
+                `id, utente_id, task_id, parent_id, descrizione, created_at, modified_at, deleted_at,
+                 utente:utente_id ( id, nome, cognome )`
+            )
+            .is("deleted_at", null)
+            .then(({ data, error }) => {
+                if (!error && data) {
+                    setCommenti(data.map((c: any) => ({
+                        ...c,
+                        utente: Array.isArray(c.utente) ? c.utente[0] : c.utente,
+                    })));
+                }
+            });
     }, []);
 
     useEffect(() => {
@@ -156,39 +162,45 @@ export default function ListaTask() {
 
             if ((soloMie || filtroAvanzato.utente) && utenteId) {
                 const idFiltro = filtroAvanzato.utente || utenteId;
-                const { data: dataUtente } = await supabase.from("utenti_task").select("task_id").eq("utente_id", idFiltro);
-                if (!dataUtente || dataUtente.length === 0) { setTasks([]); setLoading(false); return; }
-                taskIds = dataUtente.map(t => t.task_id);
+                const { data } = await supabase.from("utenti_task").select("task_id").eq("utente_id", idFiltro);
+                if (!data || data.length === 0) {
+                    setTasks([]);
+                    setLoading(false);
+                    return;
+                }
+                taskIds = data.map((t) => t.task_id);
             }
 
             if (filtroAvanzato.progetto) {
-                const { data: dataProgetto } = await supabase.from("progetti_task").select("task_id").eq("progetti_id", filtroAvanzato.progetto);
-                if (!dataProgetto || dataProgetto.length === 0) { setTasks([]); setLoading(false); return; }
-                const taskIdsProgetto = dataProgetto.map(r => r.task_id);
-                taskIds = taskIds.length > 0 ? taskIds.filter(id => taskIdsProgetto.includes(id)) : taskIdsProgetto;
+                const { data } = await supabase.from("progetti_task").select("task_id").eq("progetti_id", filtroAvanzato.progetto);
+                if (!data || data.length === 0) {
+                    setTasks([]);
+                    setLoading(false);
+                    return;
+                }
+                const taskIdsProgetto = data.map((r) => r.task_id);
+                taskIds = taskIds.length > 0 ? taskIds.filter((id) => taskIdsProgetto.includes(id)) : taskIdsProgetto;
             }
 
             const query = supabase
                 .from("tasks")
                 .select(`
-          id, slug, nome, note, consegna, tempo_stimato, created_at, modified_at, fine_task, parent_id,
-          stato:stato_id (id, nome, colore),
-          priorita:priorita_id (id, nome),
-          progetti_task:progetti_task ( progetti ( id, nome ) ),
-          utenti_task ( utenti ( id, nome, cognome ) )
-        `)
+                    id, slug, nome, note, consegna, tempo_stimato, created_at, modified_at, fine_task, parent_id,
+                    stato:stato_id (id, nome, colore),
+                    priorita:priorita_id (id, nome),
+                    progetti_task:progetti_task ( progetti ( id, nome ) ),
+                    utenti_task ( utenti ( id, nome, cognome ) )
+                `)
                 .is("deleted_at", null);
 
             if (taskIds.length > 0) query.in("id", taskIds);
             if (filtroAvanzato.stato) query.eq("stato_id", filtroAvanzato.stato);
             if (filtroAvanzato.priorita) query.eq("priorita_id", filtroAvanzato.priorita);
-            if (filtroAvanzato.dataInizio) query.gte("consegna", filtroAvanzato.dataInizio);
-            if (filtroAvanzato.dataFine) query.lte("consegna", filtroAvanzato.dataFine);
+            if (filtroAvanzato.dataInizio) query.gte("consegna", filtroAvanzato.dataInizio as string);
+            if (filtroAvanzato.dataFine) query.lte("consegna", filtroAvanzato.dataFine as string);
 
             const { data } = await query;
-
             if (data) {
-                // mappa slug per id
                 const nextSlugMap: Record<string, string> = {};
                 data.forEach((row: any) => { if (row.slug) nextSlugMap[row.id] = row.slug; });
                 setSlugById(nextSlugMap);
@@ -208,252 +220,219 @@ export default function ListaTask() {
                     progetto: item.progetti_task?.[0]?.progetti ?? null,
                     assegnatari: item.utenti_task?.map((u: any) => u.utenti) ?? [],
                 }));
-                setTasks(ordinaTaskClientSide(tasksPulite, filtroAvanzato.ordine ?? null));
+
+                setTasks(
+                    ordinaClientSide(tasksPulite, filtroAvanzato.ordine ?? null, (task, criterio) => {
+                        switch (criterio) {
+                            case "consegna_asc":
+                            case "consegna_desc":
+                                return task.consegna;
+                            case "stato_az":
+                            case "stato_za":
+                                return task.stato?.nome;
+                            case "nome_az":
+                            case "nome_za":
+                                return task.nome;
+                            case "priorita_urgente":
+                            case "priorita_meno_urgente":
+                                return task.priorita?.id;
+                            default:
+                                return task.nome;
+                        }
+                    })
+                );
             }
             setLoading(false);
         };
 
-        const caricaTaskAssegnate = async () => {
-            if (!utenteId) return;
-            const { data } = await supabase.from("utenti_task").select("task_id").eq("utente_id", utenteId);
-            if (data) setTaskAssegnate(new Set(data.map(t => t.task_id)));
-        };
-
         if (utenteId) {
             caricaTasks();
-            caricaTaskAssegnate();
+            supabase
+                .from("utenti_task")
+                .select("task_id")
+                .eq("utente_id", utenteId)
+                .then(({ data }) => data && setTaskAssegnate(new Set(data.map((t) => t.task_id))));
         }
     }, [soloMie, filtroAvanzato, utenteId]);
 
-    const caricaDurateTaskUtente = async (task: Task) => {
-        if (!task.id) return;
-        const tutteTaskId = [task.id, ...trovaTutteLeFiglie(task.id)];
-        const { data, error } = await supabase
-            .from("time_entries")
-            .select("utente_id, durata")
-            .in("task_id", tutteTaskId);
-
-        if (error) { console.error("Errore caricamento durate:", error); return; }
-
-        const duratePerUtente: Record<string, number> = {};
-        let totale = 0;
-        for (const entry of data || []) {
-            const d = entry?.durata || 0;
-            totale += d;
-            const uid = entry?.utente_id;
-            if (uid) duratePerUtente[uid] = (duratePerUtente[uid] || 0) + d;
-        }
-        setDurateTaskUtente(prev => ({ ...prev, [task.id]: duratePerUtente }));
-        setDurataTotaleTask(prev => ({ ...prev, [task.id]: totale }));
-    };
-
-    const sottoTask = (taskId: string) => tasks.filter(t => t.parent_id === taskId);
-    const trovaTutteLeFiglie = (taskId: string): string[] => {
-        const figliDiretti = tasks.filter(t => t.parent_id === taskId);
-        const ids = figliDiretti.map(f => f.id);
-        return ids.flatMap(id => [id, ...trovaTutteLeFiglie(id)]);
-    };
+    const sottoTask = (taskId: string) => tasks.filter((t) => t.parent_id === taskId);
 
     return (
-        <div className="p-4 sm:p-6 max-w-7xl mx-auto w-full">
-            <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
-                <h1 className="text-2xl font-bold text-theme">
-                    <FontAwesomeIcon icon={faTasks} className="text-green-500 mr-2" />
-                    Lista Task
-                </h1>
-                <div className="flex items-center gap-4 flex-wrap">
-                    <div className="flex items-center gap-2">
-                        <FontAwesomeIcon icon={faLink} className="w-5 h-5 text-blue-600" />
-                        <span className="text-theme font-medium">Mie</span>
-                        <div onClick={() => setSoloMie(v => !v)} className={`toggle-theme ${soloMie ? "active" : ""}`}>
-                            <div className={`toggle-thumb ${soloMie ? "translate" : ""}`} />
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <FontAwesomeIcon icon={faCheckCircle} className="w-5 h-5 text-green-600" />
-                        <span className="text-theme font-medium">Completate</span>
-                        <div onClick={() => setSoloCompletate(v => !v)} className={`toggle-theme ${soloCompletate ? "active" : ""}`}>
-                            <div className={`toggle-thumb ${soloCompletate ? "translate" : ""}`} />
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <>
+            <ListaGenerica<Task>
+                titolo="Lista Task"
+                icona={faTasks}
+                coloreIcona="text-green-500"
+                tipo="tasks"
+                dati={tasksFiltrate.filter((t) => !t.parent_id)}
+                loading={loading}
+                colonne={[
+                    {
+                        chiave: "nome",
+                        label: "Nome",
+                        render: (task) => (
+                            <div className="flex items-center gap-2">
+                                {taskAssegnate.has(task.id) && (
+                                    <FontAwesomeIcon icon={faLink} className="w-4 h-4 text-blue-600" title="Assegnata a te" />
+                                )}
+                                {task.fine_task && (
+                                    <FontAwesomeIcon icon={faCheckCircle} className="w-4 h-4 text-green-600" title="Completata" />
+                                )}
+                                <span>{task.nome}</span>
+                            </div>
+                        ),
+                    },
+                    {
+                        chiave: "consegna",
+                        label: "Consegna",
+                        className: "w-40 hidden lg:block",
+                        render: (t) => (t.consegna ? new Date(t.consegna).toLocaleDateString() : "—"),
+                    },
+                    {
+                        chiave: "stato",
+                        label: "Stato",
+                        className: "w-32 hidden lg:block",
+                        render: (t) => t.stato?.nome ?? "—",
+                    },
+                    {
+                        chiave: "priorita",
+                        label: "Priorità",
+                        className: "w-32 hidden lg:block",
+                        render: (t) => t.priorita?.nome ?? "—",
+                    },
+                ]}
+                azioni={(task) => (
+                    <>
+                        {task.progetto?.id && task.assegnatari?.length > 0 && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (activeTimer?.taskId === task.id) handleStopTimer(task);
+                                    else handleStartTimer(task.id);
+                                }}
+                                className={`icon-color ${activeTimer?.taskId === task.id
+                                    ? "hover:text-red-600"
+                                    : "hover:text-green-600"
+                                    }`}
+                                title={activeTimer?.taskId === task.id ? "Ferma timer" : "Avvia timer"}
+                            >
+                                <FontAwesomeIcon icon={activeTimer?.taskId === task.id ? faStop : faPlay} />
+                            </button>
+                        )}
 
-            <div className="mb-6">
-                <FiltriTaskAvanzati tasks={tasks} isAdmin={isAdmin} soloMie={soloMie} onChange={setFiltroAvanzato} />
-            </div>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                const slug = slugById[task.id];
+                                navigate(`/tasks/${slug || task.id}`);
+                            }}
+                            className="icon-color hover:text-green-600"
+                            title="Vai al dettaglio"
+                        >
+                            <FontAwesomeIcon icon={faTasks} />
+                        </button>
+                    </>
+                )}
+                renderDettaglio={(task) => (
+                    <div className="space-y-2">
+                        {task.progetto?.nome && <p>📁 Progetto: {task.progetto.nome}</p>}
+                        {task.tempo_stimato && <p>⏱️ Tempo stimato: {formatDurata(task.tempo_stimato)}</p>}
+                        {durataTotaleTask[task.id] !== undefined && (
+                            <p>🕒 Tempo registrato totale: {formatDurata(durataTotaleTask[task.id])}</p>
+                        )}
+                        {task.assegnatari?.length > 0 && (
+                            <p>👥 Assegnata a: {task.assegnatari.map((u) => `${u.nome} ${u.cognome || ""}`).join(", ")}</p>
+                        )}
+                        {task.note && <p>🗒️ {task.note}</p>}
 
-            {loading ? (
-                <p className="text-theme text-center text-lg">Caricamento...</p>
-            ) : (
-                <div className="rounded-xl overflow-hidden shadow-md card-theme max-w-7xl mx-auto">
-                    <div className="hidden lg:flex px-4 py-2 text-xs font-semibold text-theme border-b border-gray-300 dark:border-gray-600">
-                        <div className="w-10 shrink-0" />
-                        <div className="flex-1">Nome</div>
-                        <div className="w-40">Consegna</div>
-                        <div className="w-32">Stato</div>
-                        <div className="w-32">Priorità</div>
-                        <div className="w-20 text-center">Azioni</div>
-                    </div>
-
-                    {tasksFiltrate.filter(t => !t.parent_id).map(task => {
-                        const isAssegnata = taskAssegnate.has(task.id);
-                        const isCompletata = task.fine_task !== null;
-                        const isOpen = taskEspansaId === task.id;
-                        const children = sottoTask(task.id);
-
-                        return (
-                            <div key={task.id} className="border-t border-gray-200 dark:border-gray-700 hover-bg-theme">
+                        {sottoTask(task.id).length > 0 && (
+                            <div className="mt-4">
                                 <div
-                                    className="flex items-center px-4 py-3 text-sm text-theme cursor-pointer"
-                                    onClick={() => {
-                                        setTaskEspansaId(isOpen ? null : task.id);
-                                        if (!isOpen) caricaDurateTaskUtente(task);
-                                    }}
+                                    onClick={() => toggleSottoTaskEspansa(task.id)}
+                                    className="cursor-pointer rounded-md px-0 py-2 text-sm text-theme hover-bg-theme"
                                 >
-                                    <div className="w-8 shrink-0 flex justify-start items-center">
-                                        <div className="flex flex-col items-center gap-1">
-                                            {isAssegnata && (
-                                                <FontAwesomeIcon icon={faLink} className="w-4 h-4 text-blue-600" title="Assegnata a te" />
-                                            )}
-                                            {isCompletata && (
-                                                <FontAwesomeIcon icon={faCheckCircle} className="w-4 h-4 text-green-600" title="Completata" />
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="flex-1 font-medium truncate">{task.nome}</div>
-                                    <div className="hidden lg:block w-40">{task.consegna ? new Date(task.consegna).toLocaleDateString() : "—"}</div>
-                                    <div className="hidden lg:block w-32">{task.stato?.nome ?? "—"}</div>
-                                    <div className="hidden lg:block w-32">{task.priorita?.nome ?? "—"}</div>
-
-                                    <div className="w-20 flex justify-end items-center gap-3">
-                                        {task.progetto?.id && task.assegnatari?.length > 0 && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if (activeTimer?.taskId === task.id) handleStopTimer(task);
-                                                    else handleStartTimer(task.id);
-                                                }}
-                                                className={`icon-color ${activeTimer?.taskId === task.id ? 'hover:text-red-600' : 'hover:text-green-600'}`}
-                                                title={activeTimer?.taskId === task.id ? 'Ferma timer' : 'Avvia timer'}
-                                            >
-                                                <FontAwesomeIcon icon={activeTimer?.taskId === task.id ? faStop : faPlay} />
-                                            </button>
-                                        )}
-
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); setTaskDaModificareId(task.id); }}
-                                            className="icon-color hover:text-blue-600"
-                                            title="Modifica"
-                                        >
-                                            <FontAwesomeIcon icon={faPen} />
-                                        </button>
-
-                                        <button
-                                            onClick={e => {
-                                                e.stopPropagation();
-                                                const slug = slugById[task.id];
-                                                navigate(`/tasks/${slug || task.id}`); // 👈 preferisci slug, fallback id
-                                            }}
-                                            className="icon-color hover:text-green-600"
-                                            title="Vai al dettaglio"
-                                        >
-                                            <FontAwesomeIcon icon={faTasks} />
-                                        </button>
-
-                                        <button
-                                            onClick={e => { e.stopPropagation(); setTaskEspansaId(isOpen ? null : task.id); }}
-                                            className="text-theme text-xl font-bold"
-                                        >
-                                            {isOpen ? "−" : "+"}
-                                        </button>
-                                    </div>
+                                    📎 Sotto-task
                                 </div>
-
-                                {isOpen && (
-                                    <div className="animate-scale-fade px-6 pb-4 text-sm text-theme space-y-2">
-                                        <div className="block lg:hidden space-y-1">
-                                            <p>📅 Consegna: {task.consegna ? new Date(task.consegna).toLocaleDateString() : "—"}</p>
-                                            <p>📊 Stato: {task.stato?.nome ?? "—"}</p>
-                                            <p>⏫ Priorità: {task.priorita?.nome ?? "—"}</p>
-                                        </div>
-                                        {task.progetto?.nome && <p>📁 Progetto: {task.progetto.nome}</p>}
-                                        {task.tempo_stimato && <p>⏱️ Tempo stimato: {formatDurata(task.tempo_stimato)}</p>}
-
-                                        {durataTotaleTask[task.id] !== undefined && (
-                                            <p>🕒 Tempo registrato totale: {formatDurata(durataTotaleTask[task.id])}</p>
-                                        )}
-
-                                        {task.assegnatari?.length > 0 && (
-                                            <p>👥 Assegnata a: {task.assegnatari.map(u => `${u.nome} ${u.cognome || ""}`).join(", ")}</p>
-                                        )}
-                                        {task.note && <p>🗒️ {task.note}</p>}
-                                        {durateTaskUtente[task.id] && (
-                                            <div className="pt-2">
-                                                <p className="font-semibold">🕒 Tempo registrato:</p>
-                                                <ul className="list-disc list-inside text-sm space-y-1">
-                                                    {task.assegnatari.map(utente => {
-                                                        const durata = durateTaskUtente[task.id]?.[utente.id] || 0;
-                                                        return (
-                                                            <li key={utente.id}>
-                                                                {utente.nome} {utente.cognome || ""}: {formatDurata(durata)}
-                                                            </li>
-                                                        );
-                                                    })}
-                                                </ul>
-                                            </div>
-                                        )}
-
-                                        {children.length > 0 && (
-                                            <div className="mt-4">
-                                                <div
-                                                    onClick={() => toggleSottoTaskEspansa(task.id)}
-                                                    className="cursor-pointer rounded-md px-0 py-2 text-sm text-theme hover-bg-theme "
-                                                >
-                                                    📎 Sotto-task
-                                                </div>
-
-                                                {sottoTaskEspansa.has(task.id) && (
-                                                    <div className="mt-2 space-y-2">
-                                                        {children.map(sotto => (
-                                                            <RenderSottoTask key={sotto.id} task={sotto} allTasks={tasks} livello={1} />
-                                                        ))}
-                                                    </div>
-                                                )}
-                                                {commenti.some(c => c.task_id === task.id && !c.parent_id) && (
-                                                    <div className="mt-4">
-                                                        <div
-                                                            onClick={() => toggleCommentiEspansi(task.id)}
-                                                            className="cursor-pointer rounded-md px-0 py-2 text-sm text-theme hover-bg-theme font-semibold"
-                                                        >
-                                                            💬 Commenti
-                                                        </div>
-
-                                                        {commentiEspansi.has(task.id) && (
-                                                            <div className="space-y-3 mt-2">
-                                                                {commenti
-                                                                    .filter(c => c.task_id === task.id && !c.parent_id)
-                                                                    .map(c => (
-                                                                        <RenderCommento key={c.id} commento={c} allCommenti={commenti} livello={1} />
-                                                                    ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
+                                {sottoTaskEspansa.has(task.id) && (
+                                    <div className="mt-2 space-y-2">
+                                        {sottoTask(task.id).map((sotto) => (
+                                            <RenderSottoTask key={sotto.id} task={sotto} allTasks={tasks} livello={1} />
+                                        ))}
                                     </div>
                                 )}
                             </div>
-                        );
-                    })}
-                </div>
-            )}
+                        )}
 
-            {taskDaModificareId && (
-                <MiniTaskEditorModal taskId={taskDaModificareId} onClose={() => setTaskDaModificareId(null)} />
-            )}
-        </div>
+                        {commenti.some((c) => c.task_id === task.id && !c.parent_id) && (
+                            <div className="mt-4">
+                                <div
+                                    onClick={() => toggleCommentiEspansi(task.id)}
+                                    className="cursor-pointer rounded-md px-0 py-2 text-sm text-theme hover-bg-theme font-semibold"
+                                >
+                                    💬 Commenti
+                                </div>
+                                {commentiEspansi.has(task.id) && (
+                                    <div className="space-y-3 mt-2">
+                                        {commenti
+                                            .filter((c) => c.task_id === task.id && !c.parent_id)
+                                            .map((c) => (
+                                                <RenderCommento key={c.id} commento={c} allCommenti={commenti} livello={1} />
+                                            ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+                azioniExtra={
+                    <>
+                        {/* Toggle Mie */}
+                        <div className="flex items-center gap-2">
+                            <FontAwesomeIcon icon={faLink} className="w-5 h-5 text-blue-600" />
+                            <span className="text-theme font-medium">Mie</span>
+                            <div
+                                onClick={() => setSoloMie(v => !v)}
+                                className={`toggle-theme ${soloMie ? "active" : ""}`}
+                            >
+                                <div className={`toggle-thumb ${soloMie ? "translate" : ""}`} />
+                            </div>
+                        </div>
+
+                        {/* Toggle Completate */}
+                        <div className="flex items-center gap-2">
+                            <FontAwesomeIcon icon={faCheckCircle} className="w-5 h-5 text-green-600" />
+                            <span className="text-theme font-medium">Completate</span>
+                            <div
+                                onClick={() => setSoloCompletate(v => !v)}
+                                className={`toggle-theme ${soloCompletate ? "active" : ""}`}
+                            >
+                                <div className={`toggle-thumb ${soloCompletate ? "translate" : ""}`} />
+                            </div>
+                        </div>
+                    </>
+                }
+                filtri={
+                    <FiltriGenericiAvanzati<Task>
+                        dati={tasks}
+                        campi={["progetto", "utente", "stato", "priorita", "date", "ordine"]}
+                        estrattori={{
+                            progetto: (t: Task) =>
+                                t.progetto ? { id: t.progetto.id, nome: t.progetto.nome } : null,
+                            utente: (t: Task) => t.assegnatari,
+                            stato: (t: Task) =>
+                                t.stato ? { id: t.stato.id, nome: t.stato.nome } : null,
+                            priorita: (t: Task) =>
+                                t.priorita ? { id: t.priorita.id, nome: t.priorita.nome } : null,
+                            consegna: (t: Task) => (t.consegna ? t.consegna : null), // 👈 usa "consegna"
+                        }}
+                        onChange={setFiltroAvanzato}
+                    />
+                }
+
+                renderModaleModifica={(id, onClose) => (
+                    <MiniTaskEditorModal taskId={id} onClose={onClose} />
+                )}
+            />
+        </>
     );
 }

@@ -1,5 +1,6 @@
 // src/Modifica/MiniTaskEditorModal.tsx
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";   // 👈 serve per redirect
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCalendarDays, faXmark } from "@fortawesome/free-solid-svg-icons";
@@ -49,6 +50,8 @@ const aggiornaTaskConsegnaTempoRicorsivi = async (
 };
 
 export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
+    const navigate = useNavigate(); // 👈
+
     const [nome, setNome] = useState("");
     const [note, setNote] = useState("");
     const [statoId, setStatoId] = useState<number | null>(null);
@@ -56,6 +59,7 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
     const [consegna, setConsegna] = useState("");
     const [tempoStimato, setTempoStimato] = useState("");
     const [slug, setSlug] = useState("");
+    const [oldSlug, setOldSlug] = useState("");   // 👈 salvo slug originale
 
     const [utenti, setUtenti] = useState<Utente[]>([]);
     const [assegnati, setAssegnati] = useState<string[]>([]);
@@ -90,6 +94,7 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                 setConsegna(task.consegna || "");
                 setTempoStimato(task.tempo_stimato || "");
                 setSlug(task.slug || "");
+                setOldSlug(task.slug || "");  // 👈 salvo slug iniziale
                 setParentId(task.parent_id ?? null);
             }
             if (assegnatiRes.data) {
@@ -174,6 +179,11 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
         }
 
         onClose();
+
+        // 👇 redirect se slug cambiato
+        if (slug && slug !== oldSlug) {
+            navigate(`/tasks/${slug}`, { replace: true });
+        }
     };
 
     return (
@@ -195,6 +205,7 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                     <div>
                         <label className="text-sm font-semibold text-theme mb-1 block">Slug</label>
                         <input value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full input-style" placeholder="es: nome-task" />
+                        <p className="text-xs opacity-70 mt-1">URL: /tasks/{slug || "<vuoto>"}</p>
                     </div>
                 </div>
 
@@ -245,7 +256,7 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                     </div>
                 </div>
 
-                {/* parent (mostrato solo se la task è figlia) */}
+                {/* parent (solo se ha un padre) */}
                 {parentId !== null && (
                     <div className="mb-4">
                         <label className="text-sm font-semibold text-theme mb-1 block">Task padre</label>

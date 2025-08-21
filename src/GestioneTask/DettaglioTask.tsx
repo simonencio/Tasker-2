@@ -437,7 +437,14 @@ export default function DettaglioTask() {
                     >
                         <FontAwesomeIcon icon={faCommentDots} /> Commenti
                     </button>
+                    <button
+                        className="px-3 py-2 rounded-xl bg-red-600 text-white hover:bg-red-500 text-[15px] flex items-center gap-2 cursor-not-allowed"
+                        title="Elimina (non implementato)"
+                    >
+                        <FontAwesomeIcon icon={faTrash} /> Elimina
+                    </button>
                 </div>
+
             </div>
 
             {/* Sotto-task */}

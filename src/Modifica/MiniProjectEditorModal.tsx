@@ -1,5 +1,6 @@
 // src/Modifica/MiniProjectEditorModal.tsx
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";   // 👈 serve per redirect
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCalendarDays, faXmark } from "@fortawesome/free-solid-svg-icons";
@@ -17,9 +18,12 @@ type Priorita = { id: number; nome: string };
 type Utente = { id: string; nome: string; cognome: string };
 
 export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
+    const navigate = useNavigate(); // 👈
+
     const [nome, setNome] = useState("");
     const [note, setNote] = useState("");
     const [slug, setSlug] = useState("");
+    const [oldSlug, setOldSlug] = useState(""); // 👈 per confronto
     const [clienteId, setClienteId] = useState<string | null>(null);
     const [statoId, setStatoId] = useState<number | null>(null);
     const [prioritaId, setPrioritaId] = useState<number | null>(null);
@@ -49,6 +53,7 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                 setNome(progetto.nome || "");
                 setNote(progetto.note || "");
                 setSlug(progetto.slug || "");
+                setOldSlug(progetto.slug || ""); // 👈 salvo slug iniziale
                 setClienteId(progetto.cliente_id);
                 setStatoId(progetto.stato_id);
                 setPrioritaId(progetto.priorita_id);
@@ -68,8 +73,8 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
     }, [progettoId]);
 
     const toggleMembro = (id: string) => {
-        setMembriSelezionati((prev) =>
-            prev.includes(id) ? prev.filter((uid) => uid !== id) : [...prev, id]
+        setMembriSelezionati(prev =>
+            prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]
         );
     };
 
@@ -88,21 +93,22 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
             })
             .eq("id", progettoId);
 
+        // 🔹 gestione membri come prima
         const { data: esistenti } = await supabase
             .from("utenti_progetti")
             .select("utente_id")
             .eq("progetto_id", progettoId);
 
         const esistentiIds = esistenti?.map((e: any) => e.utente_id) || [];
-        const daAggiungere = membriSelezionati.filter((id) => !esistentiIds.includes(id));
-        const daRimuovere = esistentiIds.filter((id) => !membriSelezionati.includes(id));
-        const rimasti = membriSelezionati.filter((id) => esistentiIds.includes(id));
+        const daAggiungere = membriSelezionati.filter(id => !esistentiIds.includes(id));
+        const daRimuovere = esistentiIds.filter(id => !membriSelezionati.includes(id));
+        const rimasti = membriSelezionati.filter(id => esistentiIds.includes(id));
         const user = await supabase.auth.getUser();
         const creatoreId = user.data?.user?.id;
 
         if (daAggiungere.length > 0) {
             await supabase.from("utenti_progetti").insert(
-                daAggiungere.map((id) => ({ progetto_id: progettoId, utente_id: id }))
+                daAggiungere.map(id => ({ progetto_id: progettoId, utente_id: id }))
             );
             await inviaNotifica(
                 "PROGETTO_ASSEGNATO",
@@ -141,6 +147,11 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
         }
 
         onClose();
+
+        // 🔹 se slug cambiato → redirect
+        if (slug && slug !== oldSlug) {
+            navigate(`/progetti/${slug}`, { replace: true });
+        }
     };
 
     return (
@@ -157,16 +168,14 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                     <div>
                         <label className="text-sm font-semibold text-theme mb-1 block">Nome</label>
-                        <input value={nome} onChange={(e) => setNome(e.target.value)} className="w-full input-style" />
+                        <input value={nome} onChange={e => setNome(e.target.value)} className="w-full input-style" />
                     </div>
                     <div>
                         <label className="text-sm font-semibold text-theme mb-1 block">Slug</label>
-                        <input value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full input-style" />
+                        <input value={slug} onChange={e => setSlug(e.target.value)} className="w-full input-style" />
                         <p className="text-xs opacity-70 mt-1">URL: /progetti/{slug || "<vuoto>"}</p>
                     </div>
                 </div>
-
-
 
                 {/* Cliente & Stato */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
@@ -174,11 +183,11 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                         <label className="text-sm font-semibold text-theme mb-1 block">Cliente</label>
                         <select
                             value={clienteId ?? ""}
-                            onChange={(e) => setClienteId(e.target.value || null)}
+                            onChange={e => setClienteId(e.target.value || null)}
                             className="w-full input-style"
                         >
                             <option value="">Seleziona cliente</option>
-                            {clienti.map((c) => (
+                            {clienti.map(c => (
                                 <option key={c.id} value={c.id}>{c.nome}</option>
                             ))}
                         </select>
@@ -187,11 +196,11 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                         <label className="text-sm font-semibold text-theme mb-1 block">Stato</label>
                         <select
                             value={statoId ?? ""}
-                            onChange={(e) => setStatoId(e.target.value === "" ? null : Number(e.target.value))}
+                            onChange={e => setStatoId(e.target.value === "" ? null : Number(e.target.value))}
                             className="w-full input-style"
                         >
                             <option value="">Seleziona stato</option>
-                            {stati.map((s) => (
+                            {stati.map(s => (
                                 <option key={s.id} value={s.id}>{s.nome}</option>
                             ))}
                         </select>
@@ -204,17 +213,15 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                         <label className="text-sm font-semibold text-theme mb-1 block">Priorità</label>
                         <select
                             value={prioritaId ?? ""}
-                            onChange={(e) => setPrioritaId(e.target.value === "" ? null : Number(e.target.value))}
+                            onChange={e => setPrioritaId(e.target.value === "" ? null : Number(e.target.value))}
                             className="w-full input-style"
                         >
                             <option value="">Seleziona priorità</option>
-                            {priorita.map((p) => (
+                            {priorita.map(p => (
                                 <option key={p.id} value={p.id}>{p.nome}</option>
                             ))}
                         </select>
                     </div>
-
-                    {/* ✅ Consegna con toggle */}
                     <div className="relative">
                         <label className="text-sm font-semibold text-theme mb-1 block">Consegna</label>
                         <input
@@ -236,7 +243,7 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                                 type="date"
                                 autoFocus
                                 value={consegna}
-                                onChange={(e) => {
+                                onChange={e => {
                                     setConsegna(e.target.value);
                                     setShowDatePicker(false);
                                 }}
@@ -252,20 +259,23 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                         <label className="text-sm font-semibold text-theme mb-1 block">Tempo stimato</label>
                         <input
                             value={tempoStimato}
-                            onChange={(e) => setTempoStimato(e.target.value)}
+                            onChange={e => setTempoStimato(e.target.value)}
                             placeholder="es: 10:00"
                             className="w-full input-style"
                         />
                     </div>
-
                     <div className="relative">
                         <label className="text-sm font-semibold text-theme mb-1 block">Membri</label>
-                        <div onClick={() => setPopupOpen(!popupOpen)} className="cursor-pointer input-style text-sm">
-                            {membriSelezionati.length > 0 ? `${membriSelezionati.length} membri selezionati` : "Seleziona membri"}
+                        <div
+                            onClick={() => setPopupOpen(!popupOpen)}
+                            className="cursor-pointer input-style text-sm"
+                        >
+                            {membriSelezionati.length > 0
+                                ? `${membriSelezionati.length} membri selezionati`
+                                : "Seleziona membri"}
                         </div>
-
                         {popupOpen && (
-                            <div className="absolute bottom-full mb-2 left-0 w-full max-h-60 overflow-y-auto popup-panel z-40">
+                            <div className="absolute top-full mt-2 left-0 w-full max-h-60 overflow-y-auto popup-panel z-40">
                                 <div className="flex justify-between items-center px-3 py-2 border-b border-gray-300 dark:border-gray-600">
                                     <strong className="text-theme">Membri</strong>
                                     <button onClick={() => setPopupOpen(false)} className="icon-color">
@@ -273,7 +283,7 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                                     </button>
                                 </div>
                                 <div className="p-2 space-y-1">
-                                    {utenti.map((u) => {
+                                    {utenti.map(u => {
                                         const selected = membriSelezionati.includes(u.id);
                                         return (
                                             <div
@@ -292,11 +302,13 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                             </div>
                         )}
                     </div>
+
                 </div>
+
                 {/* Note */}
                 <div className="mb-4">
                     <label className="text-sm font-semibold text-theme mb-1 block">Note</label>
-                    <textarea value={note} onChange={(e) => setNote(e.target.value)} className="w-full input-style h-[38px]" />
+                    <textarea value={note} onChange={e => setNote(e.target.value)} className="w-full input-style h-[38px]" />
                 </div>
 
                 <button
