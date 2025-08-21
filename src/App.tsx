@@ -22,6 +22,9 @@ import CalendarioProgetto from "./GestioneProgetto/CalendarioProgetto";
 import BachecaProgetto from "./GestioneProgetto/BachecaProgetto";
 import ListaClienti from "./Liste/ListaClienti";
 import ListaUtenti from "./Liste/ListaUtenti";
+import ListaStati from "./Liste/ListaStati";
+import ListaPriorita from "./Liste/ListaPriorita";
+import ListaRuoli from "./Liste/ListaRuoli";
 import ResetPassword from "./Pagine/ResetPassword";
 import Header from "./Header/Header";
 import Sidebar from "./Sidebar/Sidebar";
@@ -30,9 +33,20 @@ import MiniProjectCreatorModal from "./Creazione/MiniProjectCreatorModal";
 import MiniTaskCreatorModal from "./Creazione/MiniTaskCreatorModal";
 import MiniClientCreatorModal from "./Creazione/MiniClientCreatorModal";
 import MiniUserCreatorModal from "./Creazione/MiniUserCreatorModal";
+import MiniStatoCreatorModal from "./Creazione/MiniStatoCreatorModal";
+import MiniPrioritaCreatorModal from "./Creazione/MiniPrioritaCreatorModal";
+import MiniRuoloCreatorModal from "./Creazione/MiniRuoloCreatorModal";
 import DettaglioTask from "./GestioneTask/DettaglioTask";
+import Cestino from "./Pagine/Cestino";
 
-type ModalType = "project" | "task" | "client" | "user";
+type ModalType =
+    | "project"
+    | "task"
+    | "client"
+    | "user"
+    | "stato"
+    | "priorita"
+    | "ruolo";
 
 /** Redirect legacy /tasks/:id -> /tasks/:slug */
 function RedirectTaskById() {
@@ -67,8 +81,8 @@ function RedirectTaskById() {
     }, [id]);
 
     if (slug) return <Navigate to={`/tasks/${slug}`} replace />;
-    if (notFound) return <Navigate to="/task" replace />; // fallback lista
-    return null; // render nulla mentre risolve
+    if (notFound) return <Navigate to="/task" replace />;
+    return null;
 }
 
 function AppContent() {
@@ -78,6 +92,7 @@ function AppContent() {
     const [activeModals, setActiveModals] = useState<ModalType[]>([]);
     const location = useLocation();
     const [userId, setUserId] = useState<string | null>(null);
+
     const publicRoutes = ["/login", "/register", "/confirm-email", "/reset-password/"];
     const isPublic = (() => {
         if (location.pathname.startsWith("/reset-password/")) return true;
@@ -184,21 +199,22 @@ function AppContent() {
                                 onApriTaskModal={() => openModal("task")}
                                 onApriClientModal={() => openModal("client")}
                                 onApriUserModal={() => openModal("user")}
+                                onApriStatoModal={() => openModal("stato")}
+                                onApriPrioritaModal={() => openModal("priorita")}
+                                onApriRuoloModal={() => openModal("ruolo")}
                             />
                         </div>
                     )}
-
 
                     {notificheOpen && (
                         <div className="fixed top-16 right-0 z-40 w-full sm:w-full md:w-64 h-[calc(100vh-4rem)] bg-theme shadow-xl">
                             <NotificheSidebar
                                 open={notificheOpen}
                                 onClose={() => setNotificheOpen(false)}
-                                userId={userId}   // ✅ aggiungi questo
+                                userId={userId}
                             />
                         </div>
                     )}
-
 
                     <div className="w-full relative z-10">
                         <div className="px-6 py-6 h-[calc(100vh-4rem)] overflow-y-auto hide-scrollbar">
@@ -209,23 +225,27 @@ function AppContent() {
                                 <Route path="/task" element={<ListaTask />} />
                                 <Route path="/clienti" element={<ListaClienti />} />
                                 <Route path="/utenti" element={<ListaUtenti />} />
+                                <Route path="/stati" element={<ListaStati />} />
+                                <Route path="/priorita" element={<ListaPriorita />} />
+                                <Route path="/ruoli" element={<ListaRuoli />} />
                                 <Route path="/profilo" element={<Profilo />} />
-                                {/* Progetti by slug */}
+
                                 <Route path="/progetti/:slug" element={<DettaglioProgetto />} />
                                 <Route path="/progetti/:slug/calendario" element={<CalendarioProgetto />} />
                                 <Route path="/progetti/:slug/bacheca" element={<BachecaProgetto />} />
-                                {/* Tasks by slug (NUOVO) */}
+
                                 <Route path="/tasks/:slug" element={<DettaglioTask />} />
-                                {/* Legacy: /tasks/:id -> redirect a slug */}
                                 <Route path="/tasks/id/:id" element={<RedirectTaskById />} />
-                                {/* opzionale: mantieni anche questo vecchio pattern se già in uso */}
                                 <Route path="/tasks/:id([0-9a-fA-F-]{36})" element={<RedirectTaskById />} />
+
+                                <Route path="/cestino/:tipo" element={<CestinoWrapper />} />
                             </Routes>
                         </div>
                     </div>
                 </main>
             )}
 
+            {/* tutte le modali con offsetIndex */}
             {activeModals.includes("project") && (
                 <MiniProjectCreatorModal onClose={() => closeModal("project")} offsetIndex={getOffset("project")} />
             )}
@@ -238,8 +258,23 @@ function AppContent() {
             {activeModals.includes("user") && (
                 <MiniUserCreatorModal onClose={() => closeModal("user")} offsetIndex={getOffset("user")} />
             )}
+            {activeModals.includes("stato") && (
+                <MiniStatoCreatorModal onClose={() => closeModal("stato")} offsetIndex={getOffset("stato")} />
+            )}
+            {activeModals.includes("priorita") && (
+                <MiniPrioritaCreatorModal onClose={() => closeModal("priorita")} offsetIndex={getOffset("priorita")} />
+            )}
+            {activeModals.includes("ruolo") && (
+                <MiniRuoloCreatorModal onClose={() => closeModal("ruolo")} offsetIndex={getOffset("ruolo")} />
+            )}
         </>
     );
+}
+
+function CestinoWrapper() {
+    const { tipo } = useParams<{ tipo: "tasks" | "progetti" | "utenti" | "clienti" | "stati" | "priorita" | "ruoli" }>();
+    if (!tipo) return <p>Tipo non valido</p>;
+    return <Cestino tipo={tipo} />;
 }
 
 export default function App() {

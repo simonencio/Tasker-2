@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
     faHome,
@@ -8,7 +7,10 @@ import {
     faTasks,
     faPlus,
     faUserTie,
-    faUser, // ✅ icona per "Utenti"
+    faUser,
+    faEllipsisH,
+    faChevronDown,
+    faChevronUp,
 } from "@fortawesome/free-solid-svg-icons";
 
 type SidebarProps = {
@@ -17,7 +19,10 @@ type SidebarProps = {
     onApriProjectModal: () => void;
     onApriTaskModal: () => void;
     onApriClientModal: () => void;
-    onApriUserModal: () => void; // nuovo
+    onApriUserModal: () => void;
+    onApriStatoModal: () => void;
+    onApriPrioritaModal: () => void;
+    onApriRuoloModal: () => void;
 };
 
 export default function Sidebar({
@@ -27,8 +32,12 @@ export default function Sidebar({
     onApriTaskModal,
     onApriClientModal,
     onApriUserModal,
+    onApriStatoModal,
+    onApriPrioritaModal,
+    onApriRuoloModal,
 }: SidebarProps) {
     const [theme, setTheme] = useState("light");
+    const [openAltro, setOpenAltro] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -36,26 +45,22 @@ export default function Sidebar({
             const isDark = document.documentElement.classList.contains("dark");
             setTheme(isDark ? "dark" : "light");
         };
-
         getCurrentTheme();
         const observer = new MutationObserver(getCurrentTheme);
         observer.observe(document.documentElement, {
             attributes: true,
             attributeFilter: ["class"],
         });
-
         return () => observer.disconnect();
     }, []);
-
-
 
     return (
         <aside
             className={`absolute top-0 left-0 h-full w-full md:w-70 sidebar-theme text-theme transition-transform duration-300 z-40 ${isOpen ? "translate-x-0 sidebar-shadow-open" : "-translate-x-full"
                 }`}
         >
-
             <nav className="flex flex-col p-4 gap-4 h-full items-center">
+                {/* LOGO */}
                 <button
                     onClick={() => {
                         navigate("/home");
@@ -72,7 +77,7 @@ export default function Sidebar({
                 </button>
 
                 <div className="w-full flex flex-col gap-4 mt-4">
-                    {/* ✅ HOME */}
+                    {/* HOME */}
                     <NavLink
                         to="/home"
                         onClick={onClose}
@@ -85,7 +90,7 @@ export default function Sidebar({
                         Home
                     </NavLink>
 
-                    {/* ✅ PROGETTI */}
+                    {/* PROGETTI */}
                     <NavLink
                         to="/progetti"
                         onClick={onClose}
@@ -112,7 +117,7 @@ export default function Sidebar({
                         </button>
                     </NavLink>
 
-                    {/* ✅ TASK */}
+                    {/* TASK */}
                     <NavLink
                         to="/task"
                         onClick={onClose}
@@ -139,7 +144,7 @@ export default function Sidebar({
                         </button>
                     </NavLink>
 
-                    {/* ✅ CLIENTI - Sempre visibile */}
+                    {/* CLIENTI */}
                     <NavLink
                         to="/clienti"
                         onClick={onClose}
@@ -166,7 +171,7 @@ export default function Sidebar({
                         </button>
                     </NavLink>
 
-                    {/* ✅ UTENTI - Sempre visibile */}
+                    {/* UTENTI */}
                     <NavLink
                         to="/utenti"
                         onClick={onClose}
@@ -193,6 +198,96 @@ export default function Sidebar({
                         </button>
                     </NavLink>
 
+                    {/* ALTRO */}
+                    <div className="flex flex-col">
+                        <button
+                            type="button"
+                            onClick={() => setOpenAltro(!openAltro)}
+                            className="hover-bg-theme flex items-center justify-between gap-2 px-4 py-2 rounded"
+                        >
+                            <div className="flex items-center gap-2">
+                                <FontAwesomeIcon icon={faEllipsisH} className="icon-color" />
+                                Altro
+                            </div>
+                            <FontAwesomeIcon icon={openAltro ? faChevronUp : faChevronDown} />
+                        </button>
+
+                        {openAltro && (
+                            <div className="ml-6 mt-2 flex flex-col gap-2">
+                                {/* Stato */}
+                                <NavLink
+                                    to="/stati"
+                                    onClick={onClose}
+                                    className={({ isActive }) =>
+                                        `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-1 rounded"
+                                        }`
+                                    }
+                                >
+                                    <span>Stato</span>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            onApriStatoModal();
+                                        }}
+                                        className="icon-color hover:text-purple-400 transition"
+                                        title="Nuovo stato"
+                                    >
+                                        <FontAwesomeIcon icon={faPlus} size="sm" />
+                                    </button>
+                                </NavLink>
+
+                                {/* Priorità */}
+                                <NavLink
+                                    to="/priorita"
+                                    onClick={onClose}
+                                    className={({ isActive }) =>
+                                        `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-1 rounded"
+                                        }`
+                                    }
+                                >
+                                    <span>Priorità</span>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            onApriPrioritaModal();
+                                        }}
+                                        className="icon-color hover:text-orange-400 transition"
+                                        title="Nuova priorità"
+                                    >
+                                        <FontAwesomeIcon icon={faPlus} size="sm" />
+                                    </button>
+                                </NavLink>
+
+                                {/* Ruoli */}
+                                <NavLink
+                                    to="/ruoli"
+                                    onClick={onClose}
+                                    className={({ isActive }) =>
+                                        `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-1 rounded"
+                                        }`
+                                    }
+                                >
+                                    <span>Ruoli</span>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            onApriRuoloModal();
+                                        }}
+                                        className="icon-color hover:text-teal-400 transition"
+                                        title="Nuovo ruolo"
+                                    >
+                                        <FontAwesomeIcon icon={faPlus} size="sm" />
+                                    </button>
+                                </NavLink>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </nav>
         </aside>
