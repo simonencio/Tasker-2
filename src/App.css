@@ -985,3 +985,27 @@ html.dark .btn-invia:hover {
       sans-serif;
   }
 }
+.react-select__control {
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-border, #ccc);
+  min-height: 38px;
+}
+.react-select__menu {
+  z-index: 50; /* evita di finire sotto al modal */
+}
+
+
+
+
+
+
+/* Avatar placeholder senza immagine */
+.avatar-placeholder {
+  background-color: #3b82f6; /* blu-500 */
+  color: #fff;
+}
+
+html.dark .avatar-placeholder {
+  background-color: #2563eb; /* blu-600 in dark mode */
+  color: #f9fafb;
+}

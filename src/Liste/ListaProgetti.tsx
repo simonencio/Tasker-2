@@ -1,17 +1,13 @@
-
+// src/Liste/ListaProgetti.tsx
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLink, faPen, faProjectDiagram } from "@fortawesome/free-solid-svg-icons";
+import { faLink, faPen, faProjectDiagram, faCheckCircle } from "@fortawesome/free-solid-svg-icons";
 import MiniProjectEditorModal from "../Modifica/MiniProjectEditorModal";
 import FiltriProgettoAvanzati, { ordinaProgettiClientSide, type FiltroAvanzatoProgetto } from "../supporto/FiltriProgettoAvanzati";
-import { faCheckCircle } from "@fortawesome/free-solid-svg-icons";
 import type { Progetto, Utente } from "../supporto/tipi";
-
-
-
 
 type TaskBreve = {
     id: string;
@@ -20,8 +16,11 @@ type TaskBreve = {
     assegnatari: Utente[];
 };
 
+// Estensione locale per assicurare la presenza di slug
+type ProgettoConSlug = Progetto & { slug: string };
+
 export default function ListaProgetti() {
-    const [progetti, setProgetti] = useState<Progetto[]>([]);
+    const [progetti, setProgetti] = useState<ProgettoConSlug[]>([]);
     const [, setProgettiConTaskAssegnate] = useState<Set<string>>(new Set());
     const [taskPerProgetto, setTaskPerProgetto] = useState<Record<string, TaskBreve[]>>({});
     const [loading, setLoading] = useState(true);
@@ -45,7 +44,6 @@ export default function ListaProgetti() {
     const [progettoDaModificareId, setProgettoDaModificareId] = useState<string | null>(null);
 
     const navigate = useNavigate();
-
 
     useEffect(() => {
         const fetchUtente = async () => {
@@ -77,35 +75,34 @@ export default function ListaProgetti() {
             const query = supabase
                 .from("progetti")
                 .select(`
-        id, nome, consegna, note, tempo_stimato,
-        stato:stato_id ( id, nome, colore ),
-        priorita:priorita_id ( id, nome ),
-        cliente:cliente_id ( id, nome )
-    `)
-
-
+          id, slug, nome, consegna, note, tempo_stimato,
+          stato:stato_id ( id, nome, colore ),
+          priorita:priorita_id ( id, nome ),
+          cliente:cliente_id ( id, nome )
+        `)
                 .is("deleted_at", null)
                 .order("created_at", { ascending: false });
 
             if (soloMie && idsProgetti.length > 0) query.in("id", idsProgetti);
 
-            const { data: progettiRaw } = await query;
-            if (!progettiRaw) return;
+            const { data: progettiRaw, error: errProgetti } = await query;
+            if (errProgetti) { console.error(errProgetti); setLoading(false); return; }
+            if (!progettiRaw) { setLoading(false); return; }
 
-            const { data: utentiProgetti } = await supabase
+            const { data: utentiProgetti, error: errMembri } = await supabase
                 .from("utenti_progetti")
                 .select("progetto_id, utenti:utente_id ( id, nome, cognome )");
+            if (errMembri) console.error(errMembri);
 
             const membriPerProgetto: Record<string, Utente[]> = {};
-            utentiProgetti?.forEach(({ progetto_id, utenti }) => {
+            (utentiProgetti || []).forEach(({ progetto_id, utenti }) => {
                 if (!membriPerProgetto[progetto_id]) membriPerProgetto[progetto_id] = [];
                 membriPerProgetto[progetto_id].push(utenti as unknown as Utente);
-
             });
 
-
-            const progettiConMembri: Progetto[] = progettiRaw.map((p: any) => ({
+            const progettiConMembri: ProgettoConSlug[] = (progettiRaw as any[]).map((p: any) => ({
                 id: p.id,
+                slug: p.slug,
                 nome: p.nome,
                 consegna: p.consegna,
                 note: p.note,
@@ -113,10 +110,8 @@ export default function ListaProgetti() {
                 priorita: Array.isArray(p.priorita) ? p.priorita[0] : p.priorita,
                 cliente: Array.isArray(p.cliente) ? p.cliente[0] : p.cliente,
                 membri: membriPerProgetto[p.id] || [],
-                tempo_stimato: p.tempo_stimato, // ✅ AGGIUNGI QUESTA RIGA
+                tempo_stimato: p.tempo_stimato,
             }));
-
-
 
             setProgetti(progettiConMembri);
             await caricaTaskPerProgetto(progettiConMembri.map(p => p.id));
@@ -124,23 +119,24 @@ export default function ListaProgetti() {
         };
 
         const caricaTaskPerProgetto = async (ids: string[]) => {
-            const { data: mappa } = await supabase.from("progetti_task").select("progetti_id, task_id").in("progetti_id", ids);
+            const { data: mappa, error: errMap } = await supabase.from("progetti_task").select("progetti_id, task_id").in("progetti_id", ids);
+            if (errMap) { console.error(errMap); return; }
             if (!mappa) return;
 
             const taskIds = mappa.map(r => r.task_id);
-            const { data: taskDettagli } = await supabase
+            const { data: taskDettagli, error: errTask } = await supabase
                 .from("tasks")
-
                 .select("id, nome, consegna, fine_task, utenti_task ( utenti ( id, nome, cognome ) )")
                 .in("id", taskIds)
                 .is("deleted_at", null);
+            if (errTask) console.error(errTask);
 
             const taskMap: Record<string, TaskBreve[]> = {};
             const completati: Set<string> = new Set();
 
             for (const id of ids) {
-                const taskIdsPerProgetto = mappa.filter(m => m.progetti_id === id).map(m => m.task_id);
-                const tasksPerProgetto = taskDettagli?.filter(t => taskIdsPerProgetto.includes(t.id)) || [];
+                const taskIdsPerProgetto = (mappa || []).filter(m => m.progetti_id === id).map(m => m.task_id);
+                const tasksPerProgetto = (taskDettagli || []).filter(t => taskIdsPerProgetto.includes(t.id));
 
                 const tutteCompletate = tasksPerProgetto.length > 0 && tasksPerProgetto.every(t => t.fine_task !== null);
                 if (tutteCompletate) completati.add(id);
@@ -151,18 +147,18 @@ export default function ListaProgetti() {
                     if (!taskMap[id]) taskMap[id] = [];
                     taskMap[id].push(voce);
                 }
-
             }
 
             setTaskPerProgetto(taskMap);
-            // carica durate per progetto
-            const { data: timeEntries } = await supabase
+
+            // Durate per progetto/utente
+            const { data: timeEntries, error: errTime } = await supabase
                 .from("time_entries")
                 .select("progetto_id, utente_id, durata, utenti:utente_id (id, nome, cognome)")
                 .in("progetto_id", ids);
+            if (errTime) console.error(errTime);
 
             const mappaDurate: Record<string, { utente: Utente; durata: number }[]> = {};
-
             for (const entry of timeEntries || []) {
                 const progettoId = entry.progetto_id;
                 const utente = Array.isArray(entry.utenti) ? entry.utenti[0] : entry.utenti;
@@ -170,18 +166,13 @@ export default function ListaProgetti() {
 
                 if (!mappaDurate[progettoId]) mappaDurate[progettoId] = [];
                 const esiste = mappaDurate[progettoId].find(d => d.utente.id === utente.id);
-                if (esiste) {
-                    esiste.durata += entry.durata;
-                } else {
-                    mappaDurate[progettoId].push({ utente, durata: entry.durata });
-                }
+                if (esiste) esiste.durata += entry.durata;
+                else mappaDurate[progettoId].push({ utente, durata: entry.durata });
             }
-
             setDurateProgettoUtente(mappaDurate);
 
             setProgettiCompletati(completati);
         };
-
 
         const caricaProgettiConTaskAssegnate = async () => {
             if (!utenteId) return;
@@ -221,9 +212,20 @@ export default function ListaProgetti() {
         return ordinaProgettiClientSide(filtrati, filtroAvanzato.ordine);
     }, [progetti, filtroAvanzato, soloCompletati, progettiCompletati]);
 
+    const formatConsegna = (val: string | null) =>
+        val ? new Date(val).toLocaleDateString() : "—";
+
+    const formatTempoStimato = (val?: string | null) => {
+        if (!val) return "";
+        const match = val.match(/(\d+):(\d+)/);
+        if (!match) return val;
+        const ore = parseInt(match[1], 10);
+        const minuti = parseInt(match[2], 10);
+        return `${ore > 0 ? `${ore}h ` : ""}${minuti}m`;
+    };
+
     return (
         <div className="p-4 sm:p-6 max-w-7xl mx-auto w-full">
-
             <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
                 <h1 className="text-2xl font-bold text-theme">
                     <FontAwesomeIcon icon={faProjectDiagram} className="text-blue-500 mr-2" />
@@ -247,7 +249,6 @@ export default function ListaProgetti() {
                         </div>
                     </div>
                 </div>
-
             </div>
 
             <FiltriProgettoAvanzati progetti={progetti} onChange={setFiltroAvanzato} />
@@ -256,11 +257,9 @@ export default function ListaProgetti() {
                 <p className="text-center text-theme text-lg">Caricamento...</p>
             ) : (
                 <div className="rounded-xl overflow-hidden shadow-md card-theme max-w-7xl mx-auto">
-
                     <div className="hidden lg:flex px-4 py-2 text-xs font-semibold text-theme border-b border-gray-300 dark:border-gray-600">
-                        <div className="w-10 shrink-0" /> {/* spazio per le icone */}
+                        <div className="w-10 shrink-0" />
                         <div className="flex-1">Nome</div>
-
                         <div className="w-40">Consegna</div>
                         <div className="w-32">Stato</div>
                         <div className="w-32">Priorità</div>
@@ -272,10 +271,12 @@ export default function ListaProgetti() {
                         const isOpen = progettoEspansoId === proj.id;
                         return (
                             <div key={proj.id} className="border-t border-gray-200 dark:border-gray-700 hover-bg-theme">
-                                <div className="flex items-center px-4 py-3 text-sm text-theme cursor-pointer" onClick={() => setProgettoEspansoId(isOpen ? null : proj.id)}>
+                                <div
+                                    className="flex items-center px-4 py-3 text-sm text-theme cursor-pointer"
+                                    onClick={() => setProgettoEspansoId(isOpen ? null : proj.id)}
+                                >
                                     <div className="w-8 shrink-0 flex justify-start items-center">
                                         <div className="flex flex-col items-center gap-1">
-
                                             {isMembro && (
                                                 <FontAwesomeIcon
                                                     icon={faLink}
@@ -290,29 +291,39 @@ export default function ListaProgetti() {
                                                     title="Progetto completato"
                                                 />
                                             )}
-
                                         </div>
                                     </div>
+
                                     <div className="flex-1 font-medium truncate">{proj.nome}</div>
-
-
-                                    <div className="hidden lg:block w-40">{proj.consegna ?? "—"}</div>
+                                    <div className="hidden lg:block w-40">{formatConsegna(proj.consegna)}</div>
                                     <div className="hidden lg:block w-32">{proj.stato?.nome ?? "—"}</div>
                                     <div className="hidden lg:block w-32">{proj.priorita?.nome ?? "—"}</div>
+
                                     <div className="w-20 flex justify-end items-center gap-3">
-                                        <button onClick={(e) => { e.stopPropagation(); setProgettoDaModificareId(proj.id); }} className="icon-color hover:text-blue-600" title="Modifica">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setProgettoDaModificareId(proj.id); }}
+                                            className="icon-color hover:text-blue-600"
+                                            title="Modifica"
+                                        >
                                             <FontAwesomeIcon icon={faPen} />
                                         </button>
 
+                                        {/* 👇 Vai al dettaglio con SLUG (niente ID nell'URL) */}
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); navigate(`/progetti/${proj.id}`); }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigate(`/progetti/${proj.slug}`);
+                                            }}
                                             className="icon-color hover:text-green-600"
                                             title="Vai al dettaglio"
                                         >
                                             <FontAwesomeIcon icon={faProjectDiagram} />
                                         </button>
 
-                                        <button onClick={(e) => { e.stopPropagation(); setProgettoEspansoId(isOpen ? null : proj.id); }} className="text-theme text-xl font-bold">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setProgettoEspansoId(isOpen ? null : proj.id); }}
+                                            className="text-theme text-xl font-bold"
+                                        >
                                             {isOpen ? "−" : "+"}
                                         </button>
                                     </div>
@@ -321,23 +332,13 @@ export default function ListaProgetti() {
                                 {isOpen && (
                                     <div className="animate-scale-fade px-6 pb-4 text-sm text-theme space-y-1">
                                         <div className="block lg:hidden space-y-1">
-                                            <p>📅 Consegna: {proj.consegna ?? "—"}</p>
+                                            <p>📅 Consegna: {formatConsegna(proj.consegna)}</p>
                                             <p>📊 Stato: {proj.stato?.nome ?? "—"}</p>
                                             <p>⏫ Priorità: {proj.priorita?.nome ?? "—"}</p>
                                         </div>
                                         {proj.cliente?.nome && <p>👤 Cliente: {proj.cliente.nome}</p>}
                                         {proj.membri.length > 0 && <p>👥 Membri: {proj.membri.map(m => `${m.nome} ${m.cognome ?? ""}`).join(", ")}</p>}
-                                        {proj.tempo_stimato && (
-                                            <p>⏱️ Tempo stimato: {
-                                                (() => {
-                                                    const match = proj.tempo_stimato?.match(/(\d+):(\d+)/);
-                                                    if (!match) return proj.tempo_stimato;
-                                                    const ore = parseInt(match[1], 10);
-                                                    const minuti = parseInt(match[2], 10);
-                                                    return `${ore > 0 ? `${ore}h ` : ""}${minuti}m`;
-                                                })()
-                                            }</p>
-                                        )}
+                                        {proj.tempo_stimato && <p>⏱️ Tempo stimato: {formatTempoStimato(proj.tempo_stimato)}</p>}
                                         {proj.note && <p>🗒️ Note: {proj.note}</p>}
 
                                         {durateProgettoUtente[proj.id]?.length > 0 && (
@@ -363,7 +364,9 @@ export default function ListaProgetti() {
                                                 {(taskPerProgetto[proj.id] ?? []).map(t => {
                                                     const utenti = t.assegnatari.map(u => `${u.nome} ${u.cognome ?? ""}`).join(", ");
                                                     return (
-                                                        <li key={t.id}>📝 {t.nome} | {utenti || "—"} | {t.consegna ? new Date(t.consegna).toLocaleDateString() : "—"}</li>
+                                                        <li key={t.id}>
+                                                            📝 {t.nome} | {utenti || "—"} | {t.consegna ? new Date(t.consegna).toLocaleDateString() : "—"}
+                                                        </li>
                                                     );
                                                 })}
                                                 {(taskPerProgetto[proj.id] ?? []).length === 0 && (
@@ -371,8 +374,6 @@ export default function ListaProgetti() {
                                                 )}
                                             </ul>
                                         </div>
-
-
                                     </div>
                                 )}
                             </div>
@@ -382,7 +383,10 @@ export default function ListaProgetti() {
             )}
 
             {progettoDaModificareId && (
-                <MiniProjectEditorModal progettoId={progettoDaModificareId} onClose={() => setProgettoDaModificareId(null)} />
+                <MiniProjectEditorModal
+                    progettoId={progettoDaModificareId}
+                    onClose={() => setProgettoDaModificareId(null)}
+                />
             )}
         </div>
     );

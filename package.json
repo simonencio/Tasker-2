@@ -30,6 +30,7 @@
     "react-date-range": "^2.0.1",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.3",
+    "react-select": "^5.10.2",
     "toaster-js": "^2.2.3",
     "uuid": "^11.1.0"
   },

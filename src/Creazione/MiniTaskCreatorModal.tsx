@@ -3,7 +3,7 @@ import React, { useEffect, useState, type JSX } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import {
     faFlag, faSignal, faCalendarDays, faClock,
-    faUserPlus, faBuilding, faXmark
+    faUserPlus, faBuilding, faXmark, faSitemap
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { inviaNotifica } from "../Notifiche/notificheUtils";
@@ -12,7 +12,7 @@ type Stato = { id: number; nome: string };
 type Priorita = { id: number; nome: string };
 type Progetto = { id: string; nome: string };
 type Utente = { id: string; nome: string; cognome: string };
-type PopupType = "stato" | "priorita" | "consegna" | "tempo" | "progetto" | "utente";
+type PopupType = "stato" | "priorita" | "consegna" | "tempo" | "progetto" | "utente" | "parent";
 type Props = { onClose: () => void; offsetIndex?: number };
 
 export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props) {
@@ -38,6 +38,11 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
     const [success, setSuccess] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
 
+    // SOTTO-TASK
+    const [isSubtask, setIsSubtask] = useState(false);
+    const [parentId, setParentId] = useState<string>("");
+    const [parentOptions, setParentOptions] = useState<Array<{ id: string; nome: string }>>([]);
+
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth <= 768);
         handleResize();
@@ -59,7 +64,6 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
         });
 
         const channel = supabase.channel("realtime_task_dropdowns");
-
         channel
             .on("postgres_changes", { event: "*", schema: "public", table: "stati" }, async () => {
                 const { data } = await supabase.from("stati").select("id, nome").is("deleted_at", null);
@@ -79,12 +83,10 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
             })
             .subscribe();
 
-        // 🔧 FIX: cleanup sincrono, nessun async qui
         return () => {
             supabase.removeChannel(channel);
         };
     }, []);
-
 
     useEffect(() => {
         if (!progettoId) return;
@@ -100,10 +102,62 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
             });
     }, [progettoId, utenti, assegnatari]);
 
+    // Carica le possibili parent (task del progetto selezionato)
+    useEffect(() => {
+        const loadParentOptions = async () => {
+            setParentOptions([]);
+            setParentId("");
+            if (!progettoId) return;
+
+            const { data, error } = await supabase
+                .from("progetti_task")
+                .select("task_id, tasks!inner(id, nome, deleted_at)")
+                .eq("progetti_id", progettoId);
+
+            if (error) return;
+            const rows = (data || [])
+                .map((r: any) => r.tasks)
+                .filter((t: any) => t && !t.deleted_at);
+
+            setParentOptions(rows.map((t: any) => ({ id: t.id, nome: t.nome })));
+        };
+
+        loadParentOptions();
+    }, [progettoId]);
+
     const reset = () => {
         setNome(""); setNote(""); setStatoId(""); setPrioritaId("");
         setConsegna(""); setOre(0); setMinuti(0); setPopupOpen(null);
         setProgettoId(""); setAssegnatari([]); setMostraAvviso(false);
+        setIsSubtask(false); setParentId(""); setParentOptions([]);
+    };
+
+    // -------- SLUGIFY + univocità --------
+    const slugify = (s: string) =>
+        s
+            .toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .slice(0, 80);
+
+    const generaSlugUnico = async (baseName: string): Promise<string> => {
+        const base = slugify(baseName) || "task";
+        // prendo tutti gli slug che iniziano per base (base, base-2, base-3, …)
+        const { data, error } = await supabase
+            .from("tasks")
+            .select("slug")
+            .ilike("slug", `${base}%`);
+
+        if (error || !data || data.length === 0) return base;
+
+        const esistenti = new Set((data as { slug: string | null }[]).map(r => r.slug || ""));
+        if (!esistenti.has(base)) return base;
+
+        // trova il prossimo suffisso disponibile
+        let n = 2;
+        while (esistenti.has(`${base}-${n}`)) n++;
+        return `${base}-${n}`;
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -112,65 +166,92 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
         setSuccess(false);
         setLoading(true);
 
-        if (!nome.trim()) {
-            setErrore("Il nome dell’attività è obbligatorio.");
-            setLoading(false);
-            return;
-        }
+        try {
+            if (!nome.trim()) throw new Error("Il nome dell’attività è obbligatorio.");
+            if (isSubtask && !progettoId) throw new Error("Se contrassegni come sotto-task devi prima selezionare il progetto.");
+            if (isSubtask && !parentId) throw new Error("Seleziona la task padre.");
 
-        const { data: userInfo } = await supabase.auth.getUser();
-        const tempo = ore || minuti ? `${ore} hours ${minuti} minutes` : null;
+            const { data: userInfo } = await supabase.auth.getUser();
+            const tempo = ore || minuti ? `${ore} hours ${minuti} minutes` : null;
+            const slug = await generaSlugUnico(nome);
 
-        const { data: createdTask, error } = await supabase
-            .from("tasks")
-            .insert({
-                nome,
-                note: note || null,
-                stato_id: statoId ? +statoId : null,
-                priorita_id: prioritaId ? +prioritaId : null,
-                consegna: consegna || null,
-                tempo_stimato: tempo,
-            })
-            .select()
-            .single();
+            // 1) Crea la task (con slug e parent_id se subtask)
+            const { data: createdTask, error: errInsert } = await supabase
+                .from("tasks")
+                .insert({
+                    nome,
+                    note: note || null,
+                    stato_id: statoId ? +statoId : null,
+                    priorita_id: prioritaId ? +prioritaId : null,
+                    consegna: consegna || null,
+                    tempo_stimato: tempo,
+                    parent_id: isSubtask ? parentId : null,
+                    slug,
+                })
+                .select()
+                .single();
+            if (errInsert || !createdTask) throw new Error(errInsert?.message || "Errore creazione attività.");
 
-        if (error || !createdTask) {
-            setErrore(error?.message || "Errore creazione attività.");
-            setLoading(false);
-            setTimeout(() => setErrore(null), 3000);
-            return;
-        }
+            const taskId = createdTask.id;
 
-        const taskId = createdTask.id;
-        const azioni = [];
-
-        if (progettoId)
-            azioni.push(supabase.from("progetti_task").insert({ task_id: taskId, progetti_id: progettoId }));
-
-        for (const u of assegnatari) {
+            // 2) Collega al progetto se presente
             if (progettoId) {
-                const { data: esiste } = await supabase
-                    .from("utenti_progetti")
-                    .select("id")
-                    .eq("utente_id", u.id)
-                    .eq("progetto_id", progettoId)
-                    .maybeSingle();
-
-                if (!esiste) {
-                    azioni.push(supabase.from("utenti_progetti").insert({ utente_id: u.id, progetto_id: progettoId }));
-                    inviaNotifica("PROGETTO_ASSEGNATO", [u.id], `Sei stato assegnato al progetto con nuova attività: ${nome}`, userInfo.user?.id, { progetto_id: progettoId });
-                }
+                const { error: errPT } = await supabase
+                    .from("progetti_task")
+                    .insert({ task_id: taskId, progetti_id: progettoId });
+                if (errPT) throw errPT;
             }
 
-            azioni.push(supabase.from("utenti_task").insert({ utente_id: u.id, task_id: taskId }));
-            inviaNotifica("TASK_ASSEGNATO", [u.id], `Ti è stata assegnata una nuova attività: ${nome}`, userInfo.user?.id, { progetto_id: progettoId || undefined, task_id: taskId });
-        }
+            // 3) Associa assegnatari (e, se non partecipano al progetto, aggiungili)
+            for (const u of assegnatari) {
+                if (progettoId) {
+                    const { data: esiste, error: errCheck } = await supabase
+                        .from("utenti_progetti")
+                        .select("id")
+                        .eq("utente_id", u.id)
+                        .eq("progetto_id", progettoId)
+                        .maybeSingle();
+                    if (errCheck) throw errCheck;
 
-        await Promise.all(azioni);
-        setSuccess(true);
-        reset();
-        setLoading(false);
-        setTimeout(() => setSuccess(false), 3000);
+                    if (!esiste) {
+                        const { error: errAddUP } = await supabase
+                            .from("utenti_progetti")
+                            .insert({ utente_id: u.id, progetto_id: progettoId });
+                        if (errAddUP) throw errAddUP;
+
+                        inviaNotifica(
+                            "PROGETTO_ASSEGNATO",
+                            [u.id],
+                            `Sei stato assegnato al progetto con nuova attività: ${nome}`,
+                            userInfo.user?.id,
+                            { progetto_id: progettoId }
+                        );
+                    }
+                }
+
+                const { error: errUT } = await supabase
+                    .from("utenti_task")
+                    .insert({ utente_id: u.id, task_id: taskId });
+                if (errUT) throw errUT;
+
+                inviaNotifica(
+                    "TASK_ASSEGNATO",
+                    [u.id],
+                    `Ti è stata assegnata una nuova attività: ${nome}`,
+                    userInfo.user?.id,
+                    { progetto_id: progettoId || undefined, task_id: taskId }
+                );
+            }
+
+            setSuccess(true);
+            reset();
+            setTimeout(() => setSuccess(false), 3000);
+        } catch (err: any) {
+            setErrore(err?.message || "Errore durante il salvataggio.");
+            setTimeout(() => setErrore(null), 3000);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const baseInputClass = "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-theme text-theme";
@@ -185,10 +266,7 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
                             ? "selected-panel font-semibold"
                             : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
                             }`}
-                        onClick={() => {
-                            setStatoId(String(s.id));
-                            setPopupOpen(null);
-                        }}
+                        onClick={() => { setStatoId(String(s.id)); setPopupOpen(null); }}
                     >
                         {s.nome}
                     </div>
@@ -204,10 +282,7 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
                             ? "selected-panel font-semibold"
                             : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
                             }`}
-                        onClick={() => {
-                            setPrioritaId(String(p.id));
-                            setPopupOpen(null);
-                        }}
+                        onClick={() => { setPrioritaId(String(p.id)); setPopupOpen(null); }}
                     >
                         {p.nome}
                     </div>
@@ -248,9 +323,7 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
                         <div
                             key={u.id}
                             onClick={() =>
-                                setAssegnatari(prev =>
-                                    selected ? prev.filter(a => a.id !== u.id) : [...prev, u]
-                                )
+                                setAssegnatari(prev => selected ? prev.filter(a => a.id !== u.id) : [...prev, u])
                             }
                             className={`p-2 rounded cursor-pointer border ${selected ? "selected-panel font-semibold" : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"}`}
                         >
@@ -261,15 +334,53 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
                 })}
             </div>
         ),
+        parent: (
+            <div className="space-y-2">
+                <label className="flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        checked={isSubtask}
+                        onChange={(e) => setIsSubtask(e.target.checked)}
+                    />
+                    <span>Questa è una sotto-task</span>
+                </label>
+
+                {!progettoId && isSubtask && (
+                    <div className="text-xs text-yellow-600">Seleziona prima un progetto per vedere le task disponibili.</div>
+                )}
+
+                {isSubtask && progettoId && (
+                    <div className="max-h-56 overflow-auto hide-scrollbar border rounded p-2">
+                        {parentOptions.length === 0 ? (
+                            <div className="text-sm opacity-70">Nessuna task disponibile nel progetto selezionato.</div>
+                        ) : (
+                            parentOptions.map(opt => (
+                                <label key={opt.id} className="flex items-center gap-2 py-1 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="parentTask"
+                                        value={opt.id}
+                                        checked={parentId === opt.id}
+                                        onChange={() => setParentId(opt.id)}
+                                    />
+                                    <span className="text-sm">{opt.nome}</span>
+                                </label>
+                            ))
+                        )}
+                    </div>
+                )}
+            </div>
+        ),
     };
 
-    const popupButtons: { icon: any; popup: PopupType; color: string; active: string }[] = [
-        { icon: faFlag, popup: "stato", color: "text-red-400", active: "text-red-600" },
-        { icon: faSignal, popup: "priorita", color: "text-yellow-400", active: "text-yellow-600" },
-        { icon: faCalendarDays, popup: "consegna", color: "text-blue-400", active: "text-blue-600" },
-        { icon: faClock, popup: "tempo", color: "text-purple-400", active: "text-purple-600" },
-        { icon: faBuilding, popup: "progetto", color: "text-cyan-400", active: "text-cyan-600" },
-        { icon: faUserPlus, popup: "utente", color: "text-green-400", active: "text-green-600" },
+    const popupButtons: { icon: any; popup: PopupType; color: string; active: string; title: string }[] = [
+        { icon: faFlag, popup: "stato", color: "text-red-400", active: "text-red-600", title: "Stato" },
+        { icon: faSignal, popup: "priorita", color: "text-yellow-400", active: "text-yellow-600", title: "Priorità" },
+        { icon: faCalendarDays, popup: "consegna", color: "text-blue-400", active: "text-blue-600", title: "Consegna" },
+        { icon: faClock, popup: "tempo", color: "text-purple-400", active: "text-purple-600", title: "Tempo stimato" },
+        { icon: faBuilding, popup: "progetto", color: "text-cyan-400", active: "text-cyan-600", title: "Progetto" },
+        { icon: faUserPlus, popup: "utente", color: "text-green-400", active: "text-green-600", title: "Assegnatari" },
+        { icon: faSitemap, popup: "parent", color: "text-pink-400", active: "text-pink-600", title: "Sotto-task" },
     ];
 
     const computedLeft = offsetIndex
@@ -281,20 +392,8 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
             className="fixed bottom-6 z-50 rounded-xl shadow-xl p-5 bg-white dark:bg-gray-800 modal-container"
             style={
                 isMobile
-                    ? {
-                        left: 0,
-                        right: 0,
-                        marginLeft: "auto",
-                        marginRight: "auto",
-                        width: "calc(100% - 32px)",
-                        maxWidth: "400px",
-                        zIndex: 100 + offsetIndex,
-                    }
-                    : {
-                        left: computedLeft,
-                        width: "400px",
-                        zIndex: 100 + offsetIndex,
-                    }
+                    ? { left: 0, right: 0, marginLeft: "auto", marginRight: "auto", width: "calc(100% - 32px)", maxWidth: "400px", zIndex: 100 + offsetIndex }
+                    : { left: computedLeft, width: "400px", zIndex: 100 + offsetIndex }
             }
         >
             <button onClick={onClose} className="absolute top-4 right-4 text-red-600 text-2xl" title="Chiudi">
@@ -306,7 +405,13 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
             <form onSubmit={handleSubmit} className="space-y-4 text-sm">
                 <div>
                     <label className="block mb-1 font-medium text-theme">Nome *</label>
-                    <input type="text" value={nome} onChange={(e) => setNome(e.target.value)} required className={baseInputClass} />
+                    <input
+                        type="text"
+                        value={nome}
+                        onChange={(e) => setNome(e.target.value)}
+                        required
+                        className={baseInputClass}
+                    />
                 </div>
 
                 <div>
@@ -316,11 +421,12 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
 
                 <div className="relative">
                     <div className="flex gap-4 text-lg mb-2">
-                        {popupButtons.map(({ icon, popup, color, active }) => (
+                        {popupButtons.map(({ icon, popup, color, active, title }) => (
                             <button
                                 key={popup}
                                 type="button"
                                 aria-label={popup}
+                                title={title}
                                 onClick={() => setPopupOpen((o) => (o === popup ? null : popup))}
                                 className={`focus:outline-none ${popupOpen === popup ? active : color}`}
                             >
@@ -331,11 +437,11 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
 
                     {popupOpen && (
                         <div
-                            key={popupOpen + "-" + stati.length + "-" + priorita.length + "-" + progetti.length + "-" + utenti.length}
+                            key={popupOpen + "-" + stati.length + "-" + priorita.length + "-" + progetti.length + "-" + utenti.length + "-" + parentOptions.length}
                             className="absolute bottom-full hide-scrollbar mb-2 border rounded p-4 bg-theme text-theme shadow-md max-h-60 overflow-auto z-50 left-0 w-full"
                         >
                             <div className="flex justify-between items-center mb-2">
-                                <strong className="capitalize text-theme">{popupOpen}</strong>
+                                <strong className="capitalize text-theme">{popupOpen === "parent" ? "sotto-task" : popupOpen}</strong>
                                 <button type="button" onClick={() => setPopupOpen(null)} className="text-sm">
                                     <FontAwesomeIcon icon={faXmark} />
                                 </button>

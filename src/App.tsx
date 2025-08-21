@@ -5,6 +5,7 @@ import {
     Route,
     Navigate,
     useLocation,
+    useParams,
 } from "react-router-dom";
 import { supabase } from "./supporto/supabaseClient";
 import "./App.css";
@@ -22,7 +23,6 @@ import BachecaProgetto from "./GestioneProgetto/BachecaProgetto";
 import ListaClienti from "./Liste/ListaClienti";
 import ListaUtenti from "./Liste/ListaUtenti";
 import ResetPassword from "./Pagine/ResetPassword";
-// import AnimatedLogo from "./LandingPage/AnimatedLogo"; // ✅ Importa l'animazione
 import Header from "./Header/Header";
 import Sidebar from "./Sidebar/Sidebar";
 import NotificheSidebar from "./Notifiche/NotificheSidebar";
@@ -32,9 +32,44 @@ import MiniClientCreatorModal from "./Creazione/MiniClientCreatorModal";
 import MiniUserCreatorModal from "./Creazione/MiniUserCreatorModal";
 import DettaglioTask from "./GestioneTask/DettaglioTask";
 
-
-
 type ModalType = "project" | "task" | "client" | "user";
+
+/** Redirect legacy /tasks/:id -> /tasks/:slug */
+function RedirectTaskById() {
+    const { id } = useParams();
+    const [slug, setSlug] = useState<string | null>(null);
+    const [notFound, setNotFound] = useState(false);
+
+    useEffect(() => {
+        let alive = true;
+        (async () => {
+            if (!id) return;
+            const { data, error } = await supabase
+                .from("tasks")
+                .select("slug")
+                .eq("id", id)
+                .maybeSingle();
+            if (!alive) return;
+            if (error) {
+                console.error(error);
+                setNotFound(true);
+                return;
+            }
+            if (!data?.slug) {
+                setNotFound(true);
+                return;
+            }
+            setSlug(data.slug);
+        })();
+        return () => {
+            alive = false;
+        };
+    }, [id]);
+
+    if (slug) return <Navigate to={`/tasks/${slug}`} replace />;
+    if (notFound) return <Navigate to="/task" replace />; // fallback lista
+    return null; // render nulla mentre risolve
+}
 
 function AppContent() {
     const [loggedIn, setLoggedIn] = useState(false);
@@ -43,7 +78,7 @@ function AppContent() {
     const [notificheOpen, setNotificheOpen] = useState(false);
     const [activeModals, setActiveModals] = useState<ModalType[]>([]);
     const location = useLocation();
-    // const [showAnimation, setShowAnimation] = useState(true); // ✅ Stato per animazione
+
     const publicRoutes = ["/login", "/register", "/confirm-email", "/reset-password/"];
     const isPublic = (() => {
         if (location.pathname.startsWith("/reset-password/")) return true;
@@ -54,30 +89,23 @@ function AppContent() {
 
     useEffect(() => {
         const checkAuth = async () => {
-            const {
-                data: { user },
-            } = await supabase.auth.getUser();
+            const { data: { user } } = await supabase.auth.getUser();
             setLoggedIn(!!user);
             setUserId(user?.id ?? null);
         };
-
         checkAuth();
-
         const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
             const newUser = session?.user;
             setLoggedIn(!!newUser);
             setUserId(newUser?.id ?? null);
         });
-
         return () => {
             listener.subscription.unsubscribe();
         };
     }, []);
 
     useEffect(() => {
-        const handleResize = () => {
-            setWindowWidth(window.innerWidth);
-        };
+        const handleResize = () => setWindowWidth(window.innerWidth);
         window.addEventListener("resize", handleResize);
         return () => window.removeEventListener("resize", handleResize);
     }, []);
@@ -114,9 +142,7 @@ function AppContent() {
             const max = getMaxModals();
             if (prev.includes(type)) return prev;
             const updated = [...prev, type];
-            if (updated.length > max) {
-                return updated.slice(updated.length - max);
-            }
+            if (updated.length > max) return updated.slice(updated.length - max);
             return updated;
         });
     };
@@ -125,11 +151,8 @@ function AppContent() {
         setActiveModals((prev) => prev.filter((m) => m !== type));
     };
 
-    const getOffset = (type: ModalType) => {
-        return activeModals.indexOf(type);
-    };
-    // ✅ Mostra l’animazione iniziale se attiva
-    // if (showAnimation) return <AnimatedLogo onFinish={() => setShowAnimation(false)} />;
+    const getOffset = (type: ModalType) => activeModals.indexOf(type);
+
     return (
         <>
             <header className="fixed top-0 left-0 right-0 z-50">
@@ -182,10 +205,16 @@ function AppContent() {
                                 <Route path="/clienti" element={<ListaClienti />} />
                                 <Route path="/utenti" element={<ListaUtenti />} />
                                 <Route path="/profilo" element={<Profilo />} />
-                                <Route path="/progetti/:id" element={<DettaglioProgetto />} />
-                                <Route path="/progetti/:id/calendario" element={<CalendarioProgetto />} />
-                                <Route path="/progetti/:id/bacheca" element={<BachecaProgetto />} />
-                                <Route path="/tasks/:id" element={<DettaglioTask />} />
+                                {/* Progetti by slug */}
+                                <Route path="/progetti/:slug" element={<DettaglioProgetto />} />
+                                <Route path="/progetti/:slug/calendario" element={<CalendarioProgetto />} />
+                                <Route path="/progetti/:slug/bacheca" element={<BachecaProgetto />} />
+                                {/* Tasks by slug (NUOVO) */}
+                                <Route path="/tasks/:slug" element={<DettaglioTask />} />
+                                {/* Legacy: /tasks/:id -> redirect a slug */}
+                                <Route path="/tasks/id/:id" element={<RedirectTaskById />} />
+                                {/* opzionale: mantieni anche questo vecchio pattern se già in uso */}
+                                <Route path="/tasks/:id([0-9a-fA-F-]{36})" element={<RedirectTaskById />} />
                             </Routes>
                         </div>
                     </div>

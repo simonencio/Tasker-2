@@ -3,7 +3,7 @@ import { Toast } from "toaster-js";
 import "../App.css";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlay, faStop, faTasks, faCheckCircle, faLink } from "@fortawesome/free-solid-svg-icons";
+import { faPlay, faStop, faTasks, faCheckCircle, faLink, faPen } from "@fortawesome/free-solid-svg-icons";
 
 import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
 import FiltriTaskAvanzati, { ordinaTaskClientSide } from "../supporto/FiltriTaskAvanzati";
@@ -13,9 +13,10 @@ import RenderSottoTask from "../supporto/SottoTask";
 import RenderCommento from "../supporto/RenderCommento";
 import { useToast } from '../supporto/useToast'
 
-
 export default function ListaTask() {
     const toast = useToast();
+    const [durataTotaleTask, setDurataTotaleTask] = useState<Record<string, number>>({});
+    const [slugById, setSlugById] = useState<Record<string, string>>({}); // 👈 id -> slug
 
     const [tasks, setTasks] = useState<Task[]>([]);
     const [taskAssegnate, setTaskAssegnate] = useState<Set<string>>(new Set());
@@ -47,46 +48,53 @@ export default function ListaTask() {
             return nuovo;
         });
     };
-
+    const formatDurata = (value: number | string | null): string => {
+        if (!value) return "0m";
+        if (typeof value === "number") {
+            const ore = Math.floor(value / 3600);
+            const minuti = Math.floor((value % 3600) / 60);
+            const secondi = value % 60;
+            if (ore > 0 && secondi > 0) return `${ore}h ${minuti}m ${secondi}s`;
+            if (ore > 0) return `${ore}h ${minuti}m`;
+            if (minuti > 0 && secondi > 0) return `${minuti}m ${secondi}s`;
+            if (minuti > 0) return `${minuti}m`;
+            return `${secondi}s`;
+        }
+        if (typeof value === "string" && value.includes(":")) {
+            const parts = value.split(":").map(p => parseInt(p, 10));
+            const ore = parts[0] || 0, minuti = parts[1] || 0, secondi = parts[2] || 0;
+            if (ore > 0 && secondi > 0) return `${ore}h ${minuti}m ${secondi}s`;
+            if (ore > 0) return `${ore}h ${minuti}m`;
+            if (minuti > 0 && secondi > 0) return `${minuti}m ${secondi}s`;
+            if (minuti > 0) return `${minuti}m`;
+            return `${secondi}s`;
+        }
+        return "0m";
+    };
 
     const [filtroAvanzato, setFiltroAvanzato] = useState<FiltroAvanzato>({
-        progetto: null,
-        utente: null,
-        stato: null,
-        priorita: null,
-        dataInizio: null,
-        dataFine: null,
-        ordine: null,
+        progetto: null, utente: null, stato: null, priorita: null, dataInizio: null, dataFine: null, ordine: null,
     });
     const navigate = useNavigate();
 
-    //Timer
+    // Timer
     const [activeTimer, setActiveTimer] = useState<{ taskId: string; startTime: Date } | null>(null);
-
     const [, setElapsed] = useState<number>(0);
-
-
 
     const handleStartTimer = (taskId: string) => {
         setActiveTimer({ taskId, startTime: new Date() });
     };
 
     const handleStopTimer = async (_task: Task) => {
-        if (!activeTimer || !utenteId) {
-            setActiveTimer(null);
-            return;
-        }
-
+        if (!activeTimer || !utenteId) { setActiveTimer(null); return; }
         const taskPlayed = tasks.find(t => t.id === activeTimer.taskId);
         if (!taskPlayed || !taskPlayed.progetto?.id) {
             new Toast("Questa task non è collegata a nessun progetto", Toast.TYPE_ERROR, Toast.TIME_SHORT);
             setActiveTimer(null);
             return;
         }
-
         const endTime = new Date();
         const durata = Math.floor((endTime.getTime() - activeTimer.startTime.getTime()) / 1000);
-
         const { error } = await supabase.from("time_entries").insert({
             utente_id: utenteId,
             progetto_id: taskPlayed.progetto.id,
@@ -96,35 +104,19 @@ export default function ListaTask() {
             data_fine: endTime.toISOString(),
             durata,
         });
-
-        if (error) {
-            toast("Errore nel salvataggio del tempo", 'error');
-            console.error(error);
-        } else {
-            toast("Tempo salvato con successo", 'success');
-        }
+        if (error) { toast("Errore nel salvataggio del tempo", 'error'); console.error(error); }
+        else { toast("Tempo salvato con successo", 'success'); }
         setActiveTimer(null);
     };
 
-
-
-
     useEffect(() => {
         let interval: NodeJS.Timeout | null = null;
-
         if (activeTimer) {
-            // Aggiorna ogni secondo
-            interval = setInterval(() => {
-                setElapsed(Math.floor((Date.now() - activeTimer.startTime.getTime()) / 1000));
-            }, 1000);
-        } else {
-            setElapsed(0);
-        }
-
-        return () => {
-            if (interval) clearInterval(interval);
-        };
+            interval = setInterval(() => setElapsed(Math.floor((Date.now() - activeTimer.startTime.getTime()) / 1000)), 1000);
+        } else setElapsed(0);
+        return () => { if (interval) clearInterval(interval); };
     }, [activeTimer]);
+
     useEffect(() => {
         const fetchUtente = async () => {
             const { data: { user } } = await supabase.auth.getUser();
@@ -135,42 +127,25 @@ export default function ListaTask() {
         };
         fetchUtente();
     }, []);
+
     useEffect(() => {
         const caricaCommenti = async () => {
             const { data, error } = await supabase
                 .from("commenti")
                 .select(`
-                id,
-                utente_id,
-                task_id,
-                parent_id,
-                descrizione,
-                created_at,
-                modified_at,
-                deleted_at,
-                utente:utente_id (
-                    id,
-                    nome,
-                    cognome
-                )
-            `)
+          id, utente_id, task_id, parent_id, descrizione, created_at, modified_at, deleted_at,
+          utente:utente_id ( id, nome, cognome )
+        `)
                 .is("deleted_at", null);
 
-            if (error) {
-                console.error("Errore nel caricamento commenti:", error);
-                return;
-            }
-
+            if (error) { console.error("Errore nel caricamento commenti:", error); return; }
             if (data) {
-                // Fix utente[] vs utente
                 const commentiPuliti: Commento[] = data.map((c: any) => ({
-                    ...c,
-                    utente: Array.isArray(c.utente) ? c.utente[0] : c.utente,
+                    ...c, utente: Array.isArray(c.utente) ? c.utente[0] : c.utente,
                 }));
                 setCommenti(commentiPuliti);
             }
         };
-
         caricaCommenti();
     }, []);
 
@@ -181,47 +156,27 @@ export default function ListaTask() {
 
             if ((soloMie || filtroAvanzato.utente) && utenteId) {
                 const idFiltro = filtroAvanzato.utente || utenteId;
-                const { data: dataUtente } = await supabase
-                    .from("utenti_task")
-                    .select("task_id")
-                    .eq("utente_id", idFiltro);
-
-                if (!dataUtente || dataUtente.length === 0) {
-                    setTasks([]);
-                    setLoading(false);
-                    return;
-                }
-
+                const { data: dataUtente } = await supabase.from("utenti_task").select("task_id").eq("utente_id", idFiltro);
+                if (!dataUtente || dataUtente.length === 0) { setTasks([]); setLoading(false); return; }
                 taskIds = dataUtente.map(t => t.task_id);
             }
 
             if (filtroAvanzato.progetto) {
-                const { data: dataProgetto } = await supabase
-                    .from("progetti_task")
-                    .select("task_id")
-                    .eq("progetti_id", filtroAvanzato.progetto);
-
-                if (!dataProgetto || dataProgetto.length === 0) {
-                    setTasks([]);
-                    setLoading(false);
-                    return;
-                }
-
+                const { data: dataProgetto } = await supabase.from("progetti_task").select("task_id").eq("progetti_id", filtroAvanzato.progetto);
+                if (!dataProgetto || dataProgetto.length === 0) { setTasks([]); setLoading(false); return; }
                 const taskIdsProgetto = dataProgetto.map(r => r.task_id);
-                taskIds = taskIds.length > 0
-                    ? taskIds.filter(id => taskIdsProgetto.includes(id))
-                    : taskIdsProgetto;
+                taskIds = taskIds.length > 0 ? taskIds.filter(id => taskIdsProgetto.includes(id)) : taskIdsProgetto;
             }
 
             const query = supabase
                 .from("tasks")
                 .select(`
-                    id, nome, note, consegna, tempo_stimato, created_at, modified_at, fine_task, parent_id,
-                    stato:stato_id (id, nome, colore),
-                    priorita:priorita_id (id, nome),
-                    progetti_task:progetti_task ( progetti ( id, nome ) ),
-                    utenti_task ( utenti ( id, nome, cognome ) )
-                `)
+          id, slug, nome, note, consegna, tempo_stimato, created_at, modified_at, fine_task, parent_id,
+          stato:stato_id (id, nome, colore),
+          priorita:priorita_id (id, nome),
+          progetti_task:progetti_task ( progetti ( id, nome ) ),
+          utenti_task ( utenti ( id, nome, cognome ) )
+        `)
                 .is("deleted_at", null);
 
             if (taskIds.length > 0) query.in("id", taskIds);
@@ -231,7 +186,13 @@ export default function ListaTask() {
             if (filtroAvanzato.dataFine) query.lte("consegna", filtroAvanzato.dataFine);
 
             const { data } = await query;
+
             if (data) {
+                // mappa slug per id
+                const nextSlugMap: Record<string, string> = {};
+                data.forEach((row: any) => { if (row.slug) nextSlugMap[row.id] = row.slug; });
+                setSlugById(nextSlugMap);
+
                 const tasksPulite: Task[] = data.map((item: any) => ({
                     id: item.id,
                     nome: item.nome,
@@ -252,7 +213,6 @@ export default function ListaTask() {
             setLoading(false);
         };
 
-
         const caricaTaskAssegnate = async () => {
             if (!utenteId) return;
             const { data } = await supabase.from("utenti_task").select("task_id").eq("utente_id", utenteId);
@@ -266,26 +226,25 @@ export default function ListaTask() {
     }, [soloMie, filtroAvanzato, utenteId]);
 
     const caricaDurateTaskUtente = async (task: Task) => {
-        if (!task.id || !task.assegnatari?.length) return;
-
+        if (!task.id) return;
         const tutteTaskId = [task.id, ...trovaTutteLeFiglie(task.id)];
         const { data, error } = await supabase
             .from("time_entries")
             .select("utente_id, durata")
             .in("task_id", tutteTaskId);
 
-        if (error) {
-            console.error("Errore caricamento durate:", error);
-            return;
-        }
+        if (error) { console.error("Errore caricamento durate:", error); return; }
 
         const duratePerUtente: Record<string, number> = {};
+        let totale = 0;
         for (const entry of data || []) {
-            if (!entry.utente_id || !entry.durata) continue;
-            duratePerUtente[entry.utente_id] = (duratePerUtente[entry.utente_id] || 0) + entry.durata;
+            const d = entry?.durata || 0;
+            totale += d;
+            const uid = entry?.utente_id;
+            if (uid) duratePerUtente[uid] = (duratePerUtente[uid] || 0) + d;
         }
-
         setDurateTaskUtente(prev => ({ ...prev, [task.id]: duratePerUtente }));
+        setDurataTotaleTask(prev => ({ ...prev, [task.id]: totale }));
     };
 
     const sottoTask = (taskId: string) => tasks.filter(t => t.parent_id === taskId);
@@ -328,7 +287,6 @@ export default function ListaTask() {
                 <p className="text-theme text-center text-lg">Caricamento...</p>
             ) : (
                 <div className="rounded-xl overflow-hidden shadow-md card-theme max-w-7xl mx-auto">
-
                     <div className="hidden lg:flex px-4 py-2 text-xs font-semibold text-theme border-b border-gray-300 dark:border-gray-600">
                         <div className="w-10 shrink-0" />
                         <div className="flex-1">Nome</div>
@@ -346,10 +304,12 @@ export default function ListaTask() {
 
                         return (
                             <div key={task.id} className="border-t border-gray-200 dark:border-gray-700 hover-bg-theme">
-                                <div className="flex items-center px-4 py-3 text-sm text-theme cursor-pointer" onClick={() => {
-                                    setTaskEspansaId(isOpen ? null : task.id);
-                                    if (!isOpen) caricaDurateTaskUtente(task);
-                                }}
+                                <div
+                                    className="flex items-center px-4 py-3 text-sm text-theme cursor-pointer"
+                                    onClick={() => {
+                                        setTaskEspansaId(isOpen ? null : task.id);
+                                        if (!isOpen) caricaDurateTaskUtente(task);
+                                    }}
                                 >
                                     <div className="w-8 shrink-0 flex justify-start items-center">
                                         <div className="flex flex-col items-center gap-1">
@@ -368,16 +328,12 @@ export default function ListaTask() {
                                     <div className="hidden lg:block w-32">{task.priorita?.nome ?? "—"}</div>
 
                                     <div className="w-20 flex justify-end items-center gap-3">
-
                                         {task.progetto?.id && task.assegnatari?.length > 0 && (
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    if (activeTimer?.taskId === task.id) {
-                                                        handleStopTimer(task);
-                                                    } else {
-                                                        handleStartTimer(task.id);
-                                                    }
+                                                    if (activeTimer?.taskId === task.id) handleStopTimer(task);
+                                                    else handleStartTimer(task.id);
                                                 }}
                                                 className={`icon-color ${activeTimer?.taskId === task.id ? 'hover:text-red-600' : 'hover:text-green-600'}`}
                                                 title={activeTimer?.taskId === task.id ? 'Ferma timer' : 'Avvia timer'}
@@ -386,23 +342,30 @@ export default function ListaTask() {
                                             </button>
                                         )}
 
-
-
-
                                         <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setTaskDaModificareId(task.id);
-                                            }}
+                                            onClick={(e) => { e.stopPropagation(); setTaskDaModificareId(task.id); }}
                                             className="icon-color hover:text-blue-600"
                                             title="Modifica"
+                                        >
+                                            <FontAwesomeIcon icon={faPen} />
+                                        </button>
 
-                                        />
-
-                                        <button onClick={e => { e.stopPropagation(); navigate(`/tasks/${task.id}`); }} className="icon-color hover:text-green-600" title="Vai al dettaglio">
+                                        <button
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                const slug = slugById[task.id];
+                                                navigate(`/tasks/${slug || task.id}`); // 👈 preferisci slug, fallback id
+                                            }}
+                                            className="icon-color hover:text-green-600"
+                                            title="Vai al dettaglio"
+                                        >
                                             <FontAwesomeIcon icon={faTasks} />
                                         </button>
-                                        <button onClick={e => { e.stopPropagation(); setTaskEspansaId(isOpen ? null : task.id); }} className="text-theme text-xl font-bold">
+
+                                        <button
+                                            onClick={e => { e.stopPropagation(); setTaskEspansaId(isOpen ? null : task.id); }}
+                                            className="text-theme text-xl font-bold"
+                                        >
                                             {isOpen ? "−" : "+"}
                                         </button>
                                     </div>
@@ -416,7 +379,12 @@ export default function ListaTask() {
                                             <p>⏫ Priorità: {task.priorita?.nome ?? "—"}</p>
                                         </div>
                                         {task.progetto?.nome && <p>📁 Progetto: {task.progetto.nome}</p>}
-                                        {task.tempo_stimato && <p>⏱️ Tempo stimato: {task.tempo_stimato}</p>}
+                                        {task.tempo_stimato && <p>⏱️ Tempo stimato: {formatDurata(task.tempo_stimato)}</p>}
+
+                                        {durataTotaleTask[task.id] !== undefined && (
+                                            <p>🕒 Tempo registrato totale: {formatDurata(durataTotaleTask[task.id])}</p>
+                                        )}
+
                                         {task.assegnatari?.length > 0 && (
                                             <p>👥 Assegnata a: {task.assegnatari.map(u => `${u.nome} ${u.cognome || ""}`).join(", ")}</p>
                                         )}
@@ -426,12 +394,10 @@ export default function ListaTask() {
                                                 <p className="font-semibold">🕒 Tempo registrato:</p>
                                                 <ul className="list-disc list-inside text-sm space-y-1">
                                                     {task.assegnatari.map(utente => {
-                                                        const durata = durateTaskUtente[task.id][utente.id] || 0;
-                                                        const ore = Math.floor(durata / 3600);
-                                                        const minuti = Math.floor((durata % 3600) / 60);
+                                                        const durata = durateTaskUtente[task.id]?.[utente.id] || 0;
                                                         return (
                                                             <li key={utente.id}>
-                                                                {utente.nome} {utente.cognome || ""}: {ore > 0 ? `${ore}h ` : ""}{minuti}m
+                                                                {utente.nome} {utente.cognome || ""}: {formatDurata(durata)}
                                                             </li>
                                                         );
                                                     })}
@@ -475,13 +441,8 @@ export default function ListaTask() {
                                                         )}
                                                     </div>
                                                 )}
-
-
                                             </div>
                                         )}
-
-
-
                                     </div>
                                 )}
                             </div>
@@ -496,5 +457,3 @@ export default function ListaTask() {
         </div>
     );
 }
-
-

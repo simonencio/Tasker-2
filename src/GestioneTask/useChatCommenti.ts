@@ -292,9 +292,10 @@ export type UseChatCommentiOptions = {
     utentiProgetto: Utente[];
     utenteId: string;
     taskId: string;
-    onNuovoCommento: () => void;
-    onClose?: () => void; // per ESC
+    onNuovoCommento: (c: Commento) => void; // ✅ allineato a Props
+    onClose?: () => void;
 };
+
 
 export function useChatCommenti({
     commenti,
@@ -450,7 +451,18 @@ export function useChatCommenti({
             setTesto("");
             setParentId(null);
             setDestinatarioIds([]);
-            onNuovoCommento();
+            // dopo l'insert e prima del reset UI
+            const nuovo: Commento = {
+                id: commentoId,
+                parent_id: parent,
+                descrizione: t,
+                created_at: new Date().toISOString(),
+                utente: utentiById.get(utenteId) || { id: utenteId, nome: "", cognome: null, avatar_url: null },
+                destinatari: menzionatiValidi.map(id => utentiById.get(id)!).filter(Boolean),
+            };
+
+            onNuovoCommento(nuovo);
+
 
             requestAnimationFrame(() => {
                 const el = inputRef.current;

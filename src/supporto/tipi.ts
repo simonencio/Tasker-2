@@ -1,3 +1,5 @@
+// supporto/tipi.ts
+
 export type Task = {
     id: string;
     nome: string;
@@ -20,6 +22,7 @@ export type Task = {
     progetto?: {
         id: string;
         nome: string;
+        slug: string; // ✅ aggiunto anche qui perché spesso nel dettaglio task serve
     } | null;
     assegnatari: {
         id: string;
@@ -37,6 +40,7 @@ export type FiltroAvanzato = {
     dataFine?: string | null;
     ordine?: string | null;
 };
+
 export type Commento = {
     id: string;
     utente_id: string;
@@ -50,11 +54,10 @@ export type Commento = {
         id: string;
         nome: string;
         cognome: string | null;
-    }; // <-- oggetto singolo
+    };
 };
 
-
-// supporto/tipi.ts
+// Support types
 export type Utente = { id: string; nome: string; cognome: string | null };
 export type Cliente = { id: string; nome: string };
 export type Stato = { id: number; nome: string; colore?: string | null };
@@ -63,6 +66,7 @@ export type Priorita = { id: number; nome: string };
 export type Progetto = {
     id: string;
     nome: string;
+    slug: string; // ✅ nuovo campo usato nell’URL
     consegna: string | null;
     stato: Stato | null;
     priorita: Priorita | null;
