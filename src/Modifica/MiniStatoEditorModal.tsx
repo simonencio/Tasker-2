@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
-import { traduciColore } from "../supporto/traduzioniColori";
+import { traduciColore, traduciColoreInverso } from "../supporto/traduzioniColori";
+// 👆 traduciColore: ITA → ENG
+// 👆 traduciColoreInverso: ENG → ITA
 
 type Props = {
-    statoId: string;   // 👈 ora string
+    statoId: string;
     onClose: () => void;
 };
 
@@ -13,8 +15,6 @@ export default function MiniStatoEditorModal({ statoId, onClose }: Props) {
     const [nome, setNome] = useState("");
     const [colore, setColore] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
-    // Mappa di colori ITA → ENG (puoi estenderla quanto vuoi)
-
 
     useEffect(() => {
         const caricaStato = async () => {
@@ -22,12 +22,13 @@ export default function MiniStatoEditorModal({ statoId, onClose }: Props) {
             const { data } = await supabase
                 .from("stati")
                 .select("*")
-                .eq("id", Number(statoId))   // 👈 conversione qui
+                .eq("id", Number(statoId))
                 .single();
 
             if (data) {
                 setNome(data.nome || "");
-                setColore(data.colore || null);
+                // 🔹 converto da ENG → ITA prima di mostrarlo
+                setColore(data.colore ? traduciColoreInverso(data.colore) : null);
             }
             setLoading(false);
         };
@@ -36,6 +37,7 @@ export default function MiniStatoEditorModal({ statoId, onClose }: Props) {
     }, [statoId]);
 
     const salvaModifiche = async () => {
+        // 🔹 converto da ITA → ENG prima di salvare
         const coloreTradotto = colore ? traduciColore(colore) : null;
 
         await supabase
@@ -45,7 +47,6 @@ export default function MiniStatoEditorModal({ statoId, onClose }: Props) {
 
         onClose();
     };
-
 
     if (loading) {
         return (

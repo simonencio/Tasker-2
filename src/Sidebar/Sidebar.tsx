@@ -9,8 +9,6 @@ import {
     faUserTie,
     faUser,
     faEllipsisH,
-    faChevronDown,
-    faChevronUp,
 } from "@fortawesome/free-solid-svg-icons";
 
 type SidebarProps = {
@@ -20,9 +18,7 @@ type SidebarProps = {
     onApriTaskModal: () => void;
     onApriClientModal: () => void;
     onApriUserModal: () => void;
-    onApriStatoModal: () => void;
-    onApriPrioritaModal: () => void;
-    onApriRuoloModal: () => void;
+
 };
 
 export default function Sidebar({
@@ -32,12 +28,8 @@ export default function Sidebar({
     onApriTaskModal,
     onApriClientModal,
     onApriUserModal,
-    onApriStatoModal,
-    onApriPrioritaModal,
-    onApriRuoloModal,
 }: SidebarProps) {
     const [theme, setTheme] = useState("light");
-    const [openAltro, setOpenAltro] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -198,96 +190,16 @@ export default function Sidebar({
                         </button>
                     </NavLink>
 
-                    {/* ALTRO */}
-                    <div className="flex flex-col">
-                        <button
-                            type="button"
-                            onClick={() => setOpenAltro(!openAltro)}
-                            className="hover-bg-theme flex items-center justify-between gap-2 px-4 py-2 rounded"
-                        >
-                            <div className="flex items-center gap-2">
-                                <FontAwesomeIcon icon={faEllipsisH} className="icon-color" />
-                                Altro
-                            </div>
-                            <FontAwesomeIcon icon={openAltro ? faChevronUp : faChevronDown} />
-                        </button>
-
-                        {openAltro && (
-                            <div className="ml-6 mt-2 flex flex-col gap-2">
-                                {/* Stato */}
-                                <NavLink
-                                    to="/stati"
-                                    onClick={onClose}
-                                    className={({ isActive }) =>
-                                        `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-1 rounded"
-                                        }`
-                                    }
-                                >
-                                    <span>Stato</span>
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            onApriStatoModal();
-                                        }}
-                                        className="icon-color hover:text-purple-400 transition"
-                                        title="Nuovo stato"
-                                    >
-                                        <FontAwesomeIcon icon={faPlus} size="sm" />
-                                    </button>
-                                </NavLink>
-
-                                {/* Priorità */}
-                                <NavLink
-                                    to="/priorita"
-                                    onClick={onClose}
-                                    className={({ isActive }) =>
-                                        `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-1 rounded"
-                                        }`
-                                    }
-                                >
-                                    <span>Priorità</span>
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            onApriPrioritaModal();
-                                        }}
-                                        className="icon-color hover:text-orange-400 transition"
-                                        title="Nuova priorità"
-                                    >
-                                        <FontAwesomeIcon icon={faPlus} size="sm" />
-                                    </button>
-                                </NavLink>
-
-                                {/* Ruoli */}
-                                <NavLink
-                                    to="/ruoli"
-                                    onClick={onClose}
-                                    className={({ isActive }) =>
-                                        `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-1 rounded"
-                                        }`
-                                    }
-                                >
-                                    <span>Ruoli</span>
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            onApriRuoloModal();
-                                        }}
-                                        className="icon-color hover:text-teal-400 transition"
-                                        title="Nuovo ruolo"
-                                    >
-                                        <FontAwesomeIcon icon={faPlus} size="sm" />
-                                    </button>
-                                </NavLink>
-                            </div>
-                        )}
-                    </div>
+                    <NavLink
+                        to="/altre-liste"
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                            `hover-bg-theme flex items-center gap-2 ${isActive ? "active-link" : "px-4 py-2 rounded"}`
+                        }
+                    >
+                        <FontAwesomeIcon icon={faEllipsisH} className="icon-color" />
+                        Altro
+                    </NavLink>
                 </div>
             </nav>
         </aside>

@@ -1,11 +1,11 @@
 // src/components/IntestazioneLista.tsx
-import { type ReactNode } from "react";
+import { type ReactNode, type JSX } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrash } from "@fortawesome/free-solid-svg-icons";
 import { useNavigate } from "react-router-dom";
 
 type Props = {
-    titolo: string;
+    titolo: string | JSX.Element;
     icona: any; // icona FontAwesome
     coloreIcona?: string;
     azioniExtra?: ReactNode;

@@ -55,12 +55,7 @@ export default function ListaPriorita() {
                         ),
                 },
             ]}
-            renderDettaglio={(p) => (
-                <p>
-                    ID: {p.id}
-                    {p.colore && <span className="ml-2">({p.colore})</span>}
-                </p>
-            )}
+
             renderModaleModifica={(id, onClose) => (
                 <MiniPrioritaEditorModal prioritaId={id} onClose={onClose} />
             )}

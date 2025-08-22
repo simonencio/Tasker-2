@@ -22,9 +22,7 @@ import CalendarioProgetto from "./GestioneProgetto/CalendarioProgetto";
 import BachecaProgetto from "./GestioneProgetto/BachecaProgetto";
 import ListaClienti from "./Liste/ListaClienti";
 import ListaUtenti from "./Liste/ListaUtenti";
-import ListaStati from "./Liste/ListaStati";
-import ListaPriorita from "./Liste/ListaPriorita";
-import ListaRuoli from "./Liste/ListaRuoli";
+import AltreListe from "./Liste/AltreListe"; // 👈 nuovo import
 import ResetPassword from "./Pagine/ResetPassword";
 import Header from "./Header/Header";
 import Sidebar from "./Sidebar/Sidebar";
@@ -125,9 +123,12 @@ function AppContent() {
     }, []);
 
     const getMaxModals = useCallback(() => {
-        if (windowWidth <= 768) return 1;
-        if (windowWidth <= 1024) return 2;
-        return 4;
+        if (windowWidth <= 640) return 1;    // telefoni piccoli
+        if (windowWidth <= 1024) return 2;   // tablet / laptop piccoli
+        if (windowWidth <= 1440) return 3;   // laptop grandi
+        if (windowWidth <= 1920) return 4;
+        if (windowWidth >= 2560) return 6;   // desktop 4k
+        return 5;                            // schermi molto grandi
     }, [windowWidth]);
 
     useEffect(() => {
@@ -199,9 +200,7 @@ function AppContent() {
                                 onApriTaskModal={() => openModal("task")}
                                 onApriClientModal={() => openModal("client")}
                                 onApriUserModal={() => openModal("user")}
-                                onApriStatoModal={() => openModal("stato")}
-                                onApriPrioritaModal={() => openModal("priorita")}
-                                onApriRuoloModal={() => openModal("ruolo")}
+
                             />
                         </div>
                     )}
@@ -225,9 +224,8 @@ function AppContent() {
                                 <Route path="/task" element={<ListaTask />} />
                                 <Route path="/clienti" element={<ListaClienti />} />
                                 <Route path="/utenti" element={<ListaUtenti />} />
-                                <Route path="/stati" element={<ListaStati />} />
-                                <Route path="/priorita" element={<ListaPriorita />} />
-                                <Route path="/ruoli" element={<ListaRuoli />} />
+                                <Route path="/altre-liste" element={<AltreListe onApriModale={openModal} />} />
+
                                 <Route path="/profilo" element={<Profilo />} />
 
                                 <Route path="/progetti/:slug" element={<DettaglioProgetto />} />

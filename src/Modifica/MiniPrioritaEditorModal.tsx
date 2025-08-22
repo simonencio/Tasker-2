@@ -2,15 +2,12 @@ import { useEffect, useState } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
-import { traduciColore } from "../supporto/traduzioniColori";
+import { traduciColore, traduciColoreInverso } from "../supporto/traduzioniColori";
 
 type Props = {
     prioritaId: string;
     onClose: () => void;
 };
-
-// 🔹 Mappa colori ITA → ENG
-
 
 export default function MiniPrioritaEditorModal({ prioritaId, onClose }: Props) {
     const [nome, setNome] = useState("");
@@ -28,7 +25,8 @@ export default function MiniPrioritaEditorModal({ prioritaId, onClose }: Props) 
 
             if (data) {
                 setNome(data.nome || "");
-                setColore(data.colore || null);
+                // 🔹 converto ENG → ITA per mostrarlo all’utente
+                setColore(data.colore ? traduciColoreInverso(data.colore) : null);
             }
             setLoading(false);
         };
@@ -37,6 +35,7 @@ export default function MiniPrioritaEditorModal({ prioritaId, onClose }: Props) 
     }, [prioritaId]);
 
     const salvaModifiche = async () => {
+        // 🔹 converto ITA → ENG prima di salvare
         const coloreTradotto = colore ? traduciColore(colore) : null;
 
         await supabase

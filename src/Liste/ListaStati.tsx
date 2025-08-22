@@ -55,12 +55,7 @@ export default function ListaStati() {
                         ),
                 },
             ]}
-            renderDettaglio={(s) => (
-                <p>
-                    ID: {s.id}
-                    {s.colore && <span className="ml-2">({s.colore})</span>}
-                </p>
-            )}
+
             renderModaleModifica={(id, onClose) => (
                 <MiniStatoEditorModal statoId={id} onClose={onClose} />
             )}

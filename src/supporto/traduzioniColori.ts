@@ -12,7 +12,17 @@ export const traduzioniColori: Record<string, string> = {
     marrone: "brown",
 };
 
+// ITA → ENG
 export const traduciColore = (colore: string): string => {
     const lower = colore.trim().toLowerCase();
-    return traduzioniColori[lower] || colore; // se non trova, lascia invariato
+    return traduzioniColori[lower] || colore;
+};
+
+// ENG → ITA
+export const traduciColoreInverso = (coloreEng: string): string => {
+    const lower = coloreEng.trim().toLowerCase();
+    const trovato = Object.entries(traduzioniColori).find(
+        ([, eng]) => eng === lower
+    );
+    return trovato ? trovato[0] : coloreEng;
 };
