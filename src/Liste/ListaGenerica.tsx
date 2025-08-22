@@ -11,7 +11,7 @@ type Colonna<T> = {
 };
 
 type ListaGenericaProps<T> = {
-    titolo: string;
+    titolo: string | JSX.Element;
     icona: any;
     coloreIcona: string;
     tipo: "tasks" | "progetti" | "clienti" | "utenti" | "stati" | "priorita" | "ruoli";
@@ -130,9 +130,11 @@ export default function ListaGenerica<T extends { id: string | number }>({
                                             <FontAwesomeIcon icon={faTrash} />
                                         </button>
 
-                                        <button className="text-theme text-xl font-bold">
-                                            {isOpen ? "−" : "+"}
-                                        </button>
+                                        {renderDettaglio && (
+                                            <button className="text-theme text-xl font-bold">
+                                                {isOpen ? "−" : "+"}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 

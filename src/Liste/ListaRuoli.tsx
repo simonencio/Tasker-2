@@ -40,7 +40,7 @@ export default function ListaRuoli() {
             colonne={[
                 { chiave: "nome", label: "Nome", className: "flex-1 font-medium truncate" },
             ]}
-            renderDettaglio={(r) => <p>ID: {r.id}</p>}
+
             renderModaleModifica={(id, onClose) => (
                 <MiniRuoloEditorModal ruoloId={id} onClose={onClose} />
             )}
