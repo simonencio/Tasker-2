@@ -15,7 +15,6 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 
 import MiniProjectEditorModal from "../Modifica/MiniProjectEditorModal";
-import IntestazioneProgetto from "./IntestazioneProgetto";
 import { isUtenteAdmin } from "../supporto/ruolo";
 import ToggleMie from "./ToggleMie";
 import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
@@ -292,11 +291,8 @@ export default function DettaglioProgetto() {
 
     return (
         <div className="min-h-screen bg-theme text-theme">
-            <IntestazioneProgetto
-                id={progettoId}
-                soloMieTask={soloMieTask}
-                setSoloMieTask={isAdmin ? setSoloMieTask : () => { }}
-            />
+
+
 
             <div className="p-6 max-w-6xl mx-auto w-full">
                 {/* titolo */}

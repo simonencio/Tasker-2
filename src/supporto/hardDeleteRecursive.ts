@@ -87,8 +87,14 @@ export async function hardDeleteProgetto(progettoId: string): Promise<void> {
 /**
  * 🔹 3. Eliminazione definitiva di un Utente
  */
+/**
+ * 🔹 3. Eliminazione definitiva di un Utente
+ */
+/**
+ * 🔹 3. Eliminazione definitiva di un Utente
+ */
 export async function hardDeleteUtente(utenteId: string): Promise<void> {
-    // Commenti scritti
+    // Pulizia tabelle collegate (commenti, notifiche, ecc.)
     const { data: commenti } = await supabase
         .from("commenti")
         .select("id")
@@ -102,25 +108,29 @@ export async function hardDeleteUtente(utenteId: string): Promise<void> {
         }
     }
 
-    // Commenti ricevuti
     await hardRemove("commenti_destinatari", "utente_id", utenteId);
-
-    // Associazioni
     await hardRemove("utenti_task", "utente_id", utenteId);
     await hardRemove("utenti_progetti", "utente_id", utenteId);
-
-    // Notifiche
     await hardRemove("notifiche", "creatore_id", utenteId);
     await hardRemove("notifiche_utenti", "utente_id", utenteId);
     await hardRemove("notifiche_preferenze", "utente_id", utenteId);
-
-    // Time tracking
     await hardRemove("time_entries", "utente_id", utenteId);
     await hardRemove("task_durate_totali", "utente_id", utenteId);
 
-    // Infine l'utente
-    await hardRemove("utenti", "id", utenteId);
+    // ⚡ Chiamata all'Edge Function per eliminare definitivamente utente e auth.user
+    const res = await fetch("https://kieyhhmxinmdsnfdglrm.supabase.co/functions/v1/delete-utente", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ utenteId }),
+    });
+
+    if (!res.ok) {
+        const { error } = await res.json();
+        throw new Error("Errore eliminazione definitiva: " + error);
+    }
 }
+
+
 
 /**
  * 🔹 4. Eliminazione definitiva di un Cliente (con tutti i suoi progetti e task)
