@@ -293,7 +293,7 @@ function AppContent() {
                                 <Route path="/profilo" element={<Profilo />} />
 
                                 <Route path="/progetti/:slug" element={<DettaglioProgetto />} />
-                                <Route path="/progetti/:slug/calendario" element={<CalendarioProgetto />} />
+                                <Route path="/calendario" element={<CalendarioProgetto />} />
                                 <Route path="/progetti/:slug/bacheca" element={<BachecaProgetto />} />
 
                                 <Route path="/tasks/:slug" element={<DettaglioTask />} />

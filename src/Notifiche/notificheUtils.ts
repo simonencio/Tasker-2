@@ -1,19 +1,41 @@
 // notificheUtils.ts
 import { supabase } from "../supporto/supabaseClient";
 
+export type DettagliNotifica = {
+    campo?: "nome" | "descrizione" | string;
+    da?: string | null;
+    a?: string | null;
+    // in futuro puoi aggiungere altre chiavi senza cambiare il tipo
+    [k: string]: any;
+};
+
 
 export type Notifica = {
-    id: string;
-    letto: boolean;
-    visualizzato: boolean;
+    // pivot notifiche_utenti
+    id: string;                       // id di notifiche_utenti (lo usi per eliminare/leggere)
+    utente_id: string;
+
+    // notifica master
+    notifica_id: string;
     messaggio: string;
     data_creazione: string;
-    notifica_id: string;
-    task_nome?: string;
-    progetto_nome?: string;
-    creatore_nome?: string;
-    tipo_codice?: string; // per logica formattazione
+    tipo_codice?: string | null;      // es. "PROGETTO_MODIFICATO"
+    tipo_descrizione?: string | null; // es. "Un progetto è stato modificato"
+    dettagli?: DettagliNotifica | null;
+
+    // meta utili per la UI
+    progetto_id?: string | null;
+    progetto_nome?: string | null;
+    task_id?: string | null;
+    task_nome?: string | null;
+    creatore_id?: string | null;
+    creatore_nome?: string | null;
+
+    // stato utente-notifica
+    letto: boolean;
+    visualizzato?: boolean | null;
 };
+
 
 // opzionale: se vuoi riusare il tipo anche altrove
 export type NotificaExtra = {
@@ -28,34 +50,48 @@ export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
     const { data, error } = await supabase
         .from("notifiche_utenti")
         .select(`
-      id,
-      letto,
-      visualizzato,
-      notifica_id,
-      notifiche (
-        id,
-        tipo: tipo_id ( codice ),
-        messaggio,
-        data_creazione,
-        tasks ( nome ),
-        progetti ( nome ),
-        creatore: creatore_id ( nome, cognome )
-      )
-    `)
+            id,
+            utente_id,                 
+            letto,
+            visualizzato,
+            notifica_id,
+            notifiche (
+            id,
+            tipo: tipo_id ( codice ),
+            messaggio,
+            data_creazione,
+            dettagli,                
+            tasks ( nome ),
+            progetti ( nome ),
+            creatore: creatore_id ( nome, cognome )
+            )
+        `)
         .eq("utente_id", userId)
         .is("deleted_at", null)
         .order("id", { ascending: false })
         .limit(30);
+
 
     if (error || !data) {
         console.error("Errore nel recupero notifiche:", error);
         return [];
     }
 
+    function parseDettagli(val: unknown): DettagliNotifica | null {
+        if (!val) return null;
+        if (typeof val === "object") return val as DettagliNotifica;
+        if (typeof val === "string") {
+            try { return JSON.parse(val) as DettagliNotifica; } catch { return null; }
+        }
+        return null;
+    }
+
+
     return data.map((row: any) => {
         const notifica = row.notifiche;
+        const dettagli = parseDettagli(notifica?.dettagli);
 
-        // Formattazione speciale per commenti
+        // Caso speciale: commento_task
         if (notifica?.tipo?.codice === "commento_task") {
             const contenuto = notifica.messaggio ?? "(nessun commento)";
             const dataOra = notifica.data_creazione
@@ -69,6 +105,7 @@ export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
 
             return {
                 id: String(row.id),
+                utente_id: row.utente_id,                 // <== ora c’è
                 letto: row.letto,
                 visualizzato: row.visualizzato,
                 notifica_id: row.notifica_id,
@@ -78,12 +115,14 @@ export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
                 progetto_nome: notifica.progetti?.nome,
                 creatore_nome: undefined,
                 tipo_codice: notifica.tipo.codice,
-            };
+                dettagli,                                 // <== passa comunque i dettagli
+            } as Notifica;
         }
 
         // Default
         return {
             id: String(row.id),
+            utente_id: row.utente_id,                   // <== ora c’è
             letto: row.letto,
             visualizzato: row.visualizzato,
             notifica_id: row.notifica_id,
@@ -95,9 +134,11 @@ export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
                 ? `${notifica.creatore.nome} ${notifica.creatore.cognome}`
                 : undefined,
             tipo_codice: notifica?.tipo?.codice,
-        };
+            dettagli,                                   // <== qui useremo {campo,da,a}
+        } as Notifica;
     });
 }
+
 
 // ✅ Crea una nuova notifica per destinatari con controllo invio mail
 export async function inviaNotifica(
@@ -105,7 +146,8 @@ export async function inviaNotifica(
     destinatari: string[],
     messaggio: string,
     creatore_id?: string,
-    contesto?: NotificaExtra // <-- ora include commento_id e parent_id
+    contesto?: NotificaExtra, // <-- ora include commento_id e parent_id
+    dettagli?: DettagliNotifica
 ): Promise<void> {
     // 1) trova tipo_id dal codice
     const { data: tipo, error: tipoError } = await supabase
@@ -133,6 +175,7 @@ export async function inviaNotifica(
             // campi extra collegati ai commenti/risposte
             commento_id: contesto?.commento_id || null,
             parent_id: contesto?.parent_id || null,
+            dettagli: dettagli ?? null,
         })
         .select()
         .single();
@@ -309,3 +352,18 @@ export function mostraNotificaBrowser(titolo: string, opzioni?: NotificationOpti
         });
     }
 }
+
+export function renderDettaglio(n: Notifica): string | null {
+    const d = n.dettagli || {};
+    switch (d.campo) {
+        case "nome":
+            if (d.da || d.a) return `Nome cambiato da "${d.da ?? ""}" a "${d.a ?? ""}"`.trim();
+            return "Nome progetto modificato";
+        case "descrizione":
+            if (d.da || d.a) return `Descrizione aggiornata da "${d.da ?? ""}" a "${d.a ?? ""}"`.trim();
+            return "Descrizione progetto aggiornata";
+        default:
+            return null;
+    }
+}
+

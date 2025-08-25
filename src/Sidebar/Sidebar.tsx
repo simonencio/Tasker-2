@@ -9,6 +9,7 @@ import {
     faUserTie,
     faUser,
     faEllipsisH,
+    faCalendarWeek
 } from "@fortawesome/free-solid-svg-icons";
 
 type SidebarProps = {
@@ -81,6 +82,19 @@ export default function Sidebar({
                         <FontAwesomeIcon icon={faHome} className="icon-color" />
                         Home
                     </NavLink>
+
+                    {/* CALENDARIO */}
+                    <NavLink
+                        to="/calendario"
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                            `hover-bg-theme flex items-center gap-2 ${isActive ? "active-link" : "px-4 py-2 rounded"}`
+                        }
+                    >
+                        <FontAwesomeIcon icon={faCalendarWeek} className="icon-color" />
+                        Calendario
+                    </NavLink>
+
 
                     {/* PROGETTI */}
                     <NavLink
