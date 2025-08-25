@@ -1,7 +1,5 @@
-// src/Liste/ListaProgetti.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faLink, faProjectDiagram, faCheckCircle } from "@fortawesome/free-solid-svg-icons";
 
@@ -12,6 +10,8 @@ import FiltriGenericiAvanzati, {
 } from "../supporto/FiltriGenericiAvanzati";
 import type { Progetto, Utente } from "../supporto/tipi";
 import ListaGenerica from "./ListaGenerica";
+import { supabase } from "../supporto/supabaseClient";
+import { fetchProgetti } from "../supporto/fetchData";
 
 type TaskBreve = {
     id: string;
@@ -30,7 +30,6 @@ export default function ListaProgetti() {
     const [utenteId, setUtenteId] = useState<string | null>(null);
     const [progettiCompletati] = useState<Set<string>>(new Set());
     const [soloCompletati, setSoloCompletati] = useState(false);
-    const [] = useState<Record<string, { utente: Utente; durata: number }[]>>({});
     const [filtroAvanzato, setFiltroAvanzato] = useState<FiltroAvanzatoGenerico>({});
 
     const navigate = useNavigate();
@@ -44,54 +43,14 @@ export default function ListaProgetti() {
     useEffect(() => {
         const caricaProgetti = async () => {
             setLoading(true);
-            let idsProgetti: string[] = [];
-
-            if ((soloMie || filtroAvanzato.utente) && utenteId) {
-                const idFiltro = filtroAvanzato.utente || utenteId;
-                const { data } = await supabase.from("utenti_progetti").select("progetto_id").eq("utente_id", idFiltro);
-                idsProgetti = data?.map((r) => r.progetto_id) || [];
-                if (idsProgetti.length === 0) {
-                    setProgetti([]);
-                    setLoading(false);
-                    return;
-                }
-            }
-
-            const query = supabase
-                .from("progetti")
-                .select(`
-                    id, slug, nome, consegna, note, tempo_stimato,
-                    stato:stato_id ( id, nome, colore ),
-                    priorita:priorita_id ( id, nome ),
-                    cliente:cliente_id ( id, nome ),
-                    utenti_progetti:utenti_progetti ( utenti ( id, nome, cognome ) )
-                `)
-                .is("deleted_at", null);
-
-            if (idsProgetti.length > 0) query.in("id", idsProgetti);
-            if (filtroAvanzato.stato) query.eq("stato_id", filtroAvanzato.stato);
-            if (filtroAvanzato.priorita) query.eq("priorita_id", filtroAvanzato.priorita);
-            if (filtroAvanzato.cliente) query.eq("cliente_id", filtroAvanzato.cliente);
-            if (filtroAvanzato.dataInizio) query.gte("consegna", filtroAvanzato.dataInizio as string);
-            if (filtroAvanzato.dataFine) query.lte("consegna", filtroAvanzato.dataFine as string);
-
-            const { data } = await query;
-            if (data) {
-                const progettiPuliti: ProgettoConSlug[] = data.map((p: any) => ({
-                    id: p.id,
-                    slug: p.slug,
-                    nome: p.nome,
-                    consegna: p.consegna,
-                    note: p.note,
-                    stato: Array.isArray(p.stato) ? p.stato[0] : p.stato,
-                    priorita: Array.isArray(p.priorita) ? p.priorita[0] : p.priorita,
-                    cliente: Array.isArray(p.cliente) ? p.cliente[0] : p.cliente,
-                    membri: p.utenti_progetti?.map((up: any) => up.utenti) ?? [],
-                    tempo_stimato: p.tempo_stimato,
-                }));
+            try {
+                const data = await fetchProgetti(
+                    { ...filtroAvanzato, soloMie },
+                    utenteId ?? undefined
+                );
 
                 setProgetti(
-                    ordinaClientSide(progettiPuliti, filtroAvanzato.ordine ?? null, (proj, criterio) => {
+                    ordinaClientSide(data, filtroAvanzato.ordine ?? null, (proj, criterio) => {
                         switch (criterio) {
                             case "consegna_asc":
                             case "consegna_desc":
@@ -110,8 +69,9 @@ export default function ListaProgetti() {
                         }
                     })
                 );
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
 
         if (utenteId) caricaProgetti();

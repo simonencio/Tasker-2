@@ -1,11 +1,11 @@
-// src/Liste/ListaUtenti.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUser, faFolderOpen } from "@fortawesome/free-solid-svg-icons";
-import MiniUserEditorModal from "../Modifica/MiniUserEditorModal";
+
 import ListaGenerica from "./ListaGenerica";
+import MiniUserEditorModal from "../Modifica/MiniUserEditorModal";
+import { fetchUtenti } from "../supporto/fetchData";
 
 type Utente = {
     id: string;
@@ -25,33 +25,9 @@ export default function ListaUtenti() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        const caricaUtenti = async () => {
-            setLoading(true);
-            const { data, error } = await supabase
-                .from("utenti")
-                .select(`
-          id, nome, cognome, email, avatar_url, deleted_at,
-          ruolo:ruoli(id, nome),
-          progetti:utenti_progetti(progetti(id, nome, slug, deleted_at))
-        `)
-                .order("created_at", { ascending: false });
-
-            if (!error && data) {
-                const utentiPuliti: Utente[] = data
-                    .filter((u) => !u.deleted_at)
-                    .map((u: any) => ({
-                        ...u,
-                        ruolo: u.ruolo,
-                        progetti: (u.progetti || [])
-                            .map((up: any) => up.progetti)
-                            .filter((p: any) => p && !p.deleted_at),
-                    }));
-                setUtenti(utentiPuliti);
-            }
-            setLoading(false);
-        };
-
-        caricaUtenti();
+        fetchUtenti()
+            .then(setUtenti)
+            .finally(() => setLoading(false));
     }, []);
 
     return (

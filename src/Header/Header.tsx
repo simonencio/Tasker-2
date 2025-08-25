@@ -16,6 +16,8 @@ import {
     richiediPermessoNotificheBrowser,
     mostraNotificaBrowser,
 } from "../Notifiche/notificheUtils";
+import { faTrash, faTrashAlt } from "@fortawesome/free-solid-svg-icons";
+import { useLocation } from "react-router-dom";
 
 type NotificaUtenteRecord = {
     notifica_id: string;
@@ -60,6 +62,15 @@ export default function Header({
     const createRef = useRef<HTMLDivElement>(null);
     const themeRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
+    const [isMobile, setIsMobile] = useState(false);
+    const location = useLocation();
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth <= 425);
+        handleResize(); // inizializza
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
 
     const applyTheme = (theme: string) => {
         let resolved = theme;
@@ -265,6 +276,20 @@ export default function Header({
             </div>
 
             <div className="flex items-center gap-2">
+                {/* --- Icona Cestino --- */}
+                {loggedIn && !isMobile && (
+                    <span
+                        onClick={() => navigate("/cestino")}
+                        className="cursor-pointer px-3 py-2 rounded"
+                        title="Vai al cestino"
+                    >
+                        <FontAwesomeIcon
+                            icon={location.pathname === "/cestino" ? faTrashAlt : faTrash}
+                            size="xl"
+                            className="text-red-600 hover:scale-125 hover:shadow-xl transition-transform duration-300"
+                        />
+                    </span>
+                )}
                 {loggedIn && (
                     <div ref={createRef} className="relative">
                         <span onClick={() => setCreateOpen(p => !p)} className="cursor-pointer px-3 py-2 rounded">
