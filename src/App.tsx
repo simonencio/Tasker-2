@@ -1,3 +1,4 @@
+// src/App.tsx
 import { useEffect, useState, useCallback } from "react";
 import {
     BrowserRouter as Router,
@@ -6,27 +7,27 @@ import {
     Navigate,
     useLocation,
     useParams,
+    useSearchParams, // ⬅️ nuovo
 } from "react-router-dom";
 import { supabase } from "./supporto/supabaseClient";
 import "./App.css";
+import BachecaDinamica from "./Liste/BachecaDinamica";
 
 import RegisterForm from "./Pagine/RegisterForm";
 import ConfirmEmailWelcome from "./Pagine/ConfirmEmailWelcome";
 import LoginForm from "./Pagine/LoginForm";
 import Home from "./Pagine/Home";
 import Profilo from "./Profilo/Profilo";
-import ListaProgetti from "./Liste/ListaProgetti";
-import ListaTask from "./Liste/ListaTask";
+
 import DettaglioProgetto from "./GestioneProgetto/DettaglioProgetto";
 import CalendarioProgetto from "./GestioneProgetto/CalendarioProgetto";
 import BachecaProgetto from "./GestioneProgetto/BachecaProgetto";
-import ListaClienti from "./Liste/ListaClienti";
-import ListaUtenti from "./Liste/ListaUtenti";
-import AltreListe from "./Liste/AltreListe"; // 👈 nuovo import
+
 import ResetPassword from "./Pagine/ResetPassword";
 import Header from "./Header/Header";
 import Sidebar from "./Sidebar/Sidebar";
 import NotificheSidebar from "./Notifiche/NotificheSidebar";
+
 import MiniProjectCreatorModal from "./Creazione/MiniProjectCreatorModal";
 import MiniTaskCreatorModal from "./Creazione/MiniTaskCreatorModal";
 import MiniClientCreatorModal from "./Creazione/MiniClientCreatorModal";
@@ -34,17 +35,16 @@ import MiniUserCreatorModal from "./Creazione/MiniUserCreatorModal";
 import MiniStatoCreatorModal from "./Creazione/MiniStatoCreatorModal";
 import MiniPrioritaCreatorModal from "./Creazione/MiniPrioritaCreatorModal";
 import MiniRuoloCreatorModal from "./Creazione/MiniRuoloCreatorModal";
+
 import DettaglioTask from "./GestioneTask/DettaglioTask";
 import Cestino from "./Pagine/Cestino";
 
-type ModalType =
-    | "project"
-    | "task"
-    | "client"
-    | "user"
-    | "stato"
-    | "priorita"
-    | "ruolo";
+// ✅ scheletri lista/card
+import ListaDinamica from "./Liste/ListaDinamica";
+import CardDinamiche from "./Liste/CardDinamiche"; // ⬅️ nuovo
+import type { ResourceKey } from "./Liste/resourceConfigs"; // ⬅️ nuovo
+
+type ModalType = "project" | "task" | "client" | "user" | "stato" | "priorita" | "ruolo";
 
 /** Redirect legacy /tasks/:id -> /tasks/:slug */
 function RedirectTaskById() {
@@ -56,11 +56,7 @@ function RedirectTaskById() {
         let alive = true;
         (async () => {
             if (!id) return;
-            const { data, error } = await supabase
-                .from("tasks")
-                .select("slug")
-                .eq("id", id)
-                .maybeSingle();
+            const { data, error } = await supabase.from("tasks").select("slug").eq("id", id).maybeSingle();
             if (!alive) return;
             if (error) {
                 console.error(error);
@@ -83,6 +79,45 @@ function RedirectTaskById() {
     return null;
 }
 
+/** ⬇️ Wrapper riutilizzabile con dropdown lista/card */
+function ResourceRoute({ tipo, paramKey = "view" }: { tipo: ResourceKey; paramKey?: string }) {
+    const [params, setParams] = useSearchParams();
+    const view = params.get(paramKey) === "cards"
+        ? "cards"
+        : params.get(paramKey) === "board"
+            ? "board"
+            : "list";
+
+    const onChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const next = new URLSearchParams(params);
+        next.set(paramKey, e.target.value);
+        setParams(next, { replace: true });
+    };
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center justify-end">
+                <label className="mr-2 text-sm opacity-80">Visualizzazione:</label>
+                <select value={view} onChange={onChange} className="input-style">
+                    <option value="list">Lista</option>
+                    <option value="cards">Card</option>
+                    <option value="board">Bacheca</option>
+                </select>
+            </div>
+
+            {view === "cards" ? (
+                <CardDinamiche tipo={tipo} />
+            ) : view === "board" ? (
+                <BachecaDinamica tipo={tipo} />
+            ) : (
+                <ListaDinamica tipo={tipo} />
+            )}
+        </div>
+    );
+}
+
+
+
 function AppContent() {
     const [loggedIn, setLoggedIn] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -101,7 +136,9 @@ function AppContent() {
 
     useEffect(() => {
         const checkAuth = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
             setLoggedIn(!!user);
             setUserId(user?.id ?? null);
         };
@@ -123,12 +160,12 @@ function AppContent() {
     }, []);
 
     const getMaxModals = useCallback(() => {
-        if (windowWidth <= 640) return 1;    // telefoni piccoli
-        if (windowWidth <= 1024) return 2;   // tablet / laptop piccoli
-        if (windowWidth <= 1440) return 3;   // laptop grandi
+        if (windowWidth <= 640) return 1;
+        if (windowWidth <= 1024) return 2;
+        if (windowWidth <= 1440) return 3;
         if (windowWidth <= 1920) return 4;
-        if (windowWidth >= 2560) return 6;   // desktop 4k
-        return 5;                            // schermi molto grandi
+        if (windowWidth >= 2560) return 6;
+        return 5;
     }, [windowWidth]);
 
     useEffect(() => {
@@ -168,6 +205,22 @@ function AppContent() {
 
     const getOffset = (type: ModalType) => activeModals.indexOf(type);
 
+    // ✅ esponi hook globale per aprire modali "create" da resourceConfigs
+    useEffect(() => {
+        (window as any).__openMiniCreate = (kind: "stato" | "priorita" | "ruolo") => {
+            if (kind === "stato") openModal("stato");
+            else if (kind === "priorita") openModal("priorita");
+            else if (kind === "ruolo") openModal("ruolo");
+        };
+        return () => {
+            try {
+                delete (window as any).__openMiniCreate;
+            } catch {
+                (window as any).__openMiniCreate = undefined;
+            }
+        };
+    }, []);
+
     return (
         <>
             <header className="fixed top-0 left-0 right-0 z-50">
@@ -200,18 +253,13 @@ function AppContent() {
                                 onApriTaskModal={() => openModal("task")}
                                 onApriClientModal={() => openModal("client")}
                                 onApriUserModal={() => openModal("user")}
-
                             />
                         </div>
                     )}
 
                     {notificheOpen && (
                         <div className="fixed top-16 right-0 z-40 w-full sm:w-full md:w-64 h-[calc(100vh-4rem)] bg-theme shadow-xl">
-                            <NotificheSidebar
-                                open={notificheOpen}
-                                onClose={() => setNotificheOpen(false)}
-                                userId={userId}
-                            />
+                            <NotificheSidebar open={notificheOpen} onClose={() => setNotificheOpen(false)} userId={userId} />
                         </div>
                     )}
 
@@ -220,11 +268,27 @@ function AppContent() {
                             <Routes>
                                 <Route path="/" element={<Navigate to={loggedIn ? "/home" : "/login"} replace />} />
                                 <Route path="/home" element={<Home />} />
-                                <Route path="/progetti" element={<ListaProgetti />} />
-                                <Route path="/task" element={<ListaTask />} />
-                                <Route path="/clienti" element={<ListaClienti />} />
-                                <Route path="/utenti" element={<ListaUtenti />} />
-                                <Route path="/altre-liste" element={<AltreListe onApriModale={openModal} />} />
+
+                                {/* ✅ route risorsa con switch Lista/Card */}
+                                <Route path="/progetti" element={<ResourceRoute tipo="progetti" />} />
+                                <Route path="/task" element={<ResourceRoute tipo="tasks" />} />
+                                <Route path="/clienti" element={<ResourceRoute tipo="clienti" />} />
+                                <Route path="/utenti" element={<ResourceRoute tipo="utenti" />} />
+
+                                {/* Aggregato “Altre liste” con switch Lista/Card per ogni risorsa */}
+                                <Route
+                                    path="/altre-liste"
+                                    element={
+                                        <div className="space-y-8">
+                                            <ResourceRoute tipo="stati" paramKey="view_stati" />
+                                            <ResourceRoute tipo="ruoli" paramKey="view_ruoli" />
+                                            <ResourceRoute tipo="priorita" paramKey="view_priorita" />
+                                            <ResourceRoute tipo="time_entries" paramKey="view_time_entries" />
+                                        </div>
+                                    }
+                                />
+
+
 
                                 <Route path="/profilo" element={<Profilo />} />
 
@@ -237,7 +301,6 @@ function AppContent() {
                                 <Route path="/tasks/:id([0-9a-fA-F-]{36})" element={<RedirectTaskById />} />
 
                                 <Route path="/cestino" element={<Cestino />} />
-
                             </Routes>
                         </div>
                     </div>
@@ -269,7 +332,6 @@ function AppContent() {
         </>
     );
 }
-
 
 export default function App() {
     return (
