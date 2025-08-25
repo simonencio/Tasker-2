@@ -17,7 +17,6 @@ export default function IntestazioneProgetto({ id }: Props) {
 
     const links = [
         { label: 'Dashboard', path: `/progetti/${id}`, end: true },
-        { label: 'Calendario', path: `/progetti/${id}/calendario`, end: false },
         { label: 'Bacheca', path: `/progetti/${id}/bacheca`, end: false },
     ];
 

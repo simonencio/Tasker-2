@@ -10,6 +10,8 @@ import {
     faBell,
 } from "@fortawesome/free-solid-svg-icons";
 
+import { renderDettaglio } from "./notificheUtils";
+
 /* ============================== Hook campanello ============================== */
 export function useNotificheBell() {
     const [open, setOpen] = useState(false);
@@ -71,7 +73,8 @@ export default function NotificheSidebar({ open, onClose, userId }: Props) {
                     visualizzato_al: new Date().toISOString(),
                 })
                 .eq("utente_id", userId)
-                .is("visualizzato", false);
+                .is("visualizzato", false)
+                .is("deleted_at", null);
         };
 
         const loadNotifiche = async () => {
@@ -170,6 +173,11 @@ export default function NotificheSidebar({ open, onClose, userId }: Props) {
                                 >
                                     {n.messaggio}
                                 </p>
+                                {renderDettaglio(n) && (
+                                    <p className="mt-2 text-sm opacity-80 border-l-2 pl-3">
+                                        {renderDettaglio(n)}
+                                    </p>
+                                )}
 
                                 {(n.task_nome ||
                                     n.progetto_nome ||
