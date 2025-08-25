@@ -1,8 +1,6 @@
 // src/components/IntestazioneLista.tsx
 import { type ReactNode, type JSX } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash } from "@fortawesome/free-solid-svg-icons";
-import { useNavigate } from "react-router-dom";
 
 type Props = {
     titolo: string | JSX.Element;
@@ -10,10 +8,10 @@ type Props = {
     coloreIcona?: string;
     azioniExtra?: ReactNode;
     tipo: "tasks" | "progetti" | "utenti" | "clienti" | "stati" | "priorita" | "ruoli"; // 👈 aggiunti
+    modalitaCestino?: boolean; // 👈
 };
 
-export default function IntestazioneLista({ titolo, icona, coloreIcona, azioniExtra, tipo }: Props) {
-    const navigate = useNavigate();
+export default function IntestazioneLista({ titolo, icona, coloreIcona, azioniExtra, }: Props) {
 
     return (
         <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
@@ -23,13 +21,7 @@ export default function IntestazioneLista({ titolo, icona, coloreIcona, azioniEx
             </h1>
             <div className="flex items-center gap-4 flex-wrap">
                 {azioniExtra}
-                <button
-                    onClick={() => navigate(`/cestino/${tipo}`)}
-                    className="px-3 py-1 bg-red-600 text-white rounded flex items-center gap-2"
-                >
-                    <FontAwesomeIcon icon={faTrash} />
-                    Cestino
-                </button>
+
             </div>
         </div>
     );

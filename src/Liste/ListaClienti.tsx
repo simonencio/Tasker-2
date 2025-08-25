@@ -1,7 +1,5 @@
-// src/Liste/ListaClienti.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
     faAddressBook,
@@ -10,8 +8,10 @@ import {
     faPhone,
     faStickyNote,
 } from "@fortawesome/free-solid-svg-icons";
-import MiniClientEditorModal from "../Modifica/MiniClientEditorModal";
+
 import ListaGenerica from "./ListaGenerica";
+import MiniClientEditorModal from "../Modifica/MiniClientEditorModal";
+import { fetchClienti } from "../supporto/fetchData";
 
 type Cliente = {
     id: string;
@@ -31,28 +31,9 @@ export default function ListaClienti() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        const caricaClienti = async () => {
-            setLoading(true);
-            const { data, error } = await supabase
-                .from("clienti")
-                .select(`
-          id, nome, email, telefono, avatar_url, note, deleted_at,
-          progetti:progetti ( id, nome, slug, deleted_at )
-        `)
-                .order("created_at", { ascending: false });
-
-            if (!error && data) {
-                const clientiPuliti = data
-                    .filter((c) => !c.deleted_at)
-                    .map((c: any) => ({
-                        ...c,
-                        progetti: (c.progetti || []).filter((p: any) => !p.deleted_at),
-                    }));
-                setClienti(clientiPuliti);
-            }
-            setLoading(false);
-        };
-        caricaClienti();
+        fetchClienti()
+            .then(setClienti)
+            .finally(() => setLoading(false));
     }, []);
 
     return (
@@ -98,7 +79,7 @@ export default function ListaClienti() {
                     </>
                 )}
                 renderDettaglio={(c) => (
-                    <>
+                    <div className="space-y-1">
                         {c.email && (
                             <p>
                                 <FontAwesomeIcon icon={faEnvelope} className="mr-2 text-gray-500" />
@@ -117,7 +98,7 @@ export default function ListaClienti() {
                                 {c.note}
                             </p>
                         )}
-                    </>
+                    </div>
                 )}
                 renderModaleModifica={(id, onClose) => (
                     <MiniClientEditorModal clienteId={id} onClose={onClose} />

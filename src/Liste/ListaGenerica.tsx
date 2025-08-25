@@ -1,7 +1,17 @@
 import { useState, type JSX } from "react";
 import IntestazioneLista from "./IntestazioneLista";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash, faPen } from "@fortawesome/free-solid-svg-icons";
+import { faTrash, faPen, faRotateLeft } from "@fortawesome/free-solid-svg-icons";
+
+import { softDelete } from "../supporto/softDelete";
+import { softDeleteTask, softDeleteProgetto, softDeleteUtente, softDeleteCliente } from "../supporto/softDeleteRecursive";
+
+import { restoreRecord } from "../supporto/restore";
+import { restoreTask, restoreProgetto, restoreUtente, restoreCliente } from "../supporto/restoreRecursive";
+
+import { replaceReferences, hardDelete } from "../supporto/hardDelete";
+import ConfermaSostituzioneModal from "../supporto/ConfermaSostituzioneModal";
+import { hardDeleteCliente, hardDeleteProgetto, hardDeleteTask, hardDeleteUtente } from "../supporto/hardDeleteRecursive";
 
 type Colonna<T> = {
     chiave: keyof T | string;
@@ -23,6 +33,7 @@ type ListaGenericaProps<T> = {
     azioniExtra?: JSX.Element;
     filtri?: JSX.Element;
     renderModaleModifica?: (id: string, onClose: () => void) => JSX.Element;
+    modalitaCestino?: boolean;
 };
 
 export default function ListaGenerica<T extends { id: string | number }>({
@@ -38,9 +49,11 @@ export default function ListaGenerica<T extends { id: string | number }>({
     azioniExtra,
     filtri,
     renderModaleModifica,
+    modalitaCestino,
 }: ListaGenericaProps<T>) {
     const [itemEspansoId, setItemEspansoId] = useState<string | null>(null);
     const [itemDaModificareId, setItemDaModificareId] = useState<string | null>(null);
+    const [showModal, setShowModal] = useState<{ tipo: string; id: number } | null>(null);
 
     return (
         <div className="p-4 sm:p-6 max-w-7xl mx-auto w-full">
@@ -50,6 +63,7 @@ export default function ListaGenerica<T extends { id: string | number }>({
                 coloreIcona={coloreIcona}
                 tipo={tipo}
                 azioniExtra={azioniExtra}
+                modalitaCestino={modalitaCestino}
             />
 
             {filtri && <div className="mb-6">{filtri}</div>}
@@ -58,17 +72,14 @@ export default function ListaGenerica<T extends { id: string | number }>({
                 <p className="text-center text-theme text-lg">Caricamento...</p>
             ) : (
                 <div className="rounded-xl overflow-hidden shadow-md card-theme max-w-7xl mx-auto">
-                    {/* header tabella */}
+                    {/* intestazione tabella */}
                     <div className="hidden lg:flex px-4 py-2 text-xs font-semibold text-theme border-b border-gray-300 dark:border-gray-600">
                         {colonne.map((col) => (
-                            <div
-                                key={col.chiave as string}
-                                className={col.className ?? "flex-1"}
-                            >
+                            <div key={col.chiave as string} className={col.className ?? "flex-1"}>
                                 {col.label}
                             </div>
                         ))}
-                        <div className="w-20 text-center">Azioni</div>
+                        <div className="w-28 text-center">Azioni</div>
                     </div>
 
                     {/* righe */}
@@ -83,34 +94,25 @@ export default function ListaGenerica<T extends { id: string | number }>({
                                 {/* riga principale */}
                                 <div
                                     className="flex items-center px-4 py-3 text-sm text-theme cursor-pointer"
-                                    onClick={() =>
-                                        setItemEspansoId(isOpen ? null : itemId)
-                                    }
+                                    onClick={() => setItemEspansoId(isOpen ? null : itemId)}
                                 >
                                     {colonne.map((col) => (
-                                        <div
-                                            key={col.chiave as string}
-                                            className={col.className ?? "flex-1"}
-                                        >
-                                            {col.render
-                                                ? col.render(item)
-                                                : (item as any)[col.chiave]}
+                                        <div key={col.chiave as string} className={col.className ?? "flex-1"}>
+                                            {col.render ? col.render(item) : (item as any)[col.chiave]}
                                         </div>
                                     ))}
 
                                     <div
-                                        className="w-20 flex justify-end items-center gap-3 shrink-0"
+                                        className={`w-28 flex items-center shrink-0 ${modalitaCestino ? "justify-center gap-3" : "justify-end gap-3"
+                                            }`}
                                         onClick={(e) => e.stopPropagation()}
                                     >
-                                        {/* azioni custom */}
                                         {azioni && azioni(item)}
 
-                                        {/* pulsante modifica */}
+                                        {/* modifica */}
                                         {renderModaleModifica && (
                                             <button
-                                                onClick={() =>
-                                                    setItemDaModificareId(itemId)
-                                                }
+                                                onClick={() => setItemDaModificareId(itemId)}
                                                 className="icon-color hover:text-blue-600"
                                                 title="Modifica"
                                             >
@@ -118,23 +120,83 @@ export default function ListaGenerica<T extends { id: string | number }>({
                                             </button>
                                         )}
 
-                                        {/* pulsante eliminazione */}
+                                        {/* ripristino (solo cestino) */}
+                                        {modalitaCestino && (
+                                            <button
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    try {
+                                                        if (tipo === "tasks") await restoreTask(itemId);
+                                                        else if (tipo === "progetti") await restoreProgetto(itemId);
+                                                        else if (tipo === "utenti") await restoreUtente(itemId);
+                                                        else if (tipo === "clienti") await restoreCliente(itemId);
+                                                        else {
+                                                            const res = await restoreRecord(tipo, itemId);
+                                                            if (!res.success) throw new Error(res.error);
+                                                        }
+
+                                                    } catch (err: any) {
+                                                        alert("Errore ripristino: " + err.message);
+                                                    }
+                                                }}
+                                                className="icon-color hover:text-green-600"
+                                                title="Ripristina"
+                                            >
+                                                <FontAwesomeIcon icon={faRotateLeft} />
+                                            </button>
+                                        )}
+
+                                        {/* eliminazione */}
                                         <button
-                                            onClick={(e) => {
+                                            onClick={async (e) => {
                                                 e.stopPropagation();
-                                                // TODO: logica di eliminazione
+
+                                                if (modalitaCestino) {
+                                                    // 🔹 SOLO per stati/priorità/ruoli → apri modale sostituzione
+                                                    if (tipo === "stati" || tipo === "priorita" || tipo === "ruoli") {
+                                                        setShowModal({ tipo, id: Number(itemId) });
+                                                        return;
+                                                    }
+
+                                                    // 🔹 Per tasks, progetti, utenti, clienti → hard delete diretto
+                                                    try {
+                                                        if (tipo === "tasks") await hardDeleteTask(itemId);
+                                                        else if (tipo === "progetti") await hardDeleteProgetto(itemId);
+                                                        else if (tipo === "utenti") await hardDeleteUtente(itemId);
+                                                        else if (tipo === "clienti") await hardDeleteCliente(itemId);
+                                                        else throw new Error("Tipo non supportato per hard delete");
+
+
+                                                    } catch (err: any) {
+                                                        alert("Errore eliminazione definitiva: " + err.message);
+                                                    }
+                                                    return;
+                                                }
+
+                                                // 🔹 Eliminazione soft (fuori dal cestino)
+                                                if (!window.confirm("Sei sicuro di voler eliminare questo elemento?")) return;
+
+                                                try {
+                                                    if (tipo === "stati" || tipo === "priorita" || tipo === "ruoli") {
+                                                        const res = await softDelete(tipo, Number(itemId));
+                                                        if (!res.success) throw new Error(res.error);
+                                                    } else if (tipo === "tasks") await softDeleteTask(itemId);
+                                                    else if (tipo === "progetti") await softDeleteProgetto(itemId);
+                                                    else if (tipo === "utenti") await softDeleteUtente(itemId);
+                                                    else if (tipo === "clienti") await softDeleteCliente(itemId);
+                                                    else throw new Error("Tipo non supportato");
+
+
+                                                } catch (err: any) {
+                                                    alert("Errore eliminazione: " + err.message);
+                                                }
                                             }}
                                             className="icon-color hover:text-red-600"
-                                            title="Elimina"
+                                            title={modalitaCestino ? "Elimina definitivamente" : "Elimina"}
                                         >
                                             <FontAwesomeIcon icon={faTrash} />
                                         </button>
 
-                                        {renderDettaglio && (
-                                            <button className="text-theme text-xl font-bold">
-                                                {isOpen ? "−" : "+"}
-                                            </button>
-                                        )}
                                     </div>
                                 </div>
 
@@ -151,9 +213,29 @@ export default function ListaGenerica<T extends { id: string | number }>({
 
             {/* modale modifica */}
             {itemDaModificareId &&
-                renderModaleModifica?.(itemDaModificareId, () =>
-                    setItemDaModificareId(null)
-                )}
+                renderModaleModifica?.(itemDaModificareId, () => setItemDaModificareId(null))}
+
+            {/* modale hard delete/sostituzione */}
+            {showModal && (
+                <ConfermaSostituzioneModal
+                    tipo={showModal.tipo as "stati" | "priorita" | "ruoli"}
+                    excludeId={showModal.id}
+                    onCancel={() => setShowModal(null)}
+                    onConfirm={async (newId) => {
+                        const rep = await replaceReferences(showModal.tipo as any, showModal.id, newId);
+                        if (!rep.success) {
+                            alert("Errore sostituzione: " + rep.error);
+                            return;
+                        }
+                        const del = await hardDelete(showModal.tipo as any, showModal.id);
+                        if (!del.success) {
+                            alert("Errore eliminazione: " + del.error);
+                            return;
+                        }
+
+                    }}
+                />
+            )}
         </div>
     );
 }

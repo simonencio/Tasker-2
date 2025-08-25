@@ -1,201 +1,413 @@
-// src/components/Cestino.tsx
+// src/Pagine/Cestino.tsx
 import { useEffect, useState } from "react";
 import { supabase } from "../supporto/supabaseClient";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash } from "@fortawesome/free-solid-svg-icons";
+import {
+    faTasks,
+    faProjectDiagram,
+    faUser,
+    faBuilding,
+    faFlag,
+    faExclamationTriangle,
+    faUserShield,
+} from "@fortawesome/free-solid-svg-icons";
+import ListaGenerica from "../Liste/ListaGenerica";
 
-type Props = {
-    tipo: "tasks" | "progetti" | "utenti" | "clienti" | "stati" | "priorita" | "ruoli"; // 👈 aggiunti
-};
-
-type Task = { id: string; nome: string; deleted_at: string | null };
-type Progetto = { id: string; nome: string; deleted_at: string | null; tasks?: Task[] };
-type Utente = { id: string; nome: string; cognome?: string; deleted_at: string | null };
-type Cliente = { id: string; nome: string; deleted_at: string | null };
+// Tipi locali
+type Task = any;
+type Progetto = any;
+type Utente = any;
+type Cliente = any;
 type Stato = { id: number; nome: string; colore?: string | null; deleted_at: string | null };
-type Priorita = { id: number; nome: string; deleted_at: string | null };
+type Priorita = { id: number; nome: string; colore?: string | null; deleted_at: string | null };
 type Ruolo = { id: number; nome: string; deleted_at: string | null };
 
-export default function Cestino({ tipo }: Props) {
-    const [loading, setLoading] = useState(false);
-
+export default function Cestino() {
     const [tasks, setTasks] = useState<Task[]>([]);
+    const [loadingTasks, setLoadingTasks] = useState(true);
+
     const [progetti, setProgetti] = useState<Progetto[]>([]);
+    const [loadingProgetti, setLoadingProgetti] = useState(true);
+
     const [utenti, setUtenti] = useState<Utente[]>([]);
+    const [loadingUtenti, setLoadingUtenti] = useState(true);
+
     const [clienti, setClienti] = useState<Cliente[]>([]);
+    const [loadingClienti, setLoadingClienti] = useState(true);
+
     const [stati, setStati] = useState<Stato[]>([]);
+    const [loadingStati, setLoadingStati] = useState(true);
+
     const [priorita, setPriorita] = useState<Priorita[]>([]);
+    const [loadingPriorita, setLoadingPriorita] = useState(true);
+
     const [ruoli, setRuoli] = useState<Ruolo[]>([]);
+    const [loadingRuoli, setLoadingRuoli] = useState(true);
 
     useEffect(() => {
-        setLoading(true);
-
         const fetchData = async () => {
-            if (tipo === "tasks") {
-                const { data, error } = await supabase
+            // Tasks
+            try {
+                const { data } = await supabase
                     .from("tasks")
-                    .select("id, nome, deleted_at")
+                    .select(`
+                        id, nome, note, consegna, tempo_stimato, fine_task, deleted_at,
+                        stato:stato_id ( id, nome, colore ),
+                        priorita:priorita_id ( id, nome ),
+                        progetti_task ( progetti ( id, nome ) ),
+                        utenti_task ( utenti ( id, nome, cognome ) )
+                    `)
                     .not("deleted_at", "is", null);
-                if (!error && data) setTasks(data);
+                setTasks(data || []);
+            } finally {
+                setLoadingTasks(false);
             }
 
-            if (tipo === "progetti") {
-                const { data, error } = await supabase
+            // Progetti
+            try {
+                const { data } = await supabase
                     .from("progetti")
-                    .select(
-                        `id, nome, deleted_at,
-                         tasks:progetti_task(task_id, tasks(id, nome, deleted_at))`
-                    )
+                    .select(`
+                        id, nome, consegna, note, tempo_stimato, deleted_at,
+                        stato:stato_id ( id, nome, colore ),
+                        priorita:priorita_id ( id, nome ),
+                        cliente:cliente_id ( id, nome ),
+                        utenti_progetti ( utenti ( id, nome, cognome ) )
+                    `)
                     .not("deleted_at", "is", null);
-                if (!error && data) {
-                    const mapped = data.map((p: any) => ({
-                        id: p.id,
-                        nome: p.nome,
-                        deleted_at: p.deleted_at,
-                        tasks: (p.tasks || [])
-                            .map((t: any) => t.tasks)
-                            .filter((t: Task) => t.deleted_at !== null),
-                    }));
-                    setProgetti(mapped);
-                }
+                setProgetti(data || []);
+            } finally {
+                setLoadingProgetti(false);
             }
 
-            if (tipo === "utenti") {
-                const { data, error } = await supabase
+            // Utenti
+            try {
+                const { data } = await supabase
                     .from("utenti")
-                    .select("id, nome, cognome, deleted_at")
+                    .select(`
+                        id, nome, cognome, email, avatar_url, deleted_at,
+                        ruolo:ruoli(id, nome),
+                        progetti:utenti_progetti(progetti(id, nome, slug, deleted_at))
+                    `)
                     .not("deleted_at", "is", null);
-                if (!error && data) setUtenti(data);
+                setUtenti(
+                    (data || []).map((u: any) => ({
+                        ...u,
+                        progetti: (u.progetti || [])
+                            .map((up: any) => up.progetti)
+                            .filter((p: any) => p && !p.deleted_at),
+                    }))
+                );
+            } finally {
+                setLoadingUtenti(false);
             }
 
-            if (tipo === "clienti") {
-                const { data, error } = await supabase
+            // Clienti
+            try {
+                const { data } = await supabase
                     .from("clienti")
-                    .select("id, nome, deleted_at")
+                    .select(`
+                        id, nome, email, telefono, avatar_url, note, deleted_at,
+                        progetti:progetti ( id, nome, slug, deleted_at )
+                    `)
                     .not("deleted_at", "is", null);
-                if (!error && data) setClienti(data);
+                setClienti(
+                    (data || []).map((c: any) => ({
+                        ...c,
+                        progetti: (c.progetti || []).filter((p: any) => !p.deleted_at),
+                    }))
+                );
+            } finally {
+                setLoadingClienti(false);
             }
 
-            if (tipo === "stati") {
-                const { data, error } = await supabase
+            // Stati
+            try {
+                const { data } = await supabase
                     .from("stati")
                     .select("id, nome, colore, deleted_at")
                     .not("deleted_at", "is", null);
-                if (!error && data) setStati(data);
+                setStati(data || []);
+            } finally {
+                setLoadingStati(false);
             }
 
-            if (tipo === "priorita") {
-                const { data, error } = await supabase
+            // Priorità
+            try {
+                const { data } = await supabase
                     .from("priorita")
-                    .select("id, nome, deleted_at")
+                    .select("id, nome, colore, deleted_at")
                     .not("deleted_at", "is", null);
-                if (!error && data) setPriorita(data);
+                setPriorita(data || []);
+            } finally {
+                setLoadingPriorita(false);
             }
 
-            if (tipo === "ruoli") {
-                const { data, error } = await supabase
+            // Ruoli
+            try {
+                const { data } = await supabase
                     .from("ruoli")
                     .select("id, nome, deleted_at")
                     .not("deleted_at", "is", null);
-                if (!error && data) setRuoli(data);
+                setRuoli(data || []);
+            } finally {
+                setLoadingRuoli(false);
             }
-
-            setLoading(false);
         };
 
         fetchData();
-    }, [tipo]);
+    }, []);
 
     return (
-        <div className="p-6">
-            <h1 className="text-2xl font-bold mb-6 flex items-center">
-                <FontAwesomeIcon icon={faTrash} className="mr-2 text-red-600" />
-                Cestino – {tipo}
-            </h1>
+        <div className="space-y-8">
+            {/* Tasks */}
+            <ListaGenerica<Task>
+                titolo={`Cestino – Tasks (${tasks.length})`}
+                icona={faTasks}
+                coloreIcona="text-red-600"
+                tipo="tasks"
+                dati={tasks}
+                loading={loadingTasks}
+                colonne={[
+                    {
+                        chiave: "nome",
+                        label: "Nome",
+                        className: "text-left w-full align-middle",
+                        render: (t) => (
+                            <div className="flex items-center gap-2">
+                                {t.fine_task && <span className="text-green-600">✔</span>}
+                                <span>{t.nome}</span>
+                            </div>
+                        ),
+                    },
+                    {
+                        chiave: "consegna",
+                        label: "Consegna",
+                        className: "w-40 hidden lg:table-cell text-center",
+                        render: (t) => (t.consegna ? new Date(t.consegna).toLocaleDateString() : "—"),
+                    },
+                    {
+                        chiave: "stato",
+                        label: "Stato",
+                        className: "w-32 hidden lg:table-cell text-center",
+                        render: (t) => t.stato?.nome ?? "—",
+                    },
+                    {
+                        chiave: "priorita",
+                        label: "Priorità",
+                        className: "w-32 hidden lg:table-cell text-center",
+                        render: (t) => t.priorita?.nome ?? "—",
+                    },
+                ]}
+                renderDettaglio={(t) => (
+                    <div className="space-y-1">
+                        {t.progetti_task?.[0]?.progetti?.nome && (
+                            <p>📁 Progetto: {t.progetti_task[0].progetti.nome}</p>
+                        )}
+                        {t.utenti_task?.length > 0 && (
+                            <p>
+                                👥 Assegnata a:{" "}
+                                {t.utenti_task
+                                    .map((u: any) => `${u.utenti.nome} ${u.utenti.cognome}`)
+                                    .join(", ")}
+                            </p>
+                        )}
+                        {t.tempo_stimato && <p>⏱️ Stima: {t.tempo_stimato}</p>}
+                        {t.note && <p>🗒️ {t.note}</p>}
+                    </div>
+                )}
+                modalitaCestino
+            />
 
-            {loading && <p>Caricamento...</p>}
+            {/* Progetti */}
+            <ListaGenerica<Progetto>
+                titolo={`Cestino – Progetti (${progetti.length})`}
+                icona={faProjectDiagram}
+                coloreIcona="text-purple-600"
+                tipo="progetti"
+                dati={progetti}
+                loading={loadingProgetti}
+                colonne={[
+                    { chiave: "nome", label: "Nome", className: "text-left w-full align-middle" },
+                    {
+                        chiave: "consegna",
+                        label: "Consegna",
+                        className: "w-40 hidden lg:table-cell text-center",
+                        render: (p) => (p.consegna ? new Date(p.consegna).toLocaleDateString() : "—"),
+                    },
+                    {
+                        chiave: "stato",
+                        label: "Stato",
+                        className: "w-32 hidden lg:table-cell text-center",
+                        render: (p) => p.stato?.nome ?? "—",
+                    },
+                    {
+                        chiave: "priorita",
+                        label: "Priorità",
+                        className: "w-32 hidden lg:table-cell text-center",
+                        render: (p) => p.priorita?.nome ?? "—",
+                    },
+                ]}
+                renderDettaglio={(p) => (
+                    <div className="space-y-1">
+                        {p.cliente?.nome && <p>👤 Cliente: {p.cliente.nome}</p>}
+                        {p.utenti_progetti?.length > 0 && (
+                            <p>
+                                👥 Membri:{" "}
+                                {p.utenti_progetti
+                                    .map((up: any) => `${up.utenti.nome} ${up.utenti.cognome}`)
+                                    .join(", ")}
+                            </p>
+                        )}
+                        {p.tempo_stimato && <p>⏱️ Stima: {p.tempo_stimato}</p>}
+                        {p.note && <p>🗒️ {p.note}</p>}
+                    </div>
+                )}
+                modalitaCestino
+            />
 
-            {/* TASKS */}
-            {!loading && tipo === "tasks" && (
-                <ul className="space-y-2">
-                    {tasks.map((t) => (
-                        <li key={t.id} className="p-2 border rounded">{t.nome}</li>
-                    ))}
-                </ul>
-            )}
+            {/* Utenti */}
+            <ListaGenerica<Utente>
+                titolo={`Cestino – Utenti (${utenti.length})`}
+                icona={faUser}
+                coloreIcona="text-blue-600"
+                tipo="utenti"
+                dati={utenti}
+                loading={loadingUtenti}
+                colonne={[
+                    {
+                        chiave: "nomeCompleto",
+                        label: "Nome",
+                        className: "text-left w-full align-middle",
+                        render: (u) => `${u.nome} ${u.cognome}`,
+                    },
+                    {
+                        chiave: "email",
+                        label: "Email",
+                        className: "hidden lg:table-cell text-center",
+                        render: (u) => u.email ?? "—",
+                    },
+                    {
+                        chiave: "ruolo",
+                        label: "Ruolo",
+                        className: "hidden lg:table-cell text-center",
+                        render: (u) => u.ruolo?.nome ?? "—",
+                    },
+                ]}
+                renderDettaglio={(u) => (
+                    <div>
+                        <p>Email: {u.email}</p>
+                        <p>Ruolo: {u.ruolo?.nome}</p>
+                        {u.progetti?.length > 0 && (
+                            <p>📁 Progetti: {u.progetti.map((p: any) => p.nome).join(", ")}</p>
+                        )}
+                    </div>
+                )}
+                modalitaCestino
+            />
 
-            {/* PROGETTI */}
-            {!loading && tipo === "progetti" && (
-                <ul className="space-y-4">
-                    {progetti.map((p) => (
-                        <li key={p.id} className="p-3 border rounded">
-                            <p className="font-semibold">{p.nome}</p>
-                            {p.tasks && p.tasks.length > 0 && (
-                                <ul className="ml-4 mt-2 list-disc">
-                                    {p.tasks.map((t) => (
-                                        <li key={t.id}>{t.nome}</li>
-                                    ))}
-                                </ul>
-                            )}
-                        </li>
-                    ))}
-                </ul>
-            )}
+            {/* Clienti */}
+            <ListaGenerica<Cliente>
+                titolo={`Cestino – Clienti (${clienti.length})`}
+                icona={faBuilding}
+                coloreIcona="text-green-600"
+                tipo="clienti"
+                dati={clienti}
+                loading={loadingClienti}
+                colonne={[
+                    { chiave: "nome", label: "Nome", className: "text-left w-full align-middle" },
+                    {
+                        chiave: "email",
+                        label: "Email",
+                        className: "hidden lg:table-cell text-center",
+                        render: (c) => c.email ?? "—",
+                    },
+                    {
+                        chiave: "telefono",
+                        label: "Telefono",
+                        className: "hidden lg:table-cell text-center",
+                        render: (c) => c.telefono ?? "—",
+                    },
+                ]}
+                renderDettaglio={(c) => (
+                    <div>
+                        {c.email && <p>📧 {c.email}</p>}
+                        {c.telefono && <p>📞 {c.telefono}</p>}
+                        {c.note && <p>🗒️ {c.note}</p>}
+                        {c.progetti?.length > 0 && (
+                            <p>📁 Progetti: {c.progetti.map((p: any) => p.nome).join(", ")}</p>
+                        )}
+                    </div>
+                )}
+                modalitaCestino
+            />
 
-            {/* UTENTI */}
-            {!loading && tipo === "utenti" && (
-                <ul className="space-y-2">
-                    {utenti.map((u) => (
-                        <li key={u.id} className="p-2 border rounded">
-                            {u.nome} {u.cognome}
-                        </li>
-                    ))}
-                </ul>
-            )}
-
-            {/* CLIENTI */}
-            {!loading && tipo === "clienti" && (
-                <ul className="space-y-2">
-                    {clienti.map((c) => (
-                        <li key={c.id} className="p-2 border rounded">{c.nome}</li>
-                    ))}
-                </ul>
-            )}
-
-            {/* STATI */}
-            {!loading && tipo === "stati" && (
-                <ul className="space-y-2">
-                    {stati.map((s) => (
-                        <li key={s.id} className="p-2 border rounded flex items-center gap-3">
-                            <span>{s.nome}</span>
-                            {s.colore && (
+            {/* Stati */}
+            <ListaGenerica<Stato>
+                titolo={`Cestino – Stati (${stati.length})`}
+                icona={faFlag}
+                coloreIcona="text-green-500"
+                tipo="stati"
+                dati={stati}
+                loading={loadingStati}
+                colonne={[
+                    { chiave: "nome", label: "Nome", className: "text-left w-full align-middle" },
+                    {
+                        chiave: "colore",
+                        label: "Colore",
+                        className: "hidden lg:table-cell text-center",
+                        render: (s) =>
+                            s.colore ? (
                                 <span
                                     className="inline-block w-4 h-4 rounded-full border"
                                     style={{ backgroundColor: s.colore }}
-                                ></span>
-                            )}
-                        </li>
-                    ))}
-                </ul>
-            )}
+                                />
+                            ) : (
+                                "—"
+                            ),
+                    },
+                ]}
+                modalitaCestino
+            />
 
-            {/* PRIORITA */}
-            {!loading && tipo === "priorita" && (
-                <ul className="space-y-2">
-                    {priorita.map((p) => (
-                        <li key={p.id} className="p-2 border rounded">{p.nome}</li>
-                    ))}
-                </ul>
-            )}
+            {/* Priorità */}
+            <ListaGenerica<Priorita>
+                titolo={`Cestino – Priorità (${priorita.length})`}
+                icona={faExclamationTriangle}
+                coloreIcona="text-yellow-600"
+                tipo="priorita"
+                dati={priorita}
+                loading={loadingPriorita}
+                colonne={[
+                    { chiave: "nome", label: "Nome", className: "text-left w-full align-middle" },
+                    {
+                        chiave: "colore",
+                        label: "Colore",
+                        className: "hidden lg:table-cell text-center",
+                        render: (p) =>
+                            p.colore ? (
+                                <span
+                                    className="inline-block w-4 h-4 rounded-full border"
+                                    style={{ backgroundColor: p.colore }}
+                                />
+                            ) : (
+                                "—"
+                            ),
+                    },
+                ]}
+                modalitaCestino
+            />
 
-            {/* RUOLI */}
-            {!loading && tipo === "ruoli" && (
-                <ul className="space-y-2">
-                    {ruoli.map((r) => (
-                        <li key={r.id} className="p-2 border rounded">{r.nome}</li>
-                    ))}
-                </ul>
-            )}
+            {/* Ruoli */}
+            <ListaGenerica<Ruolo>
+                titolo={`Cestino – Ruoli (${ruoli.length})`}
+                icona={faUserShield}
+                coloreIcona="text-indigo-600"
+                tipo="ruoli"
+                dati={ruoli}
+                loading={loadingRuoli}
+                colonne={[{ chiave: "nome", label: "Nome", className: "text-left w-full align-middle" }]}
+                modalitaCestino
+            />
         </div>
     );
 }

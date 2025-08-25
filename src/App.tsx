@@ -236,7 +236,8 @@ function AppContent() {
                                 <Route path="/tasks/id/:id" element={<RedirectTaskById />} />
                                 <Route path="/tasks/:id([0-9a-fA-F-]{36})" element={<RedirectTaskById />} />
 
-                                <Route path="/cestino/:tipo" element={<CestinoWrapper />} />
+                                <Route path="/cestino" element={<Cestino />} />
+
                             </Routes>
                         </div>
                     </div>
@@ -269,11 +270,6 @@ function AppContent() {
     );
 }
 
-function CestinoWrapper() {
-    const { tipo } = useParams<{ tipo: "tasks" | "progetti" | "utenti" | "clienti" | "stati" | "priorita" | "ruoli" }>();
-    if (!tipo) return <p>Tipo non valido</p>;
-    return <Cestino tipo={tipo} />;
-}
 
 export default function App() {
     return (

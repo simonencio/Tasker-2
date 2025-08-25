@@ -1,6 +1,4 @@
-// src/Liste/AltreListe.tsx
 import { useEffect, useState } from "react";
-import { supabase } from "../supporto/supabaseClient";
 import { faFlag, faUserShield, faExclamationTriangle, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 
@@ -8,6 +6,7 @@ import ListaGenerica from "./ListaGenerica";
 import MiniStatoEditorModal from "../Modifica/MiniStatoEditorModal";
 import MiniRuoloEditorModal from "../Modifica/MiniRuoloEditorModal";
 import MiniPrioritaEditorModal from "../Modifica/MiniPrioritaEditorModal";
+import { fetchStati, fetchRuoli, fetchPriorita } from "../supporto/fetchData";
 
 type Stato = { id: number; nome: string; colore?: string | null };
 type Ruolo = { id: number; nome: string };
@@ -23,46 +22,10 @@ export default function AltreListe({ onApriModale }: Props) {
     const [loadingRuoli, setLoadingRuoli] = useState(true);
     const [loadingPriorita, setLoadingPriorita] = useState(true);
 
-    // Carica Stati
     useEffect(() => {
-        const caricaStati = async () => {
-            setLoadingStati(true);
-            const { data, error } = await supabase
-                .from("stati")
-                .select("id, nome, colore, deleted_at")
-                .order("id", { ascending: true });
-            if (!error && data) setStati(data.filter((s: any) => !s.deleted_at));
-            setLoadingStati(false);
-        };
-        caricaStati();
-    }, []);
-
-    // Carica Ruoli
-    useEffect(() => {
-        const caricaRuoli = async () => {
-            setLoadingRuoli(true);
-            const { data, error } = await supabase
-                .from("ruoli")
-                .select("id, nome, deleted_at")
-                .order("id", { ascending: true });
-            if (!error && data) setRuoli(data.filter((r: any) => !r.deleted_at));
-            setLoadingRuoli(false);
-        };
-        caricaRuoli();
-    }, []);
-
-    // Carica Priorità
-    useEffect(() => {
-        const caricaPriorita = async () => {
-            setLoadingPriorita(true);
-            const { data, error } = await supabase
-                .from("priorita")
-                .select("id, nome, colore, deleted_at")
-                .order("id", { ascending: true });
-            if (!error && data) setPriorita(data.filter((p: any) => !p.deleted_at));
-            setLoadingPriorita(false);
-        };
-        caricaPriorita();
+        fetchStati().then(setStati).finally(() => setLoadingStati(false));
+        fetchRuoli().then(setRuoli).finally(() => setLoadingRuoli(false));
+        fetchPriorita().then(setPriorita).finally(() => setLoadingPriorita(false));
     }, []);
 
     return (
