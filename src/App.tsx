@@ -173,8 +173,19 @@ function AppContent() {
             if (kind === "stato") openModal("stato");
             else if (kind === "priorita") openModal("priorita");
             else if (kind === "ruolo") openModal("ruolo");
+            (window as any).__openMiniTask = () => openModal("tasks");
+            (window as any).__openMiniProject = () => openModal("project");
+            (window as any).__toggleNotifiche = () => toggleNotifiche();
         };
-        return () => { try { delete (window as any).__openMiniCreate; } catch { } };
+        return () => {
+            try {
+                delete (window as any).__openMiniCreate;
+                delete (window as any).__openMiniTask;
+                delete (window as any).__openMiniProject;
+                delete (window as any).__toggleNotifiche;
+            } catch { }
+        };
+
     }, []);
 
     return (
@@ -214,7 +225,7 @@ function AppContent() {
                     )}
 
                     {notificheOpen && (
-                        <div className="fixed top-16 right-0 z-40 w/full md:w-64 h-[calc(100vh-4rem)] bg-theme shadow-xl">
+                        <div className="fixed top-16 right-0 z-40 w-full md:w-64 h-[calc(100vh-4rem)] bg-theme shadow-xl">
                             <NotificheSidebar open={notificheOpen} onClose={() => setNotificheOpen(false)} userId={userId} />
                         </div>
                     )}
