@@ -19,6 +19,9 @@ export function useNotificheBell() {
     const [userId, setUserId] = useState<string | null>(null);
     const [nonViste, setNonViste] = useState(0);
 
+    
+
+
     useEffect(() => {
         supabase.auth.getUser().then(({ data: { user } }) => {
             setIsLoggedIn(!!user);
@@ -45,6 +48,7 @@ export function useNotificheBell() {
             .select("*", { count: "exact", head: true })
             .eq("utente_id", userId)
             .is("visualizzato", false)
+            .is("deleted_at", null)
             .then(({ count }) => setNonViste(count || 0));
     }, [userId, open]);
 
@@ -127,6 +131,7 @@ export default function NotificheSidebar({ open, onClose, userId }: Props) {
             .eq("id", notificaUtenteId);
     };
 
+
     return (
         <aside
             className={`absolute top-0 right-0 h-full w-full md:w-100 sidebar-theme text-theme transition-transform duration-300 z-40 ${open ? "translate-x-0 notifiche-shadow-open" : "translate-x-full"
@@ -173,11 +178,7 @@ export default function NotificheSidebar({ open, onClose, userId }: Props) {
                                 >
                                     {n.messaggio}
                                 </p>
-                                {renderDettaglio(n) && (
-                                    <p className="mt-2 text-sm opacity-80 border-l-2 pl-3">
-                                        {renderDettaglio(n)}
-                                    </p>
-                                )}
+                                {renderDettaglio(n)}
 
                                 {(n.task_nome ||
                                     n.progetto_nome ||

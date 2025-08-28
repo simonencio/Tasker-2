@@ -1,13 +1,13 @@
 // notificheUtils.ts
+import React from "react";
 import { supabase } from "../supporto/supabaseClient";
 
 export type DettagliNotifica = {
-    campo?: "nome" | "descrizione" | string;
-    da?: string | null;
-    a?: string | null;
-    // in futuro puoi aggiungere altre chiavi senza cambiare il tipo
+    campo?: string; da?: string | null; a?: string | null;
+    modifiche?: Array<{ campo: string; da?: string | null; a?: string | null }>;
     [k: string]: any;
 };
+
 
 
 export type Notifica = {
@@ -353,17 +353,68 @@ export function mostraNotificaBrowser(titolo: string, opzioni?: NotificationOpti
     }
 }
 
-export function renderDettaglio(n: Notifica): string | null {
+export function renderDettaglio(n: Notifica): React.ReactNode {
     const d = n.dettagli || {};
-    switch (d.campo) {
-        case "nome":
-            if (d.da || d.a) return `Nome cambiato da "${d.da ?? ""}" a "${d.a ?? ""}"`.trim();
-            return "Nome progetto modificato";
-        case "descrizione":
-            if (d.da || d.a) return `Descrizione aggiornata da "${d.da ?? ""}" a "${d.a ?? ""}"`.trim();
-            return "Descrizione progetto aggiornata";
-        default:
-            return null;
-    }
-}
 
+    const mods: Array<{ campo: string; da?: string | null; a?: string | null }> =
+        Array.isArray(d.modifiche) && d.modifiche.length
+            ? d.modifiche
+            : d.campo
+                ? [{ campo: d.campo, da: d.da ?? "", a: d.a ?? "" }]
+                : [];
+
+    if (mods.length === 0) return null;
+
+    const label = (c: string) =>
+        ({
+            nome: "Nome",
+            slug: "Slug",
+            note: "Note",
+            stato: "Stato",
+            priorita: "Priorità",
+            consegna: "Consegna",
+            cliente: "Cliente",
+            tempo_stimato: "Tempo stimato",
+            progetto: "Progetto",
+            parent: "Task padre",
+        } as Record<string, string>)[c] || c;
+
+    const first = mods[0];
+    const extra = mods.slice(1);
+
+    if (extra.length === 0) {
+        return React.createElement(
+            "p",
+            { className: "mt-2 text-sm opacity-80 border-l-2 pl-3" },
+            React.createElement("span", { className: "font-medium" }, `${label(first.campo)}:`),
+            " ",
+            `“${first.da ?? ""}” → “${first.a ?? ""}”`
+        );
+    }
+
+    return React.createElement(
+        "details",
+        { className: "mt-2 text-sm opacity-80 border-l-2 pl-3" },
+        React.createElement(
+            "summary",
+            { className: "cursor-pointer select-none" },
+            React.createElement("span", { className: "font-medium" }, `${label(first.campo)}:`),
+            " ",
+            `“${first.da ?? ""}” → “${first.a ?? ""}”`,
+            React.createElement("span", { className: "ml-2 text-xs underline" }, `Mostra altre ${extra.length} modifiche`)
+        ),
+        React.createElement(
+            "ul",
+            { className: "mt-2 ml-3 space-y-1" },
+            ...extra.map((m, i) =>
+                React.createElement(
+                    "li",
+                    { key: i },
+                    React.createElement("span", { className: "font-medium" }, `${label(m.campo)}:`),
+                    " ",
+                    `“${m.da ?? ""}” → “${m.a ?? ""}”`
+                )
+            )
+        )
+    );
+}

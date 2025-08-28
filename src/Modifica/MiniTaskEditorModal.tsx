@@ -74,6 +74,17 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
 
     const [popupOpen, setPopupOpen] = useState(false);
 
+    // valori "prima" (per confronti)
+    const [oldNome, setOldNome] = useState("");
+    const [oldNote, setOldNote] = useState("");
+    const [oldStatoId, setOldStatoId] = useState<number | null>(null);
+    const [oldPrioritaId, setOldPrioritaId] = useState<number | null>(null);
+    const [oldConsegna, setOldConsegna] = useState("");
+    const [oldTempoStimato, setOldTempoStimato] = useState("");
+    const [oldProgettoId, setOldProgettoId] = useState<string | null>(null);
+    const [oldParentId, setOldParentId] = useState<string | null>(null);
+
+
     useEffect(() => {
         Promise.all([
             supabase.from("tasks").select("*").eq("id", taskId).single(),
@@ -96,17 +107,30 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
                 setSlug(task.slug || "");
                 setOldSlug(task.slug || "");  // 👈 salvo slug iniziale
                 setParentId(task.parent_id ?? null);
+
+                setOldNome(task.nome || "");
+                setOldNote(task.note || "");
+                setOldStatoId(task.stato_id ?? null);
+                setOldPrioritaId(task.priorita_id ?? null);
+                setOldConsegna(task.consegna || "");
+                setOldTempoStimato(task.tempo_stimato || "");
+                setOldParentId(task.parent_id ?? null);
             }
             if (assegnatiRes.data) {
                 const ids = assegnatiRes.data.map((r: any) => r.utente_id);
                 setAssegnati(ids);
                 setAssegnatiPrecedenti(ids);
+
+
             }
             if (utentiRes.data) setUtenti(utentiRes.data);
             if (statiRes.data) setStati(statiRes.data);
             if (prioritaRes.data) setPriorita(prioritaRes.data);
             if (progettiRes.data) setProgetti(progettiRes.data);
-            if (progettoTaskRes?.data) setProgettoId(progettoTaskRes.data.progetti_id);
+            if (progettoTaskRes?.data) {
+                setProgettoId(progettoTaskRes.data.progetti_id);
+                setOldProgettoId(progettoTaskRes.data.progetti_id ?? null);
+            }
             if (allTasksRes.data) setTutteLeTask(allTasksRes.data);
         });
     }, [taskId]);
@@ -114,6 +138,12 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
     const toggleAssegnato = (id: string) => {
         setAssegnati(prev => prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]);
     };
+
+    const nomeStato = (id: number | null) => stati.find(s => s.id === id)?.nome ?? "";
+    const nomePriorita = (id: number | null) => priorita.find(p => p.id === id)?.nome ?? "";
+    const nomeProgetto = (id: string | null) => progetti.find(p => p.id === id)?.nome ?? "";
+    const nomeTask = (id: string | null) => tutteLeTask.find(t => t.id === id)?.nome ?? "";
+
 
     const salva = async () => {
         await supabase
@@ -175,8 +205,53 @@ export default function MiniTaskEditorModal({ taskId, onClose }: Props) {
             await inviaNotifica("TASK_RIMOSSO", daRimuovere, `Sei stato rimosso dalla task: ${nome}`, creatoreId, { task_id: taskId });
         }
         if (rimasti.length > 0) {
-            await inviaNotifica("TASK_MODIFICATO", rimasti, `La task "${nome}" è stata modificata.`, creatoreId, { task_id: taskId });
+            // calcola il progetto effettivo dopo il salvataggio:
+            // - se hai selezionato un parent, erediti il suo progetto
+            // - altrimenti usa il progetto selezionato nel form
+            let nuovoProgettoId: string | null = progettoId ?? null;
+            if (parentId) {
+                const { data: parentProgetto } = await supabase
+                    .from("progetti_task")
+                    .select("progetti_id")
+                    .eq("task_id", parentId)
+                    .maybeSingle();
+                if (parentProgetto?.progetti_id) nuovoProgettoId = parentProgetto.progetti_id;
+            }
+
+            const modifiche: Array<{ campo: string; da?: string | null; a?: string | null }> = [];
+            if (nome !== oldNome) modifiche.push({ campo: "nome", da: oldNome, a: nome });
+            if (slug !== oldSlug) modifiche.push({ campo: "slug", da: oldSlug, a: slug });
+            if (note !== oldNote) modifiche.push({ campo: "note", da: oldNote ?? "", a: note ?? "" });
+            if (statoId !== oldStatoId) modifiche.push({ campo: "stato", da: nomeStato(oldStatoId), a: nomeStato(statoId) });
+            if (prioritaId !== oldPrioritaId) modifiche.push({ campo: "priorita", da: nomePriorita(oldPrioritaId), a: nomePriorita(prioritaId) });
+            if (consegna !== oldConsegna) modifiche.push({ campo: "consegna", da: oldConsegna || "", a: consegna || "" });
+            if (tempoStimato !== oldTempoStimato) modifiche.push({ campo: "tempo_stimato", da: oldTempoStimato || "", a: tempoStimato || "" });
+            if (nuovoProgettoId !== oldProgettoId) modifiche.push({ campo: "progetto", da: nomeProgetto(oldProgettoId), a: nomeProgetto(nuovoProgettoId) });
+            if (parentId !== oldParentId) modifiche.push({ campo: "parent", da: nomeTask(oldParentId), a: nomeTask(parentId) });
+
+            if (modifiche.length > 0) {
+                await inviaNotifica(
+                    "TASK_MODIFICATO",
+                    rimasti,
+                    "Task modificata",
+                    creatoreId,
+                    { task_id: taskId, progetto_id: nuovoProgettoId ?? undefined },
+                    { modifiche } // 👈 tutte le differenze in un solo payload
+                );
+            }
+
+            // aggiorna i "vecchi" per i prossimi salvataggi nella stessa sessione
+            setOldNome(nome);
+            setOldSlug(slug);
+            setOldNote(note);
+            setOldStatoId(statoId);
+            setOldPrioritaId(prioritaId);
+            setOldConsegna(consegna);
+            setOldTempoStimato(tempoStimato);
+            setOldProgettoId(nuovoProgettoId);
+            setOldParentId(parentId);
         }
+
 
         onClose();
 
