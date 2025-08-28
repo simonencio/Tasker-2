@@ -39,6 +39,10 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
     const [showDatePicker, setShowDatePicker] = useState(false);
     const dateRef = useRef<HTMLInputElement>(null);
 
+
+    const [oldNome, setOldNome] = useState("");
+
+
     useEffect(() => {
         Promise.all([
             supabase.from("progetti").select("*").eq("id", progettoId).single(),
@@ -51,6 +55,7 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
             const progetto = progettoRes.data;
             if (progetto) {
                 setNome(progetto.nome || "");
+                setOldNome(progetto.nome || "");
                 setNote(progetto.note || "");
                 setSlug(progetto.slug || "");
                 setOldSlug(progetto.slug || ""); // 👈 salvo slug iniziale
@@ -137,13 +142,39 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
         }
 
         if (rimasti.length > 0) {
-            await inviaNotifica(
-                "PROGETTO_MODIFICATO",
-                rimasti,
-                `Il progetto "${nome}" è stato modificato.`,
-                creatoreId || undefined,
-                { progetto_id: progettoId }
-            );
+            const nomeCambiato = nome !== oldNome;
+            const slugCambiato = slug !== oldSlug;
+
+            if (nomeCambiato) {
+                await inviaNotifica(
+                    "PROGETTO_MODIFICATO",
+                    rimasti,
+                    "Nome progetto modificato",
+                    creatoreId || undefined,
+                    { progetto_id: progettoId },
+                    { campo: "nome", da: oldNome, a: nome }
+                );
+            } else if (slugCambiato) {
+                await inviaNotifica(
+                    "PROGETTO_MODIFICATO",
+                    rimasti,
+                    "Slug progetto modificato",
+                    creatoreId || undefined,
+                    { progetto_id: progettoId },
+                    { campo: "slug", da: oldSlug, a: slug }
+                );
+            } else {
+                await inviaNotifica(
+                    "PROGETTO_MODIFICATO",
+                    rimasti,
+                    `Il progetto "${nome}" è stato modificato.`,
+                    creatoreId || undefined,
+                    { progetto_id: progettoId }
+                );
+            }
+
+            setOldNome(nome);
+            setOldSlug(slug);
         }
 
         onClose();

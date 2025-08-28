@@ -33,6 +33,7 @@
 //             .select("*", { count: "exact", head: true })
 //             .eq("utente_id", userId)
 //             .is("visualizzato", false)
+//             .is("deleted_at", null)
 //             .then(({ count }) => setNonViste(count || 0));
 //     }, [userId, open]);
 

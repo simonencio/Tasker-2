@@ -20,6 +20,7 @@ export default function IntestazioneProgetto({ slug }: Props) {
         { label: "Dashboard", path: `/progetti/${slug}`, end: true },
         { label: "Calendario", path: `/progetti/${slug}/calendario`, end: false },
         { label: "Bacheca", path: `/progetti/${slug}/bacheca`, end: false },
+
     ];
 
     useEffect(() => {
