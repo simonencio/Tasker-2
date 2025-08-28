@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supporto/supabaseClient";
-import { DragDropContext, Droppable, Draggable,  type DropResult } from '@hello-pangea/dnd';
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { v4 as uuidv4 } from 'uuid';
 import ProgettiWidget from "../Componenti/ProgettiWidget";
 import TaskWidget from '../Componenti/TaskWidget';
@@ -112,7 +112,7 @@ export default function Home() {
                       </button>
                       {/* Widget Content */}
                       {widget.type === 'Progetti' && <ProgettiWidget />}
-                      {widget.type === 'Task'     && <TaskWidget />}
+                      {widget.type === 'Task' && <TaskWidget />}
                     </div>
                   )}
                 </Draggable>
@@ -145,10 +145,10 @@ export default function Home() {
               </li>
               <li>
                 <button
-                    onClick={() => handleAddWidget('Task')}
-                    className="w-full text-left hover:bg-gray-100 px-2 py-1 rounded"
+                  onClick={() => handleAddWidget('Task')}
+                  className="w-full text-left hover:bg-gray-100 px-2 py-1 rounded"
                 >
-                    Task
+                  Task
                 </button>
               </li>
             </ul>

@@ -117,6 +117,7 @@ export type ResourceRenderCtx<T> = {
     utenteId: string | null;
     navigate: (to: string) => void;
     extra?: any;
+    patchItem?: (id: string | number, patch: Partial<T>) => void;
 };
 
 
@@ -205,6 +206,16 @@ const formatDurata = (value: number | string | null): string => {
     }
     return "0m";
 };
+// 🔧 PATCH OTTIMISTICO GENERICO (riusabile ovunque in questo file)
+function optimisticPatch<T extends { id: string | number }>(
+    item: T,
+    patch: Partial<T>,
+    setFiltro: (f: FiltroIntestazione) => void,
+    filtro: FiltroIntestazione
+) {
+    Object.assign(item as any, patch); // aggiorna il record in memoria
+    setFiltro({ ...filtro });          // forza il re-render della tabella senza refetch
+}
 
 // ============================================================
 // STATI
@@ -561,32 +572,63 @@ export const progettiConfig: ResourceConfig<Progetto> = {
         { chiave: "stato", label: "Stato", className: "w-32 hidden lg:block", render: (p) => p.stato?.nome ?? "—" },
         { chiave: "priorita", label: "Priorità", className: "w-32 hidden lg:block", render: (p) => p.priorita?.nome ?? "—" },
     ],
-    azioni: (proj, { navigate }) => (
-        <>
-            <button
-                onClick={() => navigate(`/progetti/${proj.slug ?? proj.id}`)}
-                className="icon-color hover:text-green-600"
-                title="Vai al dettaglio"
-            >
-                <FontAwesomeIcon icon={faProjectDiagram} />
-            </button>
-            <button
-                onClick={async (e) => {
-                    e.stopPropagation();
-                    if (!window.confirm("Eliminare questo progetto?")) return;
-                    try {
-                        await softDeleteProgetto(proj.id);
-                    } catch (err: any) {
-                        alert("Errore eliminazione: " + err.message);
-                    }
-                }}
-                className="icon-color hover:text-red-600"
-                title="Elimina"
-            >
-                <FontAwesomeIcon icon={faTrash} />
-            </button>
-        </>
-    ),
+    azioni: (proj, { navigate, filtro, setFiltro }) => {
+        const completaProgetto = async (e: React.MouseEvent) => {
+            e.stopPropagation();
+            if (proj.fine_progetto) return;
+
+            const nowIso = new Date().toISOString();
+            const { error } = await supabase
+                .from("progetti")
+                .update({ fine_progetto: nowIso })
+                .eq("id", proj.id);
+
+            if (error) {
+                alert("Errore nel completare il progetto: " + error.message);
+                return;
+            }
+
+            // ✅ patch locale (ottimistico)
+            optimisticPatch(proj, { fine_progetto: nowIso }, setFiltro, filtro);
+        };
+
+        return (
+            <>
+                {/* 🔹 Pulsante check per completare */}
+                <button
+                    onClick={completaProgetto}
+                    className="icon-color hover:text-emerald-600"
+                    title={proj.fine_progetto ? "Già completato" : "Segna come completato"}
+                >
+                    <FontAwesomeIcon icon={faCheckCircle} />
+                </button>
+
+                <button
+                    onClick={() => navigate(`/progetti/${proj.slug ?? proj.id}`)}
+                    className="icon-color hover:text-green-600"
+                    title="Vai al dettaglio"
+                >
+                    <FontAwesomeIcon icon={faProjectDiagram} />
+                </button>
+                <button
+                    onClick={async (e) => {
+                        e.stopPropagation();
+                        if (!window.confirm("Eliminare questo progetto?")) return;
+                        try {
+                            await softDeleteProgetto(proj.id);
+                        } catch (err: any) {
+                            alert("Errore eliminazione: " + err.message);
+                        }
+                    }}
+                    className="icon-color hover:text-red-600"
+                    title="Elimina"
+                >
+                    <FontAwesomeIcon icon={faTrash} />
+                </button>
+            </>
+        );
+    },
+
     renderDettaglio: (proj) => (
         <div className="space-y-1">
             {proj.cliente?.nome && <p>👤 Cliente: {proj.cliente.nome}</p>}
@@ -760,9 +802,29 @@ export const tasksConfig: ResourceConfig<Task> = {
         { chiave: "stato", label: "Stato", className: "w-32 hidden lg:block", render: (t) => t.stato?.nome ?? "—" },
         { chiave: "priorita", label: "Priorità", className: "w-32 hidden lg:block", render: (t) => t.priorita?.nome ?? "—" },
     ],
-    azioni: (task, { navigate, extra }) => {
+    azioni: (task, { navigate, extra, patchItem }) => {
         const { start, stop, isRunning } = extra || {};
         const running = isRunning?.(task.id);
+
+        const completaTask = async (e: React.MouseEvent) => {
+            e.stopPropagation();
+            if (task.fine_task) return;
+
+            const nowIso = new Date().toISOString();
+            const { error } = await supabase
+                .from("tasks")
+                .update({ fine_task: nowIso })
+                .eq("id", task.id);
+
+            if (error) {
+                alert("Errore nel completare la task: " + error.message);
+                return;
+            }
+
+            // ✅ aggiorna solo questa riga in memoria, nessun refetch
+            patchItem?.(task.id, { fine_task: nowIso });
+        };
+
         return (
             <>
                 {task.progetto?.id && (task.assegnatari?.length ?? 0) > 0 ? (
@@ -778,11 +840,17 @@ export const tasksConfig: ResourceConfig<Task> = {
                     </button>
                 ) : null}
 
+                {/* ✅ check: completa senza ricaricare */}
                 <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/tasks/${task.slug ?? task.id}`);
-                    }}
+                    onClick={completaTask}
+                    className="icon-color hover:text-emerald-600"
+                    title={task.fine_task ? "Già completata" : "Segna come completata"}
+                >
+                    <FontAwesomeIcon icon={faCheckCircle} />
+                </button>
+
+                <button
+                    onClick={(e) => { e.stopPropagation(); navigate(`/tasks/${task.slug ?? task.id}`); }}
                     className="icon-color hover:text-green-600"
                     title="Vai al dettaglio"
                 >
@@ -793,11 +861,7 @@ export const tasksConfig: ResourceConfig<Task> = {
                     onClick={async (e) => {
                         e.stopPropagation();
                         if (!window.confirm("Eliminare questa task?")) return;
-                        try {
-                            await softDeleteTask(task.id);
-                        } catch (err: any) {
-                            alert("Errore eliminazione: " + err.message);
-                        }
+                        try { await softDeleteTask(task.id); } catch (err: any) { alert("Errore eliminazione: " + err.message); }
                     }}
                     className="icon-color hover:text-red-600"
                     title="Elimina"
@@ -807,6 +871,9 @@ export const tasksConfig: ResourceConfig<Task> = {
             </>
         );
     },
+
+
+
     renderDettaglio: (task) => (
         <div className="space-y-2">
             {task.progetto?.nome && <p>📁 Progetto: {task.progetto.nome}</p>}
