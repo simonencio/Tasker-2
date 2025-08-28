@@ -23,7 +23,6 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
     const [nome, setNome] = useState("");
     const [note, setNote] = useState("");
     const [slug, setSlug] = useState("");
-    const [oldSlug, setOldSlug] = useState(""); // 👈 per confronto
     const [clienteId, setClienteId] = useState<string | null>(null);
     const [statoId, setStatoId] = useState<number | null>(null);
     const [prioritaId, setPrioritaId] = useState<number | null>(null);
@@ -39,8 +38,15 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
     const [showDatePicker, setShowDatePicker] = useState(false);
     const dateRef = useRef<HTMLInputElement>(null);
 
-
+    // costanti di supporto per confronti
     const [oldNome, setOldNome] = useState("");
+    const [oldSlug, setOldSlug] = useState("");
+    const [oldNote, setOldNote] = useState<string | null>(null);
+    const [oldStatoId, setOldStatoId] = useState<number | null>(null);
+    const [oldPrioritaId, setOldPrioritaId] = useState<number | null>(null);
+    const [oldConsegna, setOldConsegna] = useState<string | null>(null);
+    const [oldClienteId, setOldClienteId] = useState<string | null>(null);
+    const [oldTempoStimato, setOldTempoStimato] = useState<string | null>(null);
 
 
     useEffect(() => {
@@ -57,13 +63,19 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
                 setNome(progetto.nome || "");
                 setOldNome(progetto.nome || "");
                 setNote(progetto.note || "");
+                setOldNote(progetto.note || "");
                 setSlug(progetto.slug || "");
-                setOldSlug(progetto.slug || ""); // 👈 salvo slug iniziale
+                setOldSlug(progetto.slug || "");
                 setClienteId(progetto.cliente_id);
+                setOldClienteId(progetto.cliente_id);
                 setStatoId(progetto.stato_id);
+                setOldStatoId(progetto.stato_id);
                 setPrioritaId(progetto.priorita_id);
+                setOldPrioritaId(progetto.priorita_id);
                 setConsegna(progetto.consegna || "");
+                setOldConsegna(progetto.consegna || "");
                 setTempoStimato(progetto.tempo_stimato || "");
+                setOldTempoStimato(progetto.tempo_stimato || "");
             }
             if (membriRes.data) {
                 const ids = membriRes.data.map((m: any) => m.utente_id);
@@ -82,6 +94,30 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
             prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]
         );
     };
+
+
+
+    const labelCampo = (c: string) => ({
+        nome: "Nome",
+        slug: "Slug",
+        note: "Note",
+        stato: "Stato",
+        priorita: "Priorità",
+        consegna: "Consegna",
+        cliente: "Cliente",
+        tempo_stimato: "Tempo stimato",
+    }[c] || c);
+
+    const fmtData = (d?: string | null) => d ? new Date(d).toLocaleDateString() : "";
+    const fmtTempo = (m?: number | null) => (m ?? 0) > 0 ? `${Math.floor((m as number) / 60)}h ${(m as number) % 60}m` : "0m";
+
+
+
+    const nomeStato = (id: number | null) => stati.find(s => s.id === id)?.nome ?? "";
+    const nomePriorita = (id: number | null) => priorita.find(p => p.id === id)?.nome ?? "";
+    const nomeCliente = (id: string | null) => clienti.find(c => c.id === id)?.nome ?? "";
+
+
 
     const salvaModifiche = async () => {
         await supabase
@@ -142,26 +178,31 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
         }
 
         if (rimasti.length > 0) {
-            const nomeCambiato = nome !== oldNome;
-            const slugCambiato = slug !== oldSlug;
+            const modifiche: Array<{ campo: string; da?: string | null; a?: string | null }> = [];
 
-            if (nomeCambiato) {
+            // confronti da tracciare 
+
+            if (nome !== oldNome) modifiche.push({ campo: "nome", da: oldNome, a: nome });
+            if (slug !== oldSlug) modifiche.push({ campo: "slug", da: oldSlug, a: slug });
+            if (note !== oldNote) modifiche.push({ campo: "note", da: oldNote ?? "", a: note ?? "" });
+            if (statoId !== oldStatoId) modifiche.push({ campo: "stato", da: nomeStato(oldStatoId), a: nomeStato(statoId) });
+            if (prioritaId !== oldPrioritaId) modifiche.push({ campo: "priorita", da: nomePriorita(oldPrioritaId), a: nomePriorita(prioritaId) });
+            if (consegna !== oldConsegna) modifiche.push({ campo: "consegna", da: fmtData(oldConsegna), a: fmtData(consegna) });
+            if (clienteId !== oldClienteId) modifiche.push({ campo: "cliente", da: nomeCliente(oldClienteId), a: nomeCliente(clienteId) });
+            if (tempoStimato !== oldTempoStimato) modifiche.push({
+                campo: "tempo_stimato",
+                da: oldTempoStimato ?? "",
+                a: tempoStimato ?? ""
+            });
+
+            if (modifiche.length > 0) {
                 await inviaNotifica(
                     "PROGETTO_MODIFICATO",
                     rimasti,
-                    "Nome progetto modificato",
+                    "Progetto modificato",
                     creatoreId || undefined,
                     { progetto_id: progettoId },
-                    { campo: "nome", da: oldNome, a: nome }
-                );
-            } else if (slugCambiato) {
-                await inviaNotifica(
-                    "PROGETTO_MODIFICATO",
-                    rimasti,
-                    "Slug progetto modificato",
-                    creatoreId || undefined,
-                    { progetto_id: progettoId },
-                    { campo: "slug", da: oldSlug, a: slug }
+                    { modifiche } // 👈 un solo payload con tutte le differenze
                 );
             } else {
                 await inviaNotifica(
@@ -175,6 +216,12 @@ export default function MiniProjectEditorModal({ progettoId, onClose }: Props) {
 
             setOldNome(nome);
             setOldSlug(slug);
+            setOldNote(note);
+            setOldStatoId(statoId);
+            setOldPrioritaId(prioritaId);
+            setOldConsegna(consegna);
+            setOldClienteId(clienteId);
+            setOldTempoStimato(tempoStimato);
         }
 
         onClose();
