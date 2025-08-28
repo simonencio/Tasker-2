@@ -1,43 +1,36 @@
-// notificheUtils.ts
+// src/Notifiche/notificheUtils.ts
 import React from "react";
 import { supabase } from "../supporto/supabaseClient";
 
+/* ============================== Tipi ============================== */
 export type DettagliNotifica = {
-    campo?: string; da?: string | null; a?: string | null;
+    campo?: string;
+    da?: string | null;
+    a?: string | null;
     modifiche?: Array<{ campo: string; da?: string | null; a?: string | null }>;
     [k: string]: any;
 };
 
-
-
 export type Notifica = {
-    // pivot notifiche_utenti
-    id: string;                       // id di notifiche_utenti (lo usi per eliminare/leggere)
+    id: string;              // id notifiche_utenti
     utente_id: string;
-
-    // notifica master
-    notifica_id: string;
+    notifica_id: string;     // id notifiche master
     messaggio: string;
     data_creazione: string;
-    tipo_codice?: string | null;      // es. "PROGETTO_MODIFICATO"
-    tipo_descrizione?: string | null; // es. "Un progetto è stato modificato"
+    tipo_codice?: string | null;
+    tipo_descrizione?: string | null;
     dettagli?: DettagliNotifica | null;
 
-    // meta utili per la UI
-    progetto_id?: string | null;
+    // meta UI
     progetto_nome?: string | null;
-    task_id?: string | null;
     task_nome?: string | null;
-    creatore_id?: string | null;
     creatore_nome?: string | null;
 
-    // stato utente-notifica
+    // stato
     letto: boolean;
     visualizzato?: boolean | null;
 };
 
-
-// opzionale: se vuoi riusare il tipo anche altrove
 export type NotificaExtra = {
     progetto_id?: string;
     task_id?: string;
@@ -45,32 +38,31 @@ export type NotificaExtra = {
     parent_id?: string;
 };
 
-// ✅ Recupera notifiche visibili per l'utente corrente
+/* ============================== GET ============================== */
 export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
     const { data, error } = await supabase
         .from("notifiche_utenti")
         .select(`
-            id,
-            utente_id,                 
-            letto,
-            visualizzato,
-            notifica_id,
-            notifiche (
-            id,
-            tipo: tipo_id ( codice ),
-            messaggio,
-            data_creazione,
-            dettagli,                
-            tasks ( nome ),
-            progetti ( nome ),
-            creatore: creatore_id ( nome, cognome )
-            )
-        `)
+      id,
+      utente_id,
+      letto,
+      visualizzato,
+      notifica_id,
+      notifiche (
+        id,
+        tipo: tipo_id ( codice ),
+        messaggio,
+        data_creazione,
+        dettagli,
+        tasks ( nome ),
+        progetti ( nome ),
+        creatore: creatore_id ( nome, cognome )
+      )
+    `)
         .eq("utente_id", userId)
         .is("deleted_at", null)
         .order("id", { ascending: false })
         .limit(30);
-
 
     if (error || !data) {
         console.error("Errore nel recupero notifiche:", error);
@@ -81,22 +73,22 @@ export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
         if (!val) return null;
         if (typeof val === "object") return val as DettagliNotifica;
         if (typeof val === "string") {
-            try { return JSON.parse(val) as DettagliNotifica; } catch { return null; }
+            try {
+                return JSON.parse(val) as DettagliNotifica;
+            } catch {
+                return null;
+            }
         }
         return null;
     }
-
 
     return data.map((row: any) => {
         const notifica = row.notifiche;
         const dettagli = parseDettagli(notifica?.dettagli);
 
-        
-
-        // Default
         return {
             id: String(row.id),
-            utente_id: row.utente_id,                   // <== ora c’è
+            utente_id: row.utente_id,
             letto: row.letto,
             visualizzato: row.visualizzato,
             notifica_id: row.notifica_id,
@@ -108,22 +100,21 @@ export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
                 ? `${notifica.creatore.nome} ${notifica.creatore.cognome}`
                 : undefined,
             tipo_codice: notifica?.tipo?.codice,
-            dettagli,                                   // <== qui useremo {campo,da,a}
+            dettagli,
         } as Notifica;
     });
 }
 
-
-// ✅ Crea una nuova notifica per destinatari con controllo invio mail
+/* ============================== INVIA ============================== */
 export async function inviaNotifica(
     tipo_codice: string,
     destinatari: string[],
     messaggio: string,
     creatore_id?: string,
-    contesto?: NotificaExtra, // <-- ora include commento_id e parent_id
+    contesto?: NotificaExtra,
     dettagli?: DettagliNotifica
 ): Promise<void> {
-    // 1) trova tipo_id dal codice
+    // 1) trova tipo_id
     const { data: tipo, error: tipoError } = await supabase
         .from("notifiche_tipi")
         .select("id")
@@ -134,19 +125,16 @@ export async function inviaNotifica(
         console.error("Tipo notifica non trovato:", tipo_codice, tipoError);
         return;
     }
-
     const tipo_id = tipo.id;
 
-    // 2) inserisci notifica principale
+    // ⚠️ 2) inserisci notifica principale
+    // NON scrivere task_id/progetto_id se rischiano di non esistere (hard delete)
     const { data: nuovaNotifica, error: notificaError } = await supabase
         .from("notifiche")
         .insert({
             tipo_id,
             messaggio,
             creatore_id: creatore_id || null,
-            progetto_id: contesto?.progetto_id || null,
-            task_id: contesto?.task_id || null,
-            // campi extra collegati ai commenti/risposte
             commento_id: contesto?.commento_id || null,
             parent_id: contesto?.parent_id || null,
             dettagli: dettagli ?? null,
@@ -161,29 +149,22 @@ export async function inviaNotifica(
 
     const notifica_id = nuovaNotifica.id;
 
-    // 3) deduplica destinatari (NON escludere il creatore se è auto-assegnato)
-    const destUnici = Array.from(new Set(destinatari)).filter((u) => !!u);
-
+    // 3) destinatari
+    const destUnici = Array.from(new Set(destinatari)).filter(Boolean);
     if (destUnici.length === 0) return;
 
-    // 4) per ciascun destinatario, crea riga notifiche_utenti e invia eventuale email
+    // 4) inserisci notifiche_utenti
     for (const userId of destUnici) {
-        // preferenze per questo tipo
-        const { data: pref, error: prefErr } = await supabase
+        const { data: pref } = await supabase
             .from("notifiche_preferenze")
             .select("invia_email")
             .eq("utente_id", userId)
             .eq("tipo_id", tipo_id)
             .maybeSingle();
 
-        if (prefErr) {
-            console.warn("Preferenze notifica non disponibili:", prefErr);
-        }
-
         const inviaEmail = pref?.invia_email === true;
 
-        // inserisci assegnazione all'utente
-        const { error: insUtenteErr } = await supabase.from("notifiche_utenti").insert({
+        const { error: insErr } = await supabase.from("notifiche_utenti").insert({
             notifica_id,
             utente_id: userId,
             inviato: inviaEmail,
@@ -192,12 +173,11 @@ export async function inviaNotifica(
             visualizzato_al: null,
         });
 
-        if (insUtenteErr) {
-            console.error("Errore inserimento notifiche_utenti:", insUtenteErr);
+        if (insErr) {
+            console.error("Errore inserimento notifiche_utenti:", insErr);
             continue;
         }
 
-        // email (se preferenze lo consentono)
         if (inviaEmail) {
             const [{ data: user }, { data: tipoDett }] = await Promise.all([
                 supabase
@@ -218,13 +198,8 @@ export async function inviaNotifica(
                     descrizioneTipo: tipoDett.descrizione,
                     messaggio,
                 });
-
                 try {
-                    await inviaEmailNotifica({
-                        to: user.email,
-                        subject,
-                        body,
-                    });
+                    await inviaEmailNotifica({ to: user.email, subject, body });
                 } catch (e) {
                     console.error("Invio email fallito:", e);
                 }
@@ -232,6 +207,8 @@ export async function inviaNotifica(
         }
     }
 }
+
+/* ============================== EMAIL ============================== */
 export async function inviaEmailNotifica({
     to,
     subject,
@@ -241,11 +218,14 @@ export async function inviaEmailNotifica({
     subject: string;
     body: string;
 }) {
-    const response = await fetch("https://kieyhhmxinmdsnfdglrm.supabase.co/functions/v1/sendEmail", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: to, subject, body }),
-    });
+    const response = await fetch(
+        "https://kieyhhmxinmdsnfdglrm.supabase.co/functions/v1/sendEmail",
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: to, subject, body }),
+        }
+    );
 
     const text = await response.text();
     if (!response.ok) {
@@ -254,7 +234,6 @@ export async function inviaEmailNotifica({
         console.log("✅ Email inviata:", text);
     }
 }
-
 
 export function generaContenutoEmail({
     nomeUtente,
@@ -266,7 +245,6 @@ export function generaContenutoEmail({
     messaggio: string;
 }): { subject: string; body: string } {
     const subject = `📢 ${descrizioneTipo}`;
-
     const body = `
 Ciao ${nomeUtente},
 
@@ -291,13 +269,12 @@ Questa email è stata inviata automaticamente in base alle tue impostazioni di n
     return { subject, body };
 }
 
-
+/* ============================== BROWSER ============================== */
 export async function richiediPermessoNotificheBrowser() {
     if (!("Notification" in window)) {
         console.warn("Questo browser non supporta le notifiche desktop.");
         return;
     }
-
     if (Notification.permission === "default") {
         try {
             const permission = await Notification.requestPermission();
@@ -319,17 +296,13 @@ export function mostraNotificaBrowser(titolo: string, opzioni?: NotificationOpti
                 ? opzioni.body.slice(0, 150) + "..."
                 : opzioni.body
             : undefined;
-
-        new Notification(titolo, {
-            ...opzioni,
-            body,
-        });
+        new Notification(titolo, { ...opzioni, body });
     }
 }
 
+/* ============================== RENDER DETTAGLI ============================== */
 export function renderDettaglio(n: Notifica): React.ReactNode {
     const d = n.dettagli || {};
-
     const mods: Array<{ campo: string; da?: string | null; a?: string | null }> =
         Array.isArray(d.modifiche) && d.modifiche.length
             ? d.modifiche
@@ -340,18 +313,20 @@ export function renderDettaglio(n: Notifica): React.ReactNode {
     if (mods.length === 0) return null;
 
     const label = (c: string) =>
-        ({
-            nome: "Nome",
-            slug: "Slug",
-            note: "Note",
-            stato: "Stato",
-            priorita: "Priorità",
-            consegna: "Consegna",
-            cliente: "Cliente",
-            tempo_stimato: "Tempo stimato",
-            progetto: "Progetto",
-            parent: "Task padre",
-        } as Record<string, string>)[c] || c;
+        (
+            {
+                nome: "Nome",
+                slug: "Slug",
+                note: "Note",
+                stato: "Stato",
+                priorita: "Priorità",
+                consegna: "Consegna",
+                cliente: "Cliente",
+                tempo_stimato: "Tempo stimato",
+                progetto: "Progetto",
+                parent: "Task padre",
+            } as Record<string, string>
+        )[c] || c;
 
     const first = mods[0];
     const extra = mods.slice(1);

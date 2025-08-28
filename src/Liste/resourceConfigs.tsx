@@ -23,15 +23,8 @@ import {
     faUndo,
 } from "@fortawesome/free-solid-svg-icons";
 
-import MiniStatoEditorModal from "../Modifica/MiniStatoEditorModal";
-import MiniRuoloEditorModal from "../Modifica/MiniRuoloEditorModal";
-import MiniPrioritaEditorModal from "../Modifica/MiniPrioritaEditorModal";
-import MiniClientEditorModal from "../Modifica/MiniClientEditorModal";
-import MiniUserEditorModal from "../Modifica/MiniUserEditorModal";
-import MiniProjectEditorModal from "../Modifica/MiniProjectEditorModal";
-import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
+import GenericEditorModal from "../Modifica/GenericEditorModal"; // 👈 usa l'editor generico
 import { useToast } from "../supporto/useToast";
-
 
 import {
     fetchStatiDeleted,
@@ -77,10 +70,8 @@ import type {
 import { useEffect, useMemo, useState } from "react";
 
 /* ============================================================
-   UTILITÀ GLOBALI (semplici, riusabili, niente logica di vista)
+   UTILITÀ GLOBALI
    ============================================================ */
-
-// Formattatori banali e chiari
 const fmt = {
     date: (val: string | null) => (val ? new Date(val).toLocaleDateString() : "—"),
     durata: (value: number | string | null): string => {
@@ -99,15 +90,12 @@ const fmt = {
     },
 };
 
-// Piccoli helper di dominio (semplici da leggere)
 const is = {
     taskDone: (t: any) => !!t?.fine_task || t?.completata === true,
     projectDone: (p: any) => !!p?.fine_progetto || p?.completato === true,
 };
 
-// Mini factory per pulsanti/icone d’azione: leggibili e uguali ovunque
 const btn = {
-    // NB: queste funzioni NON fanno routing o fetch: solo UI + callback
     edit: (onClick: () => void, title = "Modifica") => (
         <button onClick={onClick} className="icon-color hover:text-blue-600" title={title}>
             <FontAwesomeIcon icon={faPen} />
@@ -155,14 +143,12 @@ const btn = {
     ),
 };
 
-// Badge (riusabili) che puoi riutilizzare in qualsiasi colonna/titolo
 const badge = {
     meLink: <FontAwesomeIcon icon={faLink} className="w-4 h-4 text-blue-600" title="Assegnato a te" />,
     member: <FontAwesomeIcon icon={faLink} className="w-4 h-4 text-blue-600" title="Membro" />,
     done: <FontAwesomeIcon icon={faCheckCircle} className="w-4 h-4 text-green-600" title="Completato" />,
 };
 
-// “Pixel” UI per avatar fallback
 const AvatarFallback = ({ text }: { text: string }) => (
     <div className="w-8 h-8 rounded-full avatar-placeholder flex items-center justify-center text-xs font-bold">
         {text?.[0]?.toUpperCase() ?? "?"}
@@ -202,9 +188,13 @@ export const statiConfig: ResourceConfig<Stato> = {
             const res = await softDelete("stati", Number(s.id));
             if (!res.success) alert("Errore eliminazione: " + res.error);
         }),
-    renderModaleModifica: (id, onClose) => <MiniStatoEditorModal statoId={id} onClose={onClose} />,
+    renderModaleModifica: (id, onClose) => <GenericEditorModal table="stati" id={id} onClose={onClose} />,
     azioniExtra: (
-        <button type="button" onClick={() => (window as any).__openMiniCreate?.("stato")} className="px-3 py-1 bg-blue-600 text-white rounded flex items-center gap-2">
+        <button
+            type="button"
+            onClick={() => (window as any).__openMiniCreate?.("stato")}
+            className="px-3 py-1 bg-blue-600 text-white rounded flex items-center gap-2"
+        >
             <FontAwesomeIcon icon={faPlus} /> Crea
         </button>
     ),
@@ -230,9 +220,13 @@ export const ruoliConfig: ResourceConfig<Ruolo> = {
             const res = await softDelete("ruoli", Number(r.id));
             if (!res.success) alert("Errore eliminazione: " + res.error);
         }),
-    renderModaleModifica: (id, onClose) => <MiniRuoloEditorModal ruoloId={id} onClose={onClose} />,
+    renderModaleModifica: (id, onClose) => <GenericEditorModal table="ruoli" id={id} onClose={onClose} />,
     azioniExtra: (
-        <button type="button" onClick={() => (window as any).__openMiniCreate?.("ruolo")} className="px-3 py-1 bg-blue-600 text-white rounded flex items-center gap-2">
+        <button
+            type="button"
+            onClick={() => (window as any).__openMiniCreate?.("ruolo")}
+            className="px-3 py-1 bg-blue-600 text-white rounded flex items-center gap-2"
+        >
             <FontAwesomeIcon icon={faPlus} /> Crea
         </button>
     ),
@@ -271,9 +265,13 @@ export const prioritaConfig: ResourceConfig<Priorita> = {
             const res = await softDelete("priorita", Number(p.id));
             if (!res.success) alert("Errore eliminazione: " + res.error);
         }),
-    renderModaleModifica: (id, onClose) => <MiniPrioritaEditorModal prioritaId={id} onClose={onClose} />,
+    renderModaleModifica: (id, onClose) => <GenericEditorModal table="priorita" id={id} onClose={onClose} />,
     azioniExtra: (
-        <button type="button" onClick={() => (window as any).__openMiniCreate?.("priorita")} className="px-3 py-1 bg-blue-600 text-white rounded flex items-center gap-2">
+        <button
+            type="button"
+            onClick={() => (window as any).__openMiniCreate?.("priorita")}
+            className="px-3 py-1 bg-blue-600 text-white rounded flex items-center gap-2"
+        >
             <FontAwesomeIcon icon={faPlus} /> Crea
         </button>
     ),
@@ -299,7 +297,11 @@ export const clientiConfig: ResourceConfig<Cliente> = {
             className: "w-10 shrink-0",
             render: (c) =>
                 c.avatar_url ? (
-                    <img src={c.avatar_url} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-gray-300 dark:border-gray-600" />
+                    <img
+                        src={c.avatar_url}
+                        alt="Avatar"
+                        className="w-8 h-8 rounded-full object-cover border border-gray-300 dark:border-gray-600"
+                    />
                 ) : (
                     <AvatarFallback text={c.nome ?? "?"} />
                 ),
@@ -347,7 +349,7 @@ export const clientiConfig: ResourceConfig<Cliente> = {
             )}
         </div>
     ),
-    renderModaleModifica: (id, onClose) => <MiniClientEditorModal clienteId={id} onClose={onClose} />,
+    renderModaleModifica: (id, onClose) => <GenericEditorModal table="clienti" id={id} onClose={onClose} />,
 };
 
 /* ============================================================
@@ -370,7 +372,11 @@ export const utentiConfig: ResourceConfig<Utente> = {
             className: "w-10 shrink-0",
             render: (u) =>
                 u.avatar_url ? (
-                    <img src={u.avatar_url} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-gray-300 dark:border-gray-600" />
+                    <img
+                        src={u.avatar_url}
+                        alt="Avatar"
+                        className="w-8 h-8 rounded-full object-cover border border-gray-300 dark:border-gray-600"
+                    />
                 ) : (
                     <AvatarFallback text={u.nome ?? "?"} />
                 ),
@@ -402,15 +408,12 @@ export const utentiConfig: ResourceConfig<Utente> = {
             <p>Ruolo: {u.ruolo?.nome}</p>
         </>
     ),
-    renderModaleModifica: (id, onClose) => <MiniUserEditorModal utenteId={id} onClose={onClose} />,
+    renderModaleModifica: (id, onClose) => <GenericEditorModal table="utenti" id={id} onClose={onClose} />,
 };
 
 /* ============================================================
    PROGETTI
    ============================================================ */
-// ============================================================
-// PROGETTI
-// ============================================================
 export const progettiConfig: ResourceConfig<Progetto> = {
     key: "progetti",
     titolo: "Lista Progetti",
@@ -418,24 +421,12 @@ export const progettiConfig: ResourceConfig<Progetto> = {
     coloreIcona: "text-blue-500",
     useHeaderFilters: true,
     fetch: async ({ filtro, utenteId }) => {
-        // usa il flag corretto separato
-        const all = await fetchProgetti(
-            { ...filtro, soloMie: !!filtro.soloMieProgetti },
-            utenteId ?? undefined
-        );
-
-        // fallback di sicurezza lato client: se attivo "Miei", tieni solo progetti dove sono membro
+        const all = await fetchProgetti({ ...filtro, soloMie: !!filtro.soloMieProgetti }, utenteId ?? undefined);
         let items = all;
         if (filtro?.soloMieProgetti && utenteId) {
-            items = (all || []).filter((p: any) =>
-                (p.membri || []).some((m: any) => m.id === utenteId)
-            );
+            items = (all || []).filter((p: any) => (p.membri || []).some((m: any) => m.id === utenteId));
         }
-
-        // mantieni la logica "Completati"
-        return filtro.soloCompletati
-            ? items.filter((p: any) => p.completato === true || p.fine_progetto != null)
-            : items;
+        return filtro.soloCompletati ? items.filter((p: any) => p.completato === true || p.fine_progetto != null) : items;
     },
     cestino: {
         fetch: async ({ filtro }) => await fetchProgettiDeleted(filtro),
@@ -465,19 +456,13 @@ export const progettiConfig: ResourceConfig<Progetto> = {
         const completaProgetto = async (e: React.MouseEvent) => {
             e.stopPropagation();
             if (proj.fine_progetto) return;
-
-            // ✅ chiude progetto + tutte le task collegate (via progetti_task + sotto-task)
             const { error } = await supabase.rpc("complete_project", { p_id: proj.id });
             if (error) {
                 alert("Errore nel completare il progetto: " + error.message);
                 return;
             }
-
-            // Aggiorna subito la UI del progetto (niente refetch)
             const nowIso = new Date().toISOString();
             patchItem?.(proj.id, { fine_progetto: nowIso });
-
-            // (opzionale) avvisa altri componenti/lista task che sono state chiuse in bulk
             (window as any).dispatchEvent?.(
                 new CustomEvent("tasks:bulkCompleted", { detail: { progettoId: proj.id, fine_task: nowIso } })
             );
@@ -485,7 +470,6 @@ export const progettiConfig: ResourceConfig<Progetto> = {
 
         return (
             <>
-                {/* ✅ check: completa progetto + task, senza ricaricare */}
                 <button
                     onClick={completaProgetto}
                     className="icon-color hover:text-emerald-600"
@@ -520,7 +504,6 @@ export const progettiConfig: ResourceConfig<Progetto> = {
             </>
         );
     },
-
     renderDettaglio: (proj) => (
         <div className="space-y-1">
             {proj.cliente?.nome && <p>👤 Cliente: {proj.cliente.nome}</p>}
@@ -531,9 +514,8 @@ export const progettiConfig: ResourceConfig<Progetto> = {
             {proj.note && <p>🗒️ Note: {proj.note}</p>}
         </div>
     ),
-    renderModaleModifica: (id, onClose) => <MiniProjectEditorModal progettoId={id} onClose={onClose} />,
+    renderModaleModifica: (id, onClose) => <GenericEditorModal table="progetti" id={id} onClose={onClose} />,
 };
-
 
 /* ============================================================
    TIME ENTRIES
@@ -597,7 +579,12 @@ export const timeEntriesConfig: ResourceConfig<TimeEntry> = {
         },
     },
     colonne: [
-        { chiave: "utente", label: "Utente", className: "w-40", render: (t) => (t.utente ? `${t.utente.nome} ${t.utente.cognome}` : "—") },
+        {
+            chiave: "utente",
+            label: "Utente",
+            className: "w-40",
+            render: (t) => (t.utente ? `${t.utente.nome} ${t.utente.cognome}` : "—"),
+        },
         { chiave: "progetto", label: "Progetto", className: "w-40", render: (t) => t.progetto?.nome ?? "—" },
         { chiave: "task", label: "Task", className: "flex-1", render: (t) => t.task?.nome ?? "—" },
         { chiave: "data_inizio", label: "Inizio", className: "w-40", render: (t) => new Date(t.data_inizio).toLocaleString() },
@@ -605,6 +592,7 @@ export const timeEntriesConfig: ResourceConfig<TimeEntry> = {
         { chiave: "durata", label: "Durata", className: "w-32", render: (t) => fmt.durata(t.durata) },
     ],
 };
+
 const TIMER_KEY = "kal_active_task_timer";
 
 // toast globale
@@ -614,8 +602,6 @@ export const ToastBridge = () => {
     globalShowToast = showToast;
     return null;
 };
-
-
 
 type ActiveTimerStore = {
     taskId: string;
@@ -627,8 +613,10 @@ type ActiveTimerStore = {
 function readTimer(): ActiveTimerStore | null {
     try {
         const raw = localStorage.getItem(TIMER_KEY);
-        return raw ? JSON.parse(raw) as ActiveTimerStore : null;
-    } catch { return null; }
+        return raw ? (JSON.parse(raw) as ActiveTimerStore) : null;
+    } catch {
+        return null;
+    }
 }
 
 function writeTimer(v: ActiveTimerStore | null) {
@@ -640,17 +628,15 @@ export const TimerOverlay = () => {
     const [data, setData] = useState<ActiveTimerStore | null>(() => readTimer());
     const [, tick] = useState(0);
 
-    // aggiorna stato quando cambia da altre viste
     useEffect(() => {
         const onChange = () => setData(readTimer());
         window.addEventListener("tasks:timerChanged", onChange as any);
         return () => window.removeEventListener("tasks:timerChanged", onChange as any);
     }, []);
 
-    // timer 1s per tempo che scorre
     useEffect(() => {
         if (!data) return;
-        const id = setInterval(() => tick(x => x + 1), 1000);
+        const id = setInterval(() => tick((x) => x + 1), 1000);
         return () => clearInterval(id);
     }, [data]);
 
@@ -682,7 +668,6 @@ export const TimerOverlay = () => {
             <button
                 className="ml-3 text-xs px-3 py-1.5 rounded-full bg-red-600 text-white hover:bg-red-500"
                 onClick={() => {
-                    // chiede allo setup di fermare e salvare
                     window.dispatchEvent(new CustomEvent("tasks:timerStopRequest"));
                 }}
                 title="Ferma e salva"
@@ -703,23 +688,11 @@ export const tasksConfig: ResourceConfig<Task> = {
     coloreIcona: "text-green-500",
     useHeaderFilters: true,
     fetch: async ({ filtro, utenteId }) => {
-        // usa il flag corretto separato
-        const all = await fetchTasks(
-            { ...filtro, soloMie: !!filtro.soloMieTasks },
-            utenteId ?? undefined
-        );
-
-        // mostra solo root (come prima)
+        const all = await fetchTasks({ ...filtro, soloMie: !!filtro.soloMieTasks }, utenteId ?? undefined);
         let items = (all || []).filter((t: any) => !t.parent_id);
-
-        // fallback di sicurezza lato client: se attivo "Mie", tieni solo task dove sono assegnato
         if (filtro?.soloMieTasks && utenteId) {
-            items = items.filter((t: any) =>
-                (t.assegnatari || []).some((u: any) => u.id === utenteId)
-            );
+            items = items.filter((t: any) => (t.assegnatari || []).some((u: any) => u.id === utenteId));
         }
-
-        // mantieni la logica "Completate"
         return filtro.soloCompletate ? items.filter((t: any) => !!t.fine_task || t.completata === true) : items;
     },
 
@@ -730,15 +703,17 @@ export const tasksConfig: ResourceConfig<Task> = {
         },
         actions: cestinoActions.tasks,
     },
+
     setup: ({ utenteId }) => {
         let active: { taskId: string; taskName: string; progettoId?: string | null; startTime: Date } | null = null;
 
-        // ripristina stato se presente (page change)
         const stored = ((): ActiveTimerStore | null => {
             try {
                 const raw = localStorage.getItem(TIMER_KEY);
-                return raw ? JSON.parse(raw) as ActiveTimerStore : null;
-            } catch { return null; }
+                return raw ? (JSON.parse(raw) as ActiveTimerStore) : null;
+            } catch {
+                return null;
+            }
         })();
         if (!active && stored) {
             active = {
@@ -754,8 +729,18 @@ export const tasksConfig: ResourceConfig<Task> = {
         };
 
         const start = (task: Task) => {
-            active = { taskId: task.id, taskName: task.nome, progettoId: task.progetto?.id ?? null, startTime: new Date() };
-            writeTimer({ taskId: active.taskId, taskName: active.taskName, progettoId: active.progettoId ?? undefined, startISO: active.startTime.toISOString() });
+            active = {
+                taskId: task.id,
+                taskName: task.nome,
+                progettoId: task.progetto?.id ?? null,
+                startTime: new Date(),
+            };
+            writeTimer({
+                taskId: active.taskId,
+                taskName: active.taskName,
+                progettoId: active.progettoId ?? undefined,
+                startISO: active.startTime.toISOString(),
+            });
             globalShowToast("⏱️ Timer avviato", "info");
             notify();
         };
@@ -798,19 +783,18 @@ export const tasksConfig: ResourceConfig<Task> = {
 
         const isRunning = (taskId: string) => active?.taskId === taskId;
 
-        // listener per overlay "Stop"
-        const stopListener = () => { void stop(undefined); };
+        const stopListener = () => {
+            void stop(undefined);
+        };
         window.addEventListener("tasks:timerStopRequest", stopListener as any);
 
         return {
             extra: { start, stop, isRunning },
             dispose: () => {
                 window.removeEventListener("tasks:timerStopRequest", stopListener as any);
-            }
+            },
         };
     },
-
-
 
     colonne: [
         {
@@ -836,11 +820,10 @@ export const tasksConfig: ResourceConfig<Task> = {
                 await extra?.stop?.(task);
                 patchItem?.(task.id, { __runningTick: Date.now() } as any);
             } else {
-                extra?.start?.(task); // ⬅️ passa l'intera task
+                extra?.start?.(task);
                 patchItem?.(task.id, { __runningTick: Date.now() } as any);
             }
         };
-
 
         const completaTask = async () => {
             if (task.fine_task) return;
@@ -852,10 +835,7 @@ export const tasksConfig: ResourceConfig<Task> = {
 
         return (
             <>
-                {/* ✅ come in DettaglioTask: il timer è disponibile se la task ha un progetto */}
-                {task.progetto?.id
-                    ? (running ? btn.stop(toggleTimer) : btn.play(toggleTimer))
-                    : null}
+                {task.progetto?.id ? (running ? btn.stop(toggleTimer) : btn.play(toggleTimer)) : null}
 
                 {btn.complete(completaTask, task.fine_task ? "Già completata" : "Segna come completata")}
                 {btn.navigateTo(() => navigate(`/tasks/${task.slug ?? task.id}`), "Vai al dettaglio")}
@@ -881,7 +861,7 @@ export const tasksConfig: ResourceConfig<Task> = {
             {task.note && <p>🗒️ {task.note}</p>}
         </div>
     ),
-    renderModaleModifica: (id, onClose) => <MiniTaskEditorModal taskId={id} onClose={onClose} />,
+    renderModaleModifica: (id, onClose) => <GenericEditorModal table="tasks" id={id} onClose={onClose} />,
 };
 
 /* ============================================================

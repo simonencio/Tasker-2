@@ -254,7 +254,9 @@ export default function BachecaDinamica({
                 paramKey={paramKey}
                 dati={cfg.useHeaderFilters ? items : undefined}
                 onChange={cfg.useHeaderFilters ? setFiltro : undefined}
+                azioniExtra={cfg.azioniExtra}   // 👈 aggiunto
             />
+
 
             <div
                 ref={scrollRef}

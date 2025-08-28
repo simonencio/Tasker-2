@@ -13,7 +13,6 @@ import {
     faUsers
 } from "@fortawesome/free-solid-svg-icons";
 import { Toast } from "toaster-js";
-import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
 import ChatCommentiModal from "./ChatCommentiModal";
 import type { Commento } from "./tipi";
 import {
@@ -23,6 +22,7 @@ import {
     Section,
     MetaField
 } from "../supporto/ui";
+import GenericEditorModal from "../Modifica/GenericEditorModal";
 
 /* ============================== Tipi ============================== */
 type Assegnatario = { id: string; nome: string; cognome?: string | null; avatar_url?: string | null };
@@ -455,7 +455,11 @@ export default function DettaglioTask() {
 
             {/* Modali */}
             {taskDaModificare && (
-                <MiniTaskEditorModal taskId={taskDaModificare} onClose={() => setTaskDaModificare(null)} />
+                <GenericEditorModal
+                    table="tasks"
+                    id={taskDaModificare}
+                    onClose={() => setTaskDaModificare(null)}
+                />
             )}
             {taskChatCommenti && (
                 <ChatCommentiModal

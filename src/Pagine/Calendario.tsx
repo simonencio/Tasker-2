@@ -6,7 +6,7 @@ import { format, addDays } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronRight, faChevronDown, faTasks, faCheckCircle, faCircle } from '@fortawesome/free-solid-svg-icons';
-import IntestazioneProgetto from './IntestazioneProgetto';
+// import IntestazioneProgetto from '../GestioneProgetto/IntestazioneProgetto';
 import { isUtenteAdmin } from '../supporto/ruolo';
 import {
     filtraTask,
@@ -16,7 +16,7 @@ import {
     generaTaskScadute
 } from '../supporto/calendarioUtils';
 import type { Task } from '../supporto/tipi';
-import ToggleMie from './ToggleMie';
+import ToggleMie from '../GestioneProgetto/ToggleMie';
 
 export default function CalendarioProgetto() {
     // accetta sia :id che :slug (oltre al caso /calendario senza parametri)
@@ -277,7 +277,7 @@ export default function CalendarioProgetto() {
                                                                             </span>
                                                                         </>}*/}
                                                                         <span className="text-sm truncate">{child.nome}</span>
-                                                                        
+
 
                                                                     </div>
                                                                 ))}
@@ -382,14 +382,13 @@ export default function CalendarioProgetto() {
 
     return (
         <div className="min-h-screen bg-theme text-theme">
-            {/* Header di progetto solo se ho un progetto */}
-            {slug && (
+            {/* {slug && (
                 <IntestazioneProgetto
                     slug={slug}
                     soloMieTask={soloMieTask}
                     setSoloMieTask={setSoloMieTask}
                 />
-            )}
+            )} */}
 
             <div className="p-4 sm:p-6">
                 <div className="flex flex-row items-center justify-between flex-wrap gap-3 mb-6">

@@ -22,21 +22,14 @@ import { ToastBridge, TimerOverlay } from "./Liste/resourceConfigs";
 
 
 import DettaglioProgetto from "./GestioneProgetto/DettaglioProgetto";
-import CalendarioProgetto from "./GestioneProgetto/CalendarioProgetto";
-import BachecaProgetto from "./GestioneProgetto/BachecaProgetto";
+import CalendarioProgetto from "./Pagine/Calendario";
+// import BachecaProgetto from "./GestioneProgetto/BachecaProgetto";
 
 import ResetPassword from "./Pagine/ResetPassword";
 import Header from "./Header/Header";
 import Sidebar from "./Sidebar/Sidebar";
 import NotificheSidebar from "./Notifiche/NotificheSidebar";
 
-import MiniProjectCreatorModal from "./Creazione/MiniProjectCreatorModal";
-import MiniTaskCreatorModal from "./Creazione/MiniTaskCreatorModal";
-import MiniClientCreatorModal from "./Creazione/MiniClientCreatorModal";
-import MiniUserCreatorModal from "./Creazione/MiniUserCreatorModal";
-import MiniStatoCreatorModal from "./Creazione/MiniStatoCreatorModal";
-import MiniPrioritaCreatorModal from "./Creazione/MiniPrioritaCreatorModal";
-import MiniRuoloCreatorModal from "./Creazione/MiniRuoloCreatorModal";
 
 import DettaglioTask from "./GestioneTask/DettaglioTask";
 import Cestino from "./Pagine/Cestino";
@@ -48,6 +41,7 @@ import BachecaDinamica from "./Liste/BachecaDinamica";
 
 import type { ResourceKey } from "./Liste/resourceConfigs";
 import { getPreferredView, type Vista } from "./Liste/viewPrefs";
+import GenericCreatorModal from "./Creazione/GenericCreatorModal";
 
 type ModalType = "project" | "tasks" | "client" | "user" | "stato" | "priorita" | "ruolo";
 
@@ -249,7 +243,7 @@ function AppContent() {
                                 {/* Progetti */}
                                 <Route path="/progetti/:slug" element={<DettaglioProgetto />} />
                                 <Route path="/calendario" element={<CalendarioProgetto />} />
-                                <Route path="/progetti/:slug/bacheca" element={<BachecaProgetto />} />
+                                {/* <Route path="/progetti/:slug/bacheca" element={<BachecaProgetto />} /> */}
 
                                 {/* Tasks */}
                                 <Route path="/tasks/:slug" element={<DettaglioTask />} />
@@ -265,26 +259,27 @@ function AppContent() {
 
             {/* Modali con offset */}
             {activeModals.includes("project") && (
-                <MiniProjectCreatorModal onClose={() => closeModal("project")} offsetIndex={getOffset("project")} />
+                <GenericCreatorModal table="progetti" onClose={() => closeModal("project")} offsetIndex={getOffset("project")} />
             )}
             {activeModals.includes("tasks") && (
-                <MiniTaskCreatorModal onClose={() => closeModal("tasks")} offsetIndex={getOffset("tasks")} />
+                <GenericCreatorModal table="tasks" onClose={() => closeModal("tasks")} offsetIndex={getOffset("tasks")} />
             )}
             {activeModals.includes("client") && (
-                <MiniClientCreatorModal onClose={() => closeModal("client")} offsetIndex={getOffset("client")} />
+                <GenericCreatorModal table="clienti" onClose={() => closeModal("client")} offsetIndex={getOffset("client")} />
             )}
             {activeModals.includes("user") && (
-                <MiniUserCreatorModal onClose={() => closeModal("user")} offsetIndex={getOffset("user")} />
+                <GenericCreatorModal table="utenti" onClose={() => closeModal("user")} offsetIndex={getOffset("user")} />
             )}
             {activeModals.includes("stato") && (
-                <MiniStatoCreatorModal onClose={() => closeModal("stato")} offsetIndex={getOffset("stato")} />
+                <GenericCreatorModal table="stati" onClose={() => closeModal("stato")} offsetIndex={getOffset("stato")} />
             )}
             {activeModals.includes("priorita") && (
-                <MiniPrioritaCreatorModal onClose={() => closeModal("priorita")} offsetIndex={getOffset("priorita")} />
+                <GenericCreatorModal table="priorita" onClose={() => closeModal("priorita")} offsetIndex={getOffset("priorita")} />
             )}
             {activeModals.includes("ruolo") && (
-                <MiniRuoloCreatorModal onClose={() => closeModal("ruolo")} offsetIndex={getOffset("ruolo")} />
+                <GenericCreatorModal table="ruoli" onClose={() => closeModal("ruolo")} offsetIndex={getOffset("ruolo")} />
             )}
+
         </>
     );
 }

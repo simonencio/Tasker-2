@@ -120,6 +120,7 @@ export default function CardDinamiche<T extends { id: string | number }>({
                 modalitaCestino={modalitaCestino}
                 dati={config.useHeaderFilters ? items : undefined}
                 onChange={config.useHeaderFilters ? setFiltro : undefined}
+                azioniExtra={config.azioniExtra}   // 👈 aggiunto
             />
 
             {loading ? (

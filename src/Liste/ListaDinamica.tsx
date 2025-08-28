@@ -1,4 +1,3 @@
-// src/Liste/ListaDinamica.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -15,22 +14,23 @@ import type {
 
 /**
  * COMPONENTE UNICO “SCHELETRO”
- * - Legge la config da resourceConfigs[tipo]
- * - Esegue fetch/setup secondo la config (switcha su cestino.fetch se modalitaCestino)
+ * - Legge la config da resourceConfigs[tipo] oppure da configOverride
+ * - Esegue fetch/setup secondo la config
  * - Renderizza: Intestazione + Tabella + Azioni + Dettaglio + Modale (se definita in config)
- * - Nessuna logica di dominio qui dentro: tutto arriva dalla config (azioni, modali, ecc.)
  */
 export default function ListaDinamica<T extends { id: string | number }>({
     tipo,
     modalitaCestino = false,
     paramKey = "view",
+    configOverride,
 }: {
     tipo: ResourceKey;
     modalitaCestino?: boolean;
     paramKey?: string;
+    configOverride?: ResourceConfig<any>; // 👈 FIX: accettiamo override di qualsiasi tipo
 }) {
     const navigate = useNavigate();
-    const configAny = resourceConfigs[tipo] as any;
+    const configAny = configOverride ?? (resourceConfigs[tipo] as any);
     if (!configAny) {
         return <p className="text-red-600">Config non trovata per tipo: {tipo}</p>;
     }
@@ -133,7 +133,9 @@ export default function ListaDinamica<T extends { id: string | number }>({
                 coloreIcona={config.coloreIcona}
                 tipo={tipo}
                 paramKey={paramKey}
-                azioniExtra={!modalitaCestino && !config.useHeaderFilters ? config.azioniExtra : undefined}
+                azioniExtra={
+                    !modalitaCestino && !config.useHeaderFilters ? config.azioniExtra : undefined
+                }
                 modalitaCestino={modalitaCestino}
                 dati={config.useHeaderFilters ? items : undefined}
                 onChange={config.useHeaderFilters ? setFiltro : undefined}
@@ -169,14 +171,21 @@ export default function ListaDinamica<T extends { id: string | number }>({
                                     onClick={() => setItemEspansoId(isOpen ? null : itemId)}
                                 >
                                     {config.colonne.map((col) => (
-                                        <div key={String(col.chiave)} className={col.className ?? "flex-1"}>
-                                            {col.render ? col.render(item, ctx) : (item as any)[col.chiave as keyof T]}
+                                        <div
+                                            key={String(col.chiave)}
+                                            className={col.className ?? "flex-1"}
+                                        >
+                                            {col.render
+                                                ? col.render(item, ctx)
+                                                : (item as any)[col.chiave as keyof T]}
                                         </div>
                                     ))}
 
                                     {/* azioni per riga */}
                                     <div
-                                        className={`w-36 flex items-center shrink-0 ${modalitaCestino ? "justify-center gap-3" : "justify-end gap-3"
+                                        className={`w-36 flex items-center shrink-0 ${modalitaCestino
+                                            ? "justify-center gap-3"
+                                            : "justify-end gap-3"
                                             }`}
                                         onClick={(e) => e.stopPropagation()}
                                     >
@@ -200,10 +209,11 @@ export default function ListaDinamica<T extends { id: string | number }>({
                                         ) : (
                                             <>
                                                 {config.azioni && config.azioni(item, ctx)}
-                                                {/* Modifica disponibile solo fuori dal cestino */}
                                                 {config.renderModaleModifica && !modalitaCestino && (
                                                     <button
-                                                        onClick={() => setItemDaModificareId(itemId)}
+                                                        onClick={() =>
+                                                            setItemDaModificareId(itemId)
+                                                        }
                                                         className="icon-color hover:text-blue-600"
                                                         title="Modifica"
                                                     >
@@ -227,7 +237,7 @@ export default function ListaDinamica<T extends { id: string | number }>({
                 </div>
             )}
 
-            {/* modale modifica (decisa dalla config) — non in cestino */}
+            {/* modale modifica — non in cestino */}
             {itemDaModificareId &&
                 !modalitaCestino &&
                 config.renderModaleModifica?.(itemDaModificareId, () =>

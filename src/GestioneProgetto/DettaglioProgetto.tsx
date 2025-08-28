@@ -14,10 +14,8 @@ import {
     faCommentDots
 } from "@fortawesome/free-solid-svg-icons";
 
-import MiniProjectEditorModal from "../Modifica/MiniProjectEditorModal";
 import { isUtenteAdmin } from "../supporto/ruolo";
 import ToggleMie from "./ToggleMie";
-import MiniTaskEditorModal from "../Modifica/MiniTaskEditorModal";
 import RenderSottoTask from "../supporto/SottoTask";
 import RenderCommento from "../supporto/RenderCommento";
 
@@ -30,6 +28,7 @@ import {
 } from "../supporto/ui";
 
 import type { Task, Utente, Progetto, Commento } from "../supporto/tipi";
+import GenericEditorModal from "../Modifica/GenericEditorModal";
 
 /* ============================== Tipi ============================== */
 type TaskConSlug = Task & { slug: string };
@@ -445,10 +444,18 @@ export default function DettaglioProgetto() {
             </div>
 
             {modaleAperta && progettoId && (
-                <MiniProjectEditorModal progettoId={progettoId} onClose={() => setModaleAperta(false)} />
+                <GenericEditorModal
+                    table="progetti"
+                    id={progettoId}
+                    onClose={() => setModaleAperta(false)}
+                />
             )}
             {taskDaModificare && (
-                <MiniTaskEditorModal taskId={taskDaModificare} onClose={() => setTaskDaModificare(null)} />
+                <GenericEditorModal
+                    table="tasks"
+                    id={taskDaModificare}
+                    onClose={() => setTaskDaModificare(null)}
+                />
             )}
         </div>
     );
