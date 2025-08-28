@@ -430,7 +430,7 @@ export function useChatCommenti({
                 await insertDestinatari(supabase as any, commentoId, menzionatiValidi);
             }
 
-            // Notifiche
+            // Notifiche — separa menzionati vs altri assegnati
             const destinatariNotifica = computeDestinatariNotifica({
                 assegnatari: utentiProgetto,
                 utenteId,
@@ -439,13 +439,46 @@ export function useChatCommenti({
                 menzionati: menzionatiValidi,
             });
 
-            if (destinatariNotifica.length > 0) {
-                await inviaNotifica("commento_task", destinatariNotifica, t, utenteId, {
-                    task_id: taskId,
-                    commento_id: commentoId,
-                    parent_id: parent ?? undefined,
-                });
+            // autore e nome task
+            const autore = utentiById.get(utenteId);
+            const autoreNome = autore ? fullName(autore) : "Qualcuno";
+
+            const { data: taskRow } = await supabase
+                .from("tasks")
+                .select("nome")
+                .eq("id", taskId)
+                .maybeSingle();
+
+            const taskNome = taskRow?.nome || "Task";
+
+            // menzionati: solo loro
+            const menzionatiOnly = Array.from(new Set(menzionatiValidi))
+                //.filter((id) => id && id !== utenteId);
+                 .filter((id) => !!id); // permetti auto-mention
+
+            // generali: tutti i destinatari esclusi i menzionati
+            const generali = destinatariNotifica.filter((id) => !menzionatiOnly.includes(id) && id !== utenteId);  
+
+            if (menzionatiOnly.length > 0) {
+                await inviaNotifica(
+                    "COMMENTO_MENZIONE",
+                    menzionatiOnly,
+                    `${autoreNome} ti ha menzionato in un commento in '${taskNome}'`,
+                    utenteId,
+                    { task_id: taskId, commento_id: commentoId, parent_id: parent ?? undefined }
+                );
             }
+
+            if (generali.length > 0) {
+                await inviaNotifica(
+                    "COMMENTO_TASK",
+                    generali,
+                    `${autoreNome} ha commentato '${taskNome}'`,
+                    utenteId,
+                    { task_id: taskId, commento_id: commentoId, parent_id: parent ?? undefined }
+                );
+            }
+
 
             // reset UI
             setTesto("");

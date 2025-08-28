@@ -23,7 +23,9 @@ export default function CalendarioProgetto() {
     const { id: routeId, slug } = useParams<{ id?: string; slug?: string }>();
 
     const [projectId, setProjectId] = useState<string | null>(routeId ?? null);
-    const [taskList, setTaskList] = useState<Task[]>([]);
+    // prima: const [taskList, setTaskList] = useState<Task[]>([]);
+    const [taskList, setTaskList] = useState<(Task & { progetto_nome?: string | null })[]>([]);
+
     const [utenteLoggatoId, setUtenteLoggatoId] = useState<string | null>(null);
     const [soloMieTask, setSoloMieTask] = useState(() => localStorage.getItem('calSoloMie') === '1');
 
@@ -82,20 +84,31 @@ export default function CalendarioProgetto() {
         (async () => {
             let query = supabase
                 .from('progetti_task')
-                .select(`task:tasks (
-          id, stato_id, parent_id, fine_task, nome, note, consegna, tempo_stimato,
-          stati (nome),
-          priorita (nome),
-          utenti_task:utenti_task (
-            utente:utenti (id, nome, cognome)
-          )
-        )`);
+                .select(
+                    `progetti_id,
+                    progetto:progetti ( id, nome ),
+                    task:tasks (
+                    id, stato_id, parent_id, fine_task, nome, note, consegna, tempo_stimato,
+                    stati (nome),
+                    priorita (nome),
+                    utenti_task:utenti_task (
+                    utente:utenti (id, nome, cognome)
+                    )
+                )
+            `);
 
             if (projectId) query = query.eq('progetti_id', projectId);
 
             const { data, error } = await query;
             if (!alive) return;
-            if (!error && data) setTaskList(data.map((r: any) => r.task));
+            if (!error && data) {
+                setTaskList(
+                    data.map((r: any) => ({
+                        ...r.task,
+                        progetto_nome: r.progetto?.nome ?? null,
+                    }))
+                );
+            }
         })();
         return () => { alive = false };
     }, [projectId]);
@@ -216,7 +229,10 @@ export default function CalendarioProgetto() {
                                                                 )}
                                                             </span>
 
-                                                            <span className="truncate font-medium text-sm">{parent.nome}</span>
+                                                            <span className="truncate font-medium text-sm">
+                                                                {parent.nome}
+                                                                {(parent as any).progetto_nome && <> ({(parent as any).progetto_nome})</>}
+                                                            </span>
 
                                                         </div>
                                                         {/* opzionale: badge numero figli */}
@@ -253,7 +269,15 @@ export default function CalendarioProgetto() {
                                                                                 <FontAwesomeIcon icon={faCircle} className="w-4 h-4 icon-color" />
                                                                             )}
                                                                         </span>
+                                                                        {/* mostra il nome progetto anche nelel sotto task
+                                                                        {!projectId && (child as any).progetto_nome && <> 
+                                                                            <span className="text-sm truncate">
+                                                                                {child.nome}
+                                                                                {(child as any).progetto_nome && <> ({(child as any).progetto_nome})</>}
+                                                                            </span>
+                                                                        </>}*/}
                                                                         <span className="text-sm truncate">{child.nome}</span>
+                                                                        
 
                                                                     </div>
                                                                 ))}
@@ -286,7 +310,11 @@ export default function CalendarioProgetto() {
                                                                     <FontAwesomeIcon icon={faCircle} className="w-4 h-4 icon-color" />
                                                                 )}
                                                             </span>
-                                                            <span className="text-sm truncate">{t.nome}</span>
+                                                            <span className="text-sm truncate">
+                                                                {t.nome}
+                                                                {(t as any).progetto_nome && <> ({(t as any).progetto_nome})</>}
+                                                            </span>
+
 
                                                         </div>
                                                     ))}
@@ -355,9 +383,9 @@ export default function CalendarioProgetto() {
     return (
         <div className="min-h-screen bg-theme text-theme">
             {/* Header di progetto solo se ho un progetto */}
-            {projectId && (
+            {slug && (
                 <IntestazioneProgetto
-                    id={projectId}
+                    slug={slug}
                     soloMieTask={soloMieTask}
                     setSoloMieTask={setSoloMieTask}
                 />

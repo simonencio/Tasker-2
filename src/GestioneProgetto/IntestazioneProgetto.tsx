@@ -1,4 +1,4 @@
-// src/componenti/IntestazioneProgetto.tsx
+// src/GestioneProgetto/IntestazioneProgetto.tsx
 import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -6,12 +6,13 @@ import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import { isUtenteAdmin } from "../supporto/ruolo";
 
 type Props = {
+    
     slug: string; // 👈 non più id, ma slug
     soloMieTask: boolean;
     setSoloMieTask: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
-export default function IntestazioneProgetto({ slug }: Props) {
+export default function IntestazioneProgetto({ slug, soloMieTask, setSoloMieTask}: Props) {
     const navigate = useNavigate();
     const [, setIsAdmin] = useState(false);
 
