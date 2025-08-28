@@ -194,7 +194,7 @@ export async function fetchProgetti(filtro: any = {}, utenteId?: string) {
     const query = supabase
         .from("progetti")
         .select(`
-      id, slug, nome, consegna, note, tempo_stimato,
+      id, slug, nome, consegna, note, tempo_stimato, fine_progetto,   
       stato:stato_id ( id, nome, colore ),
       priorita:priorita_id ( id, nome ),
       cliente:cliente_id ( id, nome ),
@@ -212,19 +212,32 @@ export async function fetchProgetti(filtro: any = {}, utenteId?: string) {
     const { data, error } = await query;
     if (error) throw error;
 
-    return (data || []).map((p: any) => ({
-        id: p.id,
-        slug: p.slug,
-        nome: p.nome,
-        consegna: p.consegna,
-        note: p.note,
-        stato: Array.isArray(p.stato) ? p.stato[0] : p.stato,
-        priorita: Array.isArray(p.priorita) ? p.priorita[0] : p.priorita,
-        cliente: Array.isArray(p.cliente) ? p.cliente[0] : p.cliente,
-        membri: p.utenti_progetti?.map((up: any) => up.utenti) ?? [],
-        tempo_stimato: p.tempo_stimato,
-    }));
+    const mapped = (data || []).map((p: any) => {
+        const fine = p.fine_progetto ?? null;
+        return {
+            id: p.id,
+            slug: p.slug,
+            nome: p.nome,
+            consegna: p.consegna,
+            note: p.note,
+            stato: Array.isArray(p.stato) ? p.stato[0] : p.stato,
+            priorita: Array.isArray(p.priorita) ? p.priorita[0] : p.priorita,
+            cliente: Array.isArray(p.cliente) ? p.cliente[0] : p.cliente,
+            membri: p.utenti_progetti?.map((up: any) => up.utenti) ?? [],
+            tempo_stimato: p.tempo_stimato,
+            // 👇👇👇 MANCAVANO QUESTI DUE CAMPI
+            fine_progetto: fine,
+            completato: !!fine,
+        };
+    });
+
+    // filtro "solo mie" a valle se serve
+    if (filtro?.soloMie && utenteId) {
+        return mapped.filter((pr) => pr.membri?.some((m: any) => m.id === utenteId));
+    }
+    return mapped;
 }
+
 
 /* ----------------------------
  *          DELETED
@@ -363,7 +376,6 @@ export async function fetchTasksDeleted(filtro: any = {}) {
     }));
 }
 
-// 🔹 Progetti eliminati
 export async function fetchProgettiDeleted(filtro: any = {}) {
     let idsProgetti: string[] = [];
 
@@ -379,7 +391,7 @@ export async function fetchProgettiDeleted(filtro: any = {}) {
     const query = supabase
         .from("progetti")
         .select(`
-      id, slug, nome, consegna, note, tempo_stimato, deleted_at,
+      id, slug, nome, consegna, note, tempo_stimato, fine_progetto, deleted_at,  
       stato:stato_id ( id, nome, colore ),
       priorita:priorita_id ( id, nome ),
       cliente:cliente_id ( id, nome ),
@@ -395,20 +407,27 @@ export async function fetchProgettiDeleted(filtro: any = {}) {
     const { data, error } = await query;
     if (error) throw error;
 
-    return (data || []).map((p: any) => ({
-        id: p.id,
-        slug: p.slug,
-        nome: p.nome,
-        consegna: p.consegna,
-        note: p.note,
-        deleted_at: p.deleted_at,
-        stato: Array.isArray(p.stato) ? p.stato[0] : p.stato,
-        priorita: Array.isArray(p.priorita) ? p.priorita[0] : p.priorita,
-        cliente: Array.isArray(p.cliente) ? p.cliente[0] : p.cliente,
-        membri: p.utenti_progetti?.map((up: any) => up.utenti) ?? [],
-        tempo_stimato: p.tempo_stimato,
-    }));
+    return (data || []).map((p: any) => {
+        const fine = p.fine_progetto ?? null;
+        return {
+            id: p.id,
+            slug: p.slug,
+            nome: p.nome,
+            consegna: p.consegna,
+            note: p.note,
+            deleted_at: p.deleted_at,
+            stato: Array.isArray(p.stato) ? p.stato[0] : p.stato,
+            priorita: Array.isArray(p.priorita) ? p.priorita[0] : p.priorita,
+            cliente: Array.isArray(p.cliente) ? p.cliente[0] : p.cliente,
+            membri: p.utenti_progetti?.map((up: any) => up.utenti) ?? [],
+            tempo_stimato: p.tempo_stimato,
+            // 👇 coerenza anche nel cestino
+            fine_progetto: fine,
+            completato: !!fine,
+        };
+    });
 }
+
 
 /* ----------------------------
  *   HELPERS CESTINO (azioni)

@@ -1,38 +1,17 @@
 // src/Liste/ListaDinamica.tsx
-import { useEffect, useMemo, useState, type JSX } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faUndo, faTrash } from "@fortawesome/free-solid-svg-icons";
 
-import IntestazioneLista, { type FiltroIntestazione } from "./IntestazioneLista";
+import IntestazioneLista from "./IntestazioneLista";
 import { supabase } from "../supporto/supabaseClient";
 import { resourceConfigs, type ResourceKey } from "./resourceConfigs";
-
-/**
- * Tipi base per column rendering e context che passiamo alle funzioni della config
- */
-export type Colonna<T> = {
-    chiave: keyof T | string;
-    label: string;
-    className?: string;
-    render?: (item: T, ctx: ResourceRenderCtx<T>) => JSX.Element | string | null;
-};
-
-export type ResourceRenderCtx<T> = {
-    filtro: FiltroIntestazione;
-    setFiltro: (f: FiltroIntestazione) => void;
-    items: T[];
-    utenteId: string | null;
-    navigate: ReturnType<typeof useNavigate>;
-    extra?: any; // spazio per stati/azioni custom restituiti da config.setup()
-};
-
-type Props = {
-    /** Chiave della risorsa da mostrare (deve esistere in resourceConfigs) */
-    tipo: ResourceKey;
-    /** Abilita la modalità Cestino per questa lista */
-    modalitaCestino?: boolean;
-};
+import type {
+    ResourceRenderCtx,
+    FiltroIntestazione,
+    ResourceConfig,
+} from "./typesLista";
 
 /**
  * COMPONENTE UNICO “SCHELETRO”
@@ -44,42 +23,32 @@ type Props = {
 export default function ListaDinamica<T extends { id: string | number }>({
     tipo,
     modalitaCestino = false,
-}: Props) {
+    paramKey = "view",
+}: {
+    tipo: ResourceKey;
+    modalitaCestino?: boolean;
+    paramKey?: string;
+}) {
     const navigate = useNavigate();
     const configAny = resourceConfigs[tipo] as any;
     if (!configAny) {
         return <p className="text-red-600">Config non trovata per tipo: {tipo}</p>;
     }
-
-    const config = configAny as {
-        key: string;
-        titolo: string | JSX.Element;
-        icona: any;
-        coloreIcona: string;
-        fetch: (args: { filtro: FiltroIntestazione; utenteId: string | null }) => Promise<T[]>;
-        useHeaderFilters?: boolean;
-        colonne: Colonna<T>[];
-        azioni?: (item: T, ctx: ResourceRenderCtx<T>) => JSX.Element;
-        renderDettaglio?: (item: T, ctx: ResourceRenderCtx<T>) => JSX.Element | null;
-        renderModaleModifica?: (id: string, onClose: () => void) => JSX.Element;
-        azioniExtra?: JSX.Element;
-        modalitaCestino?: boolean;
-        setup?: (deps: { utenteId: string | null }) => { extra: any; dispose?: () => void };
-        cestino?: {
-            fetch: (args: { filtro: FiltroIntestazione; utenteId: string | null }) => Promise<T[]>;
-            actions: {
-                restore: (id: string | number) => Promise<void>;
-                hardDelete: (id: string | number) => Promise<void>;
-            };
-        };
-    };
+    const config = configAny as ResourceConfig<T>;
 
     const [utenteId, setUtenteId] = useState<string | null>(null);
     const [items, setItems] = useState<T[]>([]);
+    const patchItem = (id: string | number, patch: Partial<T>) => {
+        setItems((prev) =>
+            prev.map((it) => (String(it.id) === String(id) ? { ...it, ...patch } : it))
+        );
+    };
+
     const [loading, setLoading] = useState(true);
     const [filtro, setFiltro] = useState<FiltroIntestazione>({});
     const [itemEspansoId, setItemEspansoId] = useState<string | null>(null);
-    const [itemDaModificareId, setItemDaModificareId] = useState<string | null>(null);
+    const [itemDaModificareId, setItemDaModificareId] =
+        useState<string | null>(null);
 
     // Recupero utente loggato
     useEffect(() => {
@@ -94,6 +63,13 @@ export default function ListaDinamica<T extends { id: string | number }>({
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [config, utenteId]
     );
+
+    // cleanup del setup (listener, ecc.)
+    useEffect(() => {
+        return () => {
+            setupResult?.dispose?.();
+        };
+    }, [setupResult]);
 
     // Scegli la fetch in base alla modalità
     const fetchFn =
@@ -114,7 +90,6 @@ export default function ListaDinamica<T extends { id: string | number }>({
         run();
         return () => {
             cancelled = true;
-            setupResult?.dispose?.();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fetchFn, filtro, utenteId]);
@@ -127,6 +102,7 @@ export default function ListaDinamica<T extends { id: string | number }>({
         utenteId,
         navigate,
         extra: setupResult.extra,
+        patchItem,
     };
 
     // Titolo: prefisso "Cestino – " se siamo in cestino e il titolo è stringa
@@ -139,7 +115,6 @@ export default function ListaDinamica<T extends { id: string | number }>({
     const handleRestore = async (id: string | number) => {
         if (!config.cestino?.actions?.restore) return;
         await config.cestino.actions.restore(id);
-        // aggiorna lista localmente
         setItems((prev) => prev.filter((x) => String(x.id) !== String(id)));
     };
 
@@ -157,13 +132,12 @@ export default function ListaDinamica<T extends { id: string | number }>({
                 icona={config.icona}
                 coloreIcona={config.coloreIcona}
                 tipo={tipo}
-                // ⬇️ Niente pulsante Crea quando siamo nel cestino
+                paramKey={paramKey}
                 azioniExtra={!modalitaCestino && !config.useHeaderFilters ? config.azioniExtra : undefined}
                 modalitaCestino={modalitaCestino}
                 dati={config.useHeaderFilters ? items : undefined}
                 onChange={config.useHeaderFilters ? setFiltro : undefined}
             />
-
 
             {loading ? (
                 <p className="text-center text-theme text-lg">Caricamento...</p>
@@ -256,7 +230,9 @@ export default function ListaDinamica<T extends { id: string | number }>({
             {/* modale modifica (decisa dalla config) — non in cestino */}
             {itemDaModificareId &&
                 !modalitaCestino &&
-                config.renderModaleModifica?.(itemDaModificareId, () => setItemDaModificareId(null))}
+                config.renderModaleModifica?.(itemDaModificareId, () =>
+                    setItemDaModificareId(null)
+                )}
         </div>
     );
 }

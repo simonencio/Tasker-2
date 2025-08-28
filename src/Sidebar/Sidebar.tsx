@@ -125,7 +125,7 @@ export default function Sidebar({
 
                     {/* TASK */}
                     <NavLink
-                        to="/task"
+                        to="/tasks"
                         onClick={onClose}
                         className={({ isActive }) =>
                             `hover-bg-theme flex items-center justify-between gap-2 ${isActive ? "active-link" : "px-4 py-2 rounded"

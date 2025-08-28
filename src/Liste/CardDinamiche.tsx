@@ -1,64 +1,58 @@
-import { useEffect, useState, type JSX } from "react";
+// src/Liste/CardDinamiche.tsx
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faUndo, faTrash } from "@fortawesome/free-solid-svg-icons";
 
-import IntestazioneLista, { type FiltroIntestazione } from "./IntestazioneLista";
+import IntestazioneLista from "./IntestazioneLista";
 import { supabase } from "../supporto/supabaseClient";
 import { resourceConfigs, type ResourceKey } from "./resourceConfigs";
-
-type ResourceRenderCtx<T> = {
-    filtro: FiltroIntestazione;
-    setFiltro: (f: FiltroIntestazione) => void;
-    items: T[];
-    utenteId: string | null;
-    navigate: ReturnType<typeof useNavigate>;
-    extra?: any;
-};
-
-type Props = {
-    tipo: ResourceKey;
-    modalitaCestino?: boolean;
-};
+import type {
+    FiltroIntestazione,
+    ResourceRenderCtx,
+    ResourceConfig,
+} from "./typesLista";
 
 export default function CardDinamiche<T extends { id: string | number }>({
     tipo,
     modalitaCestino = false,
-}: Props) {
+    paramKey = "view",
+}: {
+    tipo: ResourceKey;
+    modalitaCestino?: boolean;
+    paramKey?: string;
+}) {
     const navigate = useNavigate();
     const configAny = resourceConfigs[tipo] as any;
     if (!configAny) {
         return <p className="text-red-600">Config non trovata per tipo: {tipo}</p>;
     }
-
-    const config = configAny as {
-        titolo: string | JSX.Element;
-        icona: any;
-        coloreIcona: string;
-        fetch: (args: { filtro: FiltroIntestazione; utenteId: string | null }) => Promise<T[]>;
-        useHeaderFilters?: boolean;
-        colonne: {
-            chiave: keyof T | string;
-            label: string;
-            render?: (item: T, ctx: ResourceRenderCtx<T>) => JSX.Element | string | null;
-        }[];
-        azioni?: (item: T, ctx: ResourceRenderCtx<T>) => JSX.Element;
-        renderDettaglio?: (item: T, ctx: ResourceRenderCtx<T>) => JSX.Element | null;
-        renderModaleModifica?: (id: string, onClose: () => void) => JSX.Element;
-        cestino?: {
-            fetch: (args: { filtro: FiltroIntestazione; utenteId: string | null }) => Promise<T[]>;
-            actions: {
-                restore: (id: string | number) => Promise<void>;
-                hardDelete: (id: string | number) => Promise<void>;
-            };
-        };
-    };
+    const config = configAny as ResourceConfig<T>;
 
     const [utenteId, setUtenteId] = useState<string | null>(null);
     const [items, setItems] = useState<T[]>([]);
+    const patchItem = (id: string | number, patch: Partial<T>) => {
+        setItems((prev) =>
+            prev.map((it) => (String(it.id) === String(id) ? { ...it, ...patch } : it))
+        );
+    };
+
     const [loading, setLoading] = useState(true);
     const [filtro, setFiltro] = useState<FiltroIntestazione>({});
-    const [itemDaModificareId, setItemDaModificareId] = useState<string | null>(null);
+    const [itemDaModificareId, setItemDaModificareId] =
+        useState<string | null>(null);
+
+    const setupResult = useMemo(
+        () => config.setup?.({ utenteId }) ?? { extra: undefined },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [config, utenteId]
+    );
+
+    useEffect(() => {
+        return () => {
+            setupResult?.dispose?.();
+        };
+    }, [setupResult]);
 
     // utente loggato
     useEffect(() => {
@@ -93,6 +87,8 @@ export default function CardDinamiche<T extends { id: string | number }>({
         items,
         utenteId,
         navigate,
+        extra: setupResult.extra,
+        patchItem,
     };
 
     const headerTitle =
@@ -120,6 +116,7 @@ export default function CardDinamiche<T extends { id: string | number }>({
                 icona={config.icona}
                 coloreIcona={config.coloreIcona}
                 tipo={tipo}
+                paramKey={paramKey}
                 modalitaCestino={modalitaCestino}
                 dati={config.useHeaderFilters ? items : undefined}
                 onChange={config.useHeaderFilters ? setFiltro : undefined}
@@ -137,7 +134,6 @@ export default function CardDinamiche<T extends { id: string | number }>({
                             <div className="flex-1 space-y-2">
                                 {config.colonne.map((col) => (
                                     <div key={String(col.chiave)} className="text-sm">
-
                                         {col.render ? col.render(item, ctx) : (item as any)[col.chiave as keyof T]}
                                     </div>
                                 ))}

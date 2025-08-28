@@ -7,17 +7,19 @@ import {
     Navigate,
     useLocation,
     useParams,
-    useSearchParams, // ⬅️ nuovo
+    useSearchParams,
 } from "react-router-dom";
 import { supabase } from "./supporto/supabaseClient";
 import "./App.css";
-import BachecaDinamica from "./Liste/BachecaDinamica";
 
 import RegisterForm from "./Pagine/RegisterForm";
 import ConfirmEmailWelcome from "./Pagine/ConfirmEmailWelcome";
 import LoginForm from "./Pagine/LoginForm";
 import Home from "./Pagine/Home";
 import Profilo from "./Profilo/Profilo";
+// ⬇️ aggiungi
+import { ToastBridge, TimerOverlay } from "./Liste/resourceConfigs";
+
 
 import DettaglioProgetto from "./GestioneProgetto/DettaglioProgetto";
 import CalendarioProgetto from "./GestioneProgetto/CalendarioProgetto";
@@ -39,12 +41,15 @@ import MiniRuoloCreatorModal from "./Creazione/MiniRuoloCreatorModal";
 import DettaglioTask from "./GestioneTask/DettaglioTask";
 import Cestino from "./Pagine/Cestino";
 
-// ✅ scheletri lista/card
+// Viste
 import ListaDinamica from "./Liste/ListaDinamica";
-import CardDinamiche from "./Liste/CardDinamiche"; // ⬅️ nuovo
-import type { ResourceKey } from "./Liste/resourceConfigs"; // ⬅️ nuovo
+import CardDinamiche from "./Liste/CardDinamiche";
+import BachecaDinamica from "./Liste/BachecaDinamica";
 
-type ModalType = "project" | "task" | "client" | "user" | "stato" | "priorita" | "ruolo";
+import type { ResourceKey } from "./Liste/resourceConfigs";
+import { getPreferredView, type Vista } from "./Liste/viewPrefs";
+
+type ModalType = "project" | "tasks" | "client" | "user" | "stato" | "priorita" | "ruolo";
 
 /** Redirect legacy /tasks/:id -> /tasks/:slug */
 function RedirectTaskById() {
@@ -58,12 +63,7 @@ function RedirectTaskById() {
             if (!id) return;
             const { data, error } = await supabase.from("tasks").select("slug").eq("id", id).maybeSingle();
             if (!alive) return;
-            if (error) {
-                console.error(error);
-                setNotFound(true);
-                return;
-            }
-            if (!data?.slug) {
+            if (error || !data?.slug) {
                 setNotFound(true);
                 return;
             }
@@ -75,48 +75,24 @@ function RedirectTaskById() {
     }, [id]);
 
     if (slug) return <Navigate to={`/tasks/${slug}`} replace />;
-    if (notFound) return <Navigate to="/task" replace />;
+    if (notFound) return <Navigate to="/tasks" replace />;
     return null;
 }
 
-/** ⬇️ Wrapper riutilizzabile con dropdown lista/card */
+/** Route che decide la vista in base a ?{paramKey}= (fallback su localStorage) e la PROPAGA alle viste */
 function ResourceRoute({ tipo, paramKey = "view" }: { tipo: ResourceKey; paramKey?: string }) {
-    const [params, setParams] = useSearchParams();
-    const view = params.get(paramKey) === "cards"
-        ? "cards"
-        : params.get(paramKey) === "board"
-            ? "board"
-            : "list";
+    const [params] = useSearchParams();
 
-    const onChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const next = new URLSearchParams(params);
-        next.set(paramKey, e.target.value);
-        setParams(next, { replace: true });
-    };
+    const view: Vista = (() => {
+        const v = params.get(paramKey);
+        if (v === "list" || v === "cards" || v === "board") return v;
+        return getPreferredView(tipo, "list");
+    })();
 
-    return (
-        <div className="space-y-4">
-            <div className="flex items-center justify-end">
-                <label className="mr-2 text-sm opacity-80">Visualizzazione:</label>
-                <select value={view} onChange={onChange} className="input-style">
-                    <option value="list">Lista</option>
-                    <option value="cards">Card</option>
-                    <option value="board">Bacheca</option>
-                </select>
-            </div>
-
-            {view === "cards" ? (
-                <CardDinamiche tipo={tipo} />
-            ) : view === "board" ? (
-                <BachecaDinamica tipo={tipo} />
-            ) : (
-                <ListaDinamica tipo={tipo} />
-            )}
-        </div>
-    );
+    if (view === "cards") return <CardDinamiche tipo={tipo} paramKey={paramKey} />;
+    if (view === "board") return <BachecaDinamica tipo={tipo} paramKey={paramKey} />;
+    return <ListaDinamica tipo={tipo} paramKey={paramKey} />;
 }
-
-
 
 function AppContent() {
     const [loggedIn, setLoggedIn] = useState(false);
@@ -127,36 +103,30 @@ function AppContent() {
     const [userId, setUserId] = useState<string | null>(null);
 
     const publicRoutes = ["/login", "/register", "/confirm-email", "/reset-password/"];
-    const isPublic = (() => {
-        if (location.pathname.startsWith("/reset-password/")) return true;
-        return publicRoutes.includes(location.pathname);
-    })();
+    const isPublic = location.pathname.startsWith("/reset-password/") || publicRoutes.includes(location.pathname);
 
     const [windowWidth, setWindowWidth] = useState<number>(window.innerWidth);
 
     useEffect(() => {
-        const checkAuth = async () => {
-            const {
-                data: { user },
-            } = await supabase.auth.getUser();
+        const apply = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
             setLoggedIn(!!user);
             setUserId(user?.id ?? null);
         };
-        checkAuth();
-        const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-            const newUser = session?.user;
+        apply();
+
+        const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+            const newUser = session?.user ?? null;
             setLoggedIn(!!newUser);
             setUserId(newUser?.id ?? null);
         });
-        return () => {
-            listener.subscription.unsubscribe();
-        };
+        return () => authListener.subscription.unsubscribe();
     }, []);
 
     useEffect(() => {
-        const handleResize = () => setWindowWidth(window.innerWidth);
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
+        const onResize = () => setWindowWidth(window.innerWidth);
+        window.addEventListener("resize", onResize);
+        return () => window.removeEventListener("resize", onResize);
     }, []);
 
     const getMaxModals = useCallback(() => {
@@ -170,55 +140,41 @@ function AppContent() {
 
     useEffect(() => {
         const max = getMaxModals();
-        if (activeModals.length > max) {
-            setActiveModals((prev) => prev.slice(prev.length - max));
-        }
-    }, [windowWidth, activeModals, getMaxModals]);
+        setActiveModals(prev => (prev.length > max ? prev.slice(prev.length - max) : prev));
+    }, [windowWidth, getMaxModals]);
 
     const toggleSidebar = () => {
-        setSidebarOpen((prev) => {
+        setSidebarOpen(prev => {
             if (!prev) setNotificheOpen(false);
             return !prev;
         });
     };
-
     const toggleNotifiche = () => {
-        setNotificheOpen((prev) => {
+        setNotificheOpen(prev => {
             if (!prev) setSidebarOpen(false);
             return !prev;
         });
     };
 
     const openModal = (type: ModalType) => {
-        setActiveModals((prev) => {
-            const max = getMaxModals();
+        setActiveModals(prev => {
             if (prev.includes(type)) return prev;
+            const max = getMaxModals();
             const updated = [...prev, type];
-            if (updated.length > max) return updated.slice(updated.length - max);
-            return updated;
+            return updated.length > max ? updated.slice(updated.length - max) : updated;
         });
     };
-
-    const closeModal = (type: ModalType) => {
-        setActiveModals((prev) => prev.filter((m) => m !== type));
-    };
-
+    const closeModal = (type: ModalType) => setActiveModals(prev => prev.filter(m => m !== type));
     const getOffset = (type: ModalType) => activeModals.indexOf(type);
 
-    // ✅ esponi hook globale per aprire modali "create" da resourceConfigs
+    // esponi apertura "mini create" a risorse
     useEffect(() => {
         (window as any).__openMiniCreate = (kind: "stato" | "priorita" | "ruolo") => {
             if (kind === "stato") openModal("stato");
             else if (kind === "priorita") openModal("priorita");
             else if (kind === "ruolo") openModal("ruolo");
         };
-        return () => {
-            try {
-                delete (window as any).__openMiniCreate;
-            } catch {
-                (window as any).__openMiniCreate = undefined;
-            }
-        };
+        return () => { try { delete (window as any).__openMiniCreate; } catch { } };
     }, []);
 
     return (
@@ -245,12 +201,12 @@ function AppContent() {
             ) : (
                 <main className="pt-16 bg-theme text-theme overflow-hidden relative">
                     {sidebarOpen && (
-                        <div className="fixed top-16 left-0 z-40 w-full sm:w-full md:w-64 h-[calc(100vh-4rem)] bg-theme shadow-xl">
+                        <div className="fixed top-16 left-0 z-40 w-full md:w-64 h-[calc(100vh-4rem)] bg-theme shadow-xl">
                             <Sidebar
                                 isOpen={sidebarOpen}
                                 onClose={() => setSidebarOpen(false)}
                                 onApriProjectModal={() => openModal("project")}
-                                onApriTaskModal={() => openModal("task")}
+                                onApriTaskModal={() => openModal("tasks")}
                                 onApriClientModal={() => openModal("client")}
                                 onApriUserModal={() => openModal("user")}
                             />
@@ -258,7 +214,7 @@ function AppContent() {
                     )}
 
                     {notificheOpen && (
-                        <div className="fixed top-16 right-0 z-40 w-full sm:w-full md:w-64 h-[calc(100vh-4rem)] bg-theme shadow-xl">
+                        <div className="fixed top-16 right-0 z-40 w/full md:w-64 h-[calc(100vh-4rem)] bg-theme shadow-xl">
                             <NotificheSidebar open={notificheOpen} onClose={() => setNotificheOpen(false)} userId={userId} />
                         </div>
                     )}
@@ -269,13 +225,13 @@ function AppContent() {
                                 <Route path="/" element={<Navigate to={loggedIn ? "/home" : "/login"} replace />} />
                                 <Route path="/home" element={<Home />} />
 
-                                {/* ✅ route risorsa con switch Lista/Card */}
+                                {/* UNA SOLA route per risorsa: vista decisa da ?view= e fallback su preferenza */}
                                 <Route path="/progetti" element={<ResourceRoute tipo="progetti" />} />
-                                <Route path="/task" element={<ResourceRoute tipo="tasks" />} />
+                                <Route path="/tasks" element={<ResourceRoute tipo="tasks" />} />
                                 <Route path="/clienti" element={<ResourceRoute tipo="clienti" />} />
                                 <Route path="/utenti" element={<ResourceRoute tipo="utenti" />} />
 
-                                {/* Aggregato “Altre liste” con switch Lista/Card per ogni risorsa */}
+                                {/* ALTRE LISTE — ognuna con IL PROPRIO paramKey (indipendenti) */}
                                 <Route
                                     path="/altre-liste"
                                     element={
@@ -288,14 +244,14 @@ function AppContent() {
                                     }
                                 />
 
-
-
                                 <Route path="/profilo" element={<Profilo />} />
 
+                                {/* Progetti */}
                                 <Route path="/progetti/:slug" element={<DettaglioProgetto />} />
                                 <Route path="/calendario" element={<CalendarioProgetto />} />
                                 <Route path="/progetti/:slug/bacheca" element={<BachecaProgetto />} />
 
+                                {/* Tasks */}
                                 <Route path="/tasks/:slug" element={<DettaglioTask />} />
                                 <Route path="/tasks/id/:id" element={<RedirectTaskById />} />
                                 <Route path="/tasks/:id([0-9a-fA-F-]{36})" element={<RedirectTaskById />} />
@@ -307,12 +263,12 @@ function AppContent() {
                 </main>
             )}
 
-            {/* tutte le modali con offsetIndex */}
+            {/* Modali con offset */}
             {activeModals.includes("project") && (
                 <MiniProjectCreatorModal onClose={() => closeModal("project")} offsetIndex={getOffset("project")} />
             )}
-            {activeModals.includes("task") && (
-                <MiniTaskCreatorModal onClose={() => closeModal("task")} offsetIndex={getOffset("task")} />
+            {activeModals.includes("tasks") && (
+                <MiniTaskCreatorModal onClose={() => closeModal("tasks")} offsetIndex={getOffset("tasks")} />
             )}
             {activeModals.includes("client") && (
                 <MiniClientCreatorModal onClose={() => closeModal("client")} offsetIndex={getOffset("client")} />
@@ -336,7 +292,10 @@ function AppContent() {
 export default function App() {
     return (
         <Router>
+            <ToastBridge />  {/* toasts globali */}
+            <TimerOverlay /> {/* overlay timer persistente */}
             <AppContent />
         </Router>
     );
 }
+
