@@ -8,20 +8,32 @@ import TaskWidget from '../Componenti/TaskWidget';
 // import WidgetB from '../components/WidgetB';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes } from '@fortawesome/free-solid-svg-icons';
+import QuickActionsWidget from "../Componenti/QuickActionWidget";
+import MetricheWidget from "../Componenti/MetricheWidget";
+
 
 interface WidgetItem { id: string; type: string; }
 
 export default function Home() {
   const [nome, setNome] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [widgets, setWidgets] = useState<WidgetItem[]>(() => {
     const stored = localStorage.getItem('home_widgets');
-    return stored ? JSON.parse(stored) : [];
+    if (stored) return JSON.parse(stored);
+    // ⬇️ default "ibrido" alla prima apertura
+    return [
+      { id: uuidv4(), type: 'Task' },
+      { id: uuidv4(), type: 'Progetti' },
+      { id: uuidv4(), type: 'Azioni' },
+    ];
   });
   const [showPicker, setShowPicker] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const navigate = useNavigate();
+
+
 
   // Persist widgets
   useEffect(() => {
@@ -35,6 +47,9 @@ export default function Home() {
         navigate('/login');
         return;
       }
+
+      setUserId(user.id);
+
       const { data } = await supabase
         .from('utenti')
         .select('nome, email')
@@ -113,6 +128,9 @@ export default function Home() {
                       {/* Widget Content */}
                       {widget.type === 'Progetti' && <ProgettiWidget />}
                       {widget.type === 'Task' && <TaskWidget />}
+                      {widget.type === 'Azioni' && <QuickActionsWidget />}
+                      {widget.type === 'Metriche' && <MetricheWidget userId={userId ?? undefined} />}
+
                     </div>
                   )}
                 </Draggable>
@@ -149,6 +167,23 @@ export default function Home() {
                   className="w-full text-left hover:bg-gray-100 px-2 py-1 rounded"
                 >
                   Task
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => handleAddWidget('Metriche')}
+                  className="w-full text-left hover:bg-gray-100 dark:hover:bg-gray-800 px-2 py-1 rounded"
+                >
+                  Metriche (settimanali)
+                </button>
+              </li>
+
+              <li>
+                <button
+                  onClick={() => handleAddWidget('Azioni')}
+                  className="w-full text-left hover:bg-gray-100 dark:hover:bg-gray-800 px-2 py-1 rounded"
+                >
+                  Azioni rapide
                 </button>
               </li>
             </ul>

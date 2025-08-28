@@ -81,7 +81,7 @@ export default function TaskWidget() {
 
   const handleTitleClick = () => {
     const qs = view === "list" ? "" : `?view=${view}`;
-    navigate(`/task${qs}`);
+    navigate(`/tasks${qs}`);
   };
 
   return (
