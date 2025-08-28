@@ -91,33 +91,7 @@ export async function getNotificheUtente(userId: string): Promise<Notifica[]> {
         const notifica = row.notifiche;
         const dettagli = parseDettagli(notifica?.dettagli);
 
-        // Caso speciale: commento_task
-        if (notifica?.tipo?.codice === "commento_task") {
-            const contenuto = notifica.messaggio ?? "(nessun commento)";
-            const dataOra = notifica.data_creazione
-                ? new Date(notifica.data_creazione).toLocaleString()
-                : "";
-
-            const messaggioFormattato =
-                `💬 Nuovo commento:\n` +
-                `"${contenuto}"\n` +
-                `🕒 ${dataOra}`;
-
-            return {
-                id: String(row.id),
-                utente_id: row.utente_id,                 // <== ora c’è
-                letto: row.letto,
-                visualizzato: row.visualizzato,
-                notifica_id: row.notifica_id,
-                messaggio: messaggioFormattato,
-                data_creazione: notifica.data_creazione ?? "",
-                task_nome: notifica.tasks?.nome,
-                progetto_nome: notifica.progetti?.nome,
-                creatore_nome: undefined,
-                tipo_codice: notifica.tipo.codice,
-                dettagli,                                 // <== passa comunque i dettagli
-            } as Notifica;
-        }
+        
 
         // Default
         return {

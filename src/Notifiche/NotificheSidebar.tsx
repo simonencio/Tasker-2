@@ -19,7 +19,7 @@ export function useNotificheBell() {
     const [userId, setUserId] = useState<string | null>(null);
     const [nonViste, setNonViste] = useState(0);
 
-    
+
 
 
     useEffect(() => {
@@ -212,20 +212,14 @@ export default function NotificheSidebar({ open, onClose, userId }: Props) {
                                                     </span>
                                                 </div>
                                             )}
-                                            {n.creatore_nome && (
-                                                <div className="flex items-center gap-2">
-                                                    <FontAwesomeIcon
-                                                        icon={faUserTie}
-                                                        className="text-green-500 text-lg"
-                                                    />
-                                                    <span>
-                                                        <span className="font-medium">
-                                                            Azione di:
-                                                        </span>{" "}
-                                                        {n.creatore_nome}
-                                                    </span>
-                                                </div>
-                                            )}
+                                            {n.creatore_nome &&
+                                                !["COMMENTO_TASK", "COMMENTO_MENZIONE"].includes(n.tipo_codice || "") && (
+                                                    <div className="flex items-center gap-2">
+                                                        <FontAwesomeIcon icon={faUserTie} className="text-green-500 text-lg" />
+                                                        <span><span className="font-medium">Azione di:</span> {n.creatore_nome}</span>
+                                                    </div>
+                                                )}
+
                                         </div>
                                     )}
 
