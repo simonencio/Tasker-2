@@ -5,6 +5,7 @@ declare module "toaster-js" {
     static TIME_SHORT: number;
     static TIME_NORMAL: number;
     static TIME_LONG: number;
+    static TYPE_INFO: string | undefined;
     constructor(message: string, type?: string, duration?: number);
   }
 }

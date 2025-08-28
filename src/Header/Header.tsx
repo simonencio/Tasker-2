@@ -34,7 +34,7 @@ type HeaderProps = {
     onToggleSidebar: () => void;
     onApriNotifiche: () => void;
     notificheSidebarAperta: boolean;
-    onApriModale: (type: "project" | "task" | "client" | "user") => void;
+    onApriModale: (type: "project" | "tasks" | "client" | "user") => void;
 };
 
 type Utente = {
@@ -297,7 +297,7 @@ export default function Header({
                         </span>
                         {createOpen && (
                             <div className="dropdown-panel absolute right-0 mt-2 w-36 sm:w-40 z-50">
-                                <button onClick={() => { onApriModale("task"); setCreateOpen(false); }} className="dropdown-button">Attività</button>
+                                <button onClick={() => { onApriModale("tasks"); setCreateOpen(false); }} className="dropdown-button">Attività</button>
                                 <button onClick={() => { onApriModale("project"); setCreateOpen(false); }} className="dropdown-button">Progetto</button>
                                 <button onClick={() => { onApriModale("client"); setCreateOpen(false); }} className="dropdown-button">Clienti</button>
                                 <button onClick={() => { onApriModale("user"); setCreateOpen(false); }} className="dropdown-button">Utenti</button>

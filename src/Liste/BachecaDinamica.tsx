@@ -2,164 +2,95 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supporto/supabaseClient";
-import { format, isToday, isTomorrow, isBefore, startOfDay, addDays } from "date-fns";
-import { it } from "date-fns/locale";
 
-import IntestazioneLista, { type FiltroIntestazione } from "./IntestazioneLista";
-import { resourceConfigs, type ResourceKey, type ResourceConfig } from "./resourceConfigs";
+import IntestazioneLista from "./IntestazioneLista";
+import { resourceConfigs, type ResourceKey } from "./resourceConfigs";
+import type {
+    FiltroIntestazione,
+    ResourceConfig,
+    GroupByDef,
+    KanbanColumn,
+} from "./typesLista";
 
-type Props = {
-    tipo: ResourceKey;
-    defaultGroupBy?: string;
-    className?: string;
-    emptyLabel?: string;
-};
-
-type KanbanColumn = { key: string; label: string };
-
-type GroupByDef = {
-    label?: string;
-    staticColumns?: { key: string; label: string }[];
-    getKey?: (item: any) => string;
-    getLabel?: (key: string, item?: any) => string;
-    getStaticColumns?: () => { key: string; label: string }[];
-};
+type AnyItem = any;
 
 export default function BachecaDinamica({
     tipo,
     defaultGroupBy,
     className = "",
     emptyLabel = "Nessun elemento",
-}: Props) {
-    const cfg = resourceConfigs[tipo] as ResourceConfig<any> & {
+    paramKey = "view",
+}: {
+    tipo: ResourceKey;
+    defaultGroupBy?: string;
+    className?: string;
+    emptyLabel?: string;
+    paramKey?: string;
+}) {
+    // tipizzo esplicitamente groupBy per evitare 'never'
+    const cfg = resourceConfigs[tipo] as ResourceConfig<AnyItem> & {
         groupBy?: Record<string, GroupByDef>;
     };
 
     const navigate = useNavigate();
 
-    const [items, setItems] = useState<any[]>([]);
+    const [items, setItems] = useState<AnyItem[]>([]);
+    const patchItem = (id: string | number, patch: Partial<AnyItem>) => {
+        setItems((prev) =>
+            prev.map((it) => (String(it.id) === String(id) ? { ...it, ...patch } : it))
+        );
+    };
+
     const [loading, setLoading] = useState(true);
     const [utenteId, setUtenteId] = useState<string | null>(null);
     const [filtro, setFiltro] = useState<FiltroIntestazione>({});
 
-    // groupBy senza dropdown (fisso: primo disponibile o builtin tasks)
+    // groupBy solo se definito in config
+    const hasGroupBy = !!cfg?.groupBy && Object.keys(cfg.groupBy!).length > 0;
     const [groupByKey, setGroupByKey] = useState<string | null>(null);
 
-    // drag orizzontale
-    const scrollRef = useRef<HTMLDivElement>(null);
-    const isDragging = useRef(false);
-    const startX = useRef(0);
-    const scrollLeftStart = useRef(0);
-    const [dragEnabled, setDragEnabled] = useState(false);
+    const setupResult = useMemo(
+        () => (cfg.setup ? cfg.setup({ utenteId }) : { extra: undefined }),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [cfg, utenteId]
+    );
 
     useEffect(() => {
-        supabase.auth.getUser().then(({ data: { user } }) => {
-            setUtenteId(user?.id ?? null);
-        });
+        return () => {
+            setupResult?.dispose?.();
+        };
+    }, [setupResult]);
+
+    useEffect(() => {
+        supabase.auth.getUser().then(({ data: { user } }) =>
+            setUtenteId(user?.id ?? null)
+        );
     }, []);
 
-    const hasConfigGroupBy = !!cfg?.groupBy && Object.keys(cfg.groupBy!).length > 0;
-
-    // built-in per tasks se non c’è groupBy custom
-    const builtinTaskGroupBy = useMemo<Record<string, GroupByDef> | null>(() => {
-        if (tipo !== "tasks" || hasConfigGroupBy) return null;
-        return {
-            stato: {
-                label: "Stato",
-                getKey: (t) => String(t?.stato?.id ?? "Nessuno"),
-                getLabel: (_k, t) => t?.stato?.nome ?? "Nessuno",
-            },
-            assegnatario: {
-                label: "Assegnatario",
-                getKey: (t) => {
-                    const names = (t?.assegnatari ?? []).map((u: any) => u?.nome).filter(Boolean);
-                    return names.length ? names[0] : "Non assegnata";
-                },
-                getLabel: (k) => k,
-            },
-            priorita: {
-                label: "Priorità",
-                getKey: (t) => t?.priorita?.nome ?? "Nessuna",
-                getLabel: (k) => k,
-            },
-            scadenza: {
-                label: "Data di scadenza",
-                getKey: (t) => {
-                    if (t?.stato?.nome?.toLowerCase() === "completato") return "completati";
-                    if (!t?.consegna) return "senza";
-                    const dataTask = startOfDay(new Date(t.consegna));
-                    const oggi = startOfDay(new Date());
-                    if (isBefore(dataTask, oggi)) return "scaduti";
-                    if (isToday(dataTask)) return "oggi";
-                    if (isTomorrow(dataTask)) return "domani";
-                    let aggiunti = 0;
-                    let giorno = addDays(oggi, 2);
-                    while (aggiunti < 5) {
-                        const dow = giorno.getDay();
-                        if (dow !== 0 && dow !== 6) {
-                            if (dataTask.getTime() === giorno.getTime()) {
-                                return giorno.toISOString().split("T")[0];
-                            }
-                            aggiunti++;
-                        }
-                        giorno = addDays(giorno, 1);
-                    }
-                    return "futuri";
-                },
-                getStaticColumns: () => {
-                    const oggi = startOfDay(new Date());
-                    const cols: KanbanColumn[] = [
-                        { key: "scaduti", label: "Scaduti" },
-                        { key: "oggi", label: "Oggi" },
-                        { key: "domani", label: "Domani" },
-                    ];
-                    let aggiunti = 0;
-                    let giorno = addDays(oggi, 2);
-                    while (aggiunti < 5) {
-                        const dow = giorno.getDay();
-                        if (dow !== 0 && dow !== 6) {
-                            cols.push({
-                                key: giorno.toISOString().split("T")[0],
-                                label: format(giorno, "EEEE", { locale: it }),
-                            });
-                            aggiunti++;
-                        }
-                        giorno = addDays(giorno, 1);
-                    }
-                    cols.push({ key: "futuri", label: "Futuri" });
-                    cols.push({ key: "senza", label: "Senza data" });
-                    cols.push({ key: "completati", label: "Completati" });
-                    return cols;
-                },
-            },
-        };
-    }, [tipo, hasConfigGroupBy]);
-
-    // init groupBy (senza UI)
     useEffect(() => {
-        if (hasConfigGroupBy) {
-            const keys = Object.keys(cfg.groupBy!);
-            const initial = defaultGroupBy && cfg.groupBy![defaultGroupBy] ? defaultGroupBy : keys[0];
-            setGroupByKey(initial);
-        } else if (builtinTaskGroupBy) {
-            const initial = defaultGroupBy && builtinTaskGroupBy[defaultGroupBy] ? defaultGroupBy : "stato";
-            setGroupByKey(initial);
-        } else {
+        if (!hasGroupBy) {
             setGroupByKey(null);
+            return;
         }
-    }, [tipo]);
+        const keys = Object.keys(cfg.groupBy!);
+        const initial =
+            defaultGroupBy && cfg.groupBy![defaultGroupBy] ? defaultGroupBy : keys[0];
+        setGroupByKey(initial);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tipo, hasGroupBy]);
 
-    // fetch
+    // fetch demandato alla config, con tipizzazione sicura
     useEffect(() => {
         let alive = true;
         (async () => {
             try {
                 setLoading(true);
-                const fetched = (await cfg.fetch?.({ filtro: filtro ?? {}, utenteId })) ?? [];
+                const data = (await (cfg.fetch
+                    ? cfg.fetch({ filtro: filtro ?? {}, utenteId })
+                    : Promise.resolve([]))) as AnyItem[];
                 if (!alive) return;
-                setItems(fetched as any[]);
-            } catch (e) {
-                console.error("BachecaDinamica fetch error:", e);
+                setItems(Array.isArray(data) ? data : []);
+            } catch {
                 if (!alive) return;
                 setItems([]);
             } finally {
@@ -167,115 +98,98 @@ export default function BachecaDinamica({
                 setLoading(false);
             }
         })();
+        return () => {
+            alive = false;
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tipo, JSON.stringify(filtro), utenteId]);
 
-    // colonne
+    // colonne della bacheca dal groupBy (solo se definito in config)
     const columns: KanbanColumn[] = useMemo(() => {
-        if (!groupByKey) return [{ key: "all", label: "Tutti" }];
+        if (!hasGroupBy || !groupByKey) return [{ key: "all", label: "Tutti" }];
 
-        if (hasConfigGroupBy) {
-            const gb = cfg.groupBy![groupByKey];
-            if (!gb) return [{ key: "all", label: "Tutti" }];
-            if (Array.isArray(gb.staticColumns) && gb.staticColumns.length > 0) {
-                return gb.staticColumns.map((c) => ({ key: String(c.key), label: String(c.label) }));
-            }
-            const keys = new Map<string, string>();
-            for (const it of items) {
-                const k = String(gb.getKey?.(it) ?? "Tutti");
-                const lbl = String(gb.getLabel?.(k, it) ?? k);
-                keys.set(k, lbl);
-            }
-            if (keys.size === 0) return [{ key: "all", label: "Tutti" }];
-            return Array.from(keys.entries()).map(([key, label]) => ({ key, label }));
+        const gb = (cfg.groupBy as Record<string, GroupByDef>)[groupByKey];
+        if (!gb) return [{ key: "all", label: "Tutti" }];
+
+        // normalizzo staticColumns: può essere array o funzione
+        type StaticDef = KanbanColumn[] | ((items: AnyItem[]) => KanbanColumn[]);
+        const staticDef = gb.staticColumns as StaticDef | undefined;
+
+        let staticCols: KanbanColumn[] | null = null;
+        if (Array.isArray(staticDef)) {
+            staticCols = staticDef;
+        } else if (typeof staticDef === "function") {
+            staticCols = staticDef(items);
         }
 
-        if (builtinTaskGroupBy) {
-            const gb = builtinTaskGroupBy[groupByKey];
-            if (!gb) return [{ key: "all", label: "Tutti" }];
-            if (typeof gb.getStaticColumns === "function") return gb.getStaticColumns();
-            const keys = new Map<string, string>();
-            for (const it of items) {
-                const k = String(gb.getKey?.(it) ?? "Tutti");
-                const lbl = String(gb.getLabel?.(k, it) ?? k);
-                keys.set(k, lbl);
-            }
-            if (keys.size === 0) return [{ key: "all", label: "Tutti" }];
-            return Array.from(keys.entries()).map(([key, label]) => ({ key, label }));
+        if (staticCols && staticCols.length > 0) {
+            return staticCols.map((c: KanbanColumn) => ({
+                key: String(c.key),
+                label: String(c.label),
+            }));
         }
 
-        return [{ key: "all", label: "Tutti" }];
-    }, [cfg, items, groupByKey, hasConfigGroupBy, builtinTaskGroupBy]);
-
-    // abilita drag orizzontale
-    useEffect(() => {
-        if (scrollRef.current) {
-            const enabled = scrollRef.current.scrollWidth > scrollRef.current.clientWidth;
-            setDragEnabled(enabled);
+        // generazione dinamica da getKey/getLabel
+        const keys = new Map<string, string>();
+        for (const it of items) {
+            const k = String(gb.getKey?.(it) ?? "Tutti");
+            const lbl = String(gb.getLabel?.(k, it) ?? k);
+            keys.set(k, lbl);
         }
-    }, [columns, items]);
+        if (keys.size === 0) return [{ key: "all", label: "Tutti" }];
+        return Array.from(keys.entries()).map(([key, label]) => ({ key, label }));
+    }, [cfg, items, groupByKey, hasGroupBy]);
 
-    // partizionamento
-    const itemsByColumn = useMemo<Record<string, any[]>>(() => {
-        const map: Record<string, any[]> = {};
+    // partizionamento items per colonna
+    const itemsByColumn = useMemo<Record<string, AnyItem[]>>(() => {
+        const map: Record<string, AnyItem[]> = {};
         for (const col of columns) map[col.key] = [];
 
-        if (!groupByKey) {
+        if (!hasGroupBy || !groupByKey) {
             map["all"] = items;
             return map;
         }
 
-        if (hasConfigGroupBy) {
-            const gb = cfg.groupBy![groupByKey];
-            for (const it of items) {
-                const k = String(gb?.getKey?.(it) ?? "all");
-                if (!map[k]) map[k] = [];
-                map[k].push(it);
-            }
-            return map;
+        const gb = (cfg.groupBy as Record<string, GroupByDef>)[groupByKey];
+        for (const it of items) {
+            const k = String(gb?.getKey?.(it) ?? "all");
+            if (!map[k]) map[k] = [];
+            map[k].push(it);
         }
-
-        if (builtinTaskGroupBy) {
-            const gb = builtinTaskGroupBy[groupByKey];
-            for (const it of items) {
-                const k = String(gb?.getKey?.(it) ?? "all");
-                if (!map[k]) map[k] = [];
-                map[k].push(it);
-            }
-            return map;
-        }
-
-        map["all"] = items;
         return map;
-    }, [items, columns, groupByKey, hasConfigGroupBy, cfg, builtinTaskGroupBy]);
+    }, [items, columns, hasGroupBy, groupByKey, cfg]);
 
-    // ctx condiviso per i renderer del config
-    const ctx = { filtro, setFiltro, items, utenteId, navigate };
+    // ctx passato ai renderer della config
+    const ctx = {
+        filtro,
+        setFiltro,
+        items,
+        utenteId,
+        navigate,
+        patchItem,
+        extra: setupResult.extra,
+    };
 
-    // ---- Renderer card: usa card/renderCard, poi riga; NO JSON fallback ----
-    const renderGenericCard = (item: any) => {
-        // usa le colonne per mostrare titolo + 3 dettagli max
+    // fallback card generica basata sulle colonne
+    const renderGenericCard = (item: AnyItem) => {
         const cols = Array.isArray((cfg as any).colonne) ? (cfg as any).colonne : [];
         const [titleCol, ...rest] = cols as {
             chiave: string;
             label: string;
-            render?: (it: any, ctx: any) => any;
+            render?: (it: AnyItem, ctx: any) => any;
             className?: string;
         }[];
 
         const renderCell = (col: any) =>
-            col.render ? col.render(item, ctx) : (item?.[col.chiave] ?? "—");
+            col.render ? col.render(item, ctx) : item?.[col.chiave] ?? "—";
 
         return (
             <div className="bg-theme border border-gray-200 dark:border-gray-600 p-3 rounded-xl shadow-sm hover:shadow-md transition">
                 {titleCol ? (
-                    <div className="font-semibold text-theme mb-2 text-sm">
-                        {renderCell(titleCol)}
-                    </div>
+                    <div className="font-semibold text-theme mb-2 text-sm">{renderCell(titleCol)}</div>
                 ) : null}
-
                 <div className="text-xs space-y-1">
-                    {rest.slice(0, 3).map((col) => (
+                    {rest.slice(0, 3).map((col: any) => (
                         <div key={String(col.chiave)} className="flex gap-2">
                             <span className="opacity-70 min-w-[84px]">{col.label}:</span>
                             <div className="flex-1">{renderCell(col)}</div>
@@ -286,22 +200,35 @@ export default function BachecaDinamica({
         );
     };
 
-    const renderCard = (item: any) => {
+    const renderCard = (item: AnyItem) => {
         if (typeof (cfg as any).card === "function") return (cfg as any).card(item, ctx);
-        if (typeof (cfg as any).renderCard === "function") return (cfg as any).renderCard(item, ctx);
+        if (typeof (cfg as any).renderCard === "function")
+            return (cfg as any).renderCard(item, ctx);
         if (typeof (cfg as any).riga === "function")
             return (
                 <div className="bg-theme border border-gray-200 dark:border-gray-600 p-3 rounded-xl shadow-sm hover:shadow-md transition">
                     {(cfg as any).riga(item, ctx)}
                 </div>
             );
-        // fallback elegante (mai JSON)
         return renderGenericCard(item);
     };
 
-    // header (senza dropdown “Visualizza per”)
-    const headerTitle = cfg?.titolo ?? "📋 Bacheca";
+    // drag orizzontale
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const [dragEnabled, setDragEnabled] = useState(false);
+    const isDragging = useRef(false);
+    const startX = useRef(0);
+    const scrollLeftStart = useRef(0);
 
+    useEffect(() => {
+        if (scrollRef.current) {
+            const enabled =
+                scrollRef.current.scrollWidth > scrollRef.current.clientWidth;
+            setDragEnabled(enabled);
+        }
+    }, [columns, items]);
+
+    const headerTitle = cfg?.titolo ?? "📋 Bacheca";
     const colAccent = (i: number) =>
         [
             "border-t-blue-500",
@@ -311,9 +238,8 @@ export default function BachecaDinamica({
             "border-t-cyan-500",
             "border-t-rose-500",
         ][i % 6];
-
     const countBadge = (n: number) => (
-        <span className="ml-2 inline-flex items-center justify-center rounded-full text-[10px] px-2 py-0.5 bg-gray-900/10 dark:bg-white/10">
+        <span className="ml-2 inline-flex items-center justify-center rounded-full text-[10px] px-2 py-0.5 bg-gray-900/10 dark:bg:white/10">
             {n}
         </span>
     );
@@ -325,6 +251,7 @@ export default function BachecaDinamica({
                 icona={cfg.icona}
                 coloreIcona={cfg.coloreIcona}
                 tipo={tipo}
+                paramKey={paramKey}
                 dati={cfg.useHeaderFilters ? items : undefined}
                 onChange={cfg.useHeaderFilters ? setFiltro : undefined}
             />
@@ -334,21 +261,19 @@ export default function BachecaDinamica({
                 className={`flex gap-4 overflow-x-auto hide-scrollbar ${dragEnabled ? "cursor-grab active:cursor-grabbing" : "cursor-default"
                     }`}
                 onMouseDown={(e) => {
-                    if (!dragEnabled) return;
+                    if (!dragEnabled || !scrollRef.current) return;
                     isDragging.current = true;
-                    startX.current = e.pageX - (scrollRef.current?.offsetLeft ?? 0);
-                    scrollLeftStart.current = scrollRef.current?.scrollLeft ?? 0;
+                    startX.current = e.pageX - scrollRef.current.offsetLeft;
+                    scrollLeftStart.current = scrollRef.current.scrollLeft;
                 }}
                 onMouseLeave={() => (isDragging.current = false)}
                 onMouseUp={() => (isDragging.current = false)}
                 onMouseMove={(e) => {
-                    if (!isDragging.current || !dragEnabled) return;
+                    if (!isDragging.current || !dragEnabled || !scrollRef.current) return;
                     e.preventDefault();
-                    const x = e.pageX - (scrollRef.current?.offsetLeft ?? 0);
+                    const x = e.pageX - scrollRef.current.offsetLeft;
                     const walk = (x - startX.current) * 1;
-                    if (scrollRef.current) {
-                        scrollRef.current.scrollLeft = scrollLeftStart.current - walk;
-                    }
+                    scrollRef.current.scrollLeft = scrollLeftStart.current - walk;
                 }}
                 onWheel={(e) => {
                     if (!scrollRef.current) return;
@@ -386,8 +311,11 @@ export default function BachecaDinamica({
                                         {emptyLabel}
                                     </div>
                                 ) : (
-                                    list.map((item: any, i: number) => (
-                                        <div key={item?.id ?? i} className="transition-transform hover:-translate-y-0.5">
+                                    list.map((item: AnyItem, i: number) => (
+                                        <div
+                                            key={item?.id ?? i}
+                                            className="transition-transform hover:-translate-y-0.5"
+                                        >
                                             {renderCard(item)}
                                         </div>
                                     ))
