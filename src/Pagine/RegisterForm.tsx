@@ -1,3 +1,4 @@
+// src/Pagine/RegisterForm.tsx
 import { useEffect, useState } from "react";
 import { supabase, AVATAR_BASE_URL } from "../supporto/supabaseClient";
 import { Link } from "react-router-dom";
@@ -5,8 +6,11 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
     faUser, faEnvelope, faLock, faLockOpen, faImage, faEye, faEyeSlash,
 } from "@fortawesome/free-solid-svg-icons";
+import { GoogleReCaptchaProvider } from "react-google-recaptcha-v3";
+import { useCaptcha } from "../supporto/useCaptcha";
+import CaptchaStatus from "../supporto/CaptchaStatus";
 
-export default function RegisterForm() {
+function RegisterInnerForm() {
     const [form, setForm] = useState({
         email: "", confermaEmail: "", password: "", confermaPassword: "",
         nome: "", cognome: "", avatar: "",
@@ -18,6 +22,8 @@ export default function RegisterForm() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
+
+    const { captchaReady, runCaptcha } = useCaptcha("register");
 
     useEffect(() => {
         const fetchAvatars = async () => {
@@ -49,6 +55,11 @@ export default function RegisterForm() {
         }
 
         try {
+            const token = await runCaptcha();
+            if (!token) {
+                setError("Verifica captcha fallita."); setLoading(false); return;
+            }
+
             const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                 email: form.email,
                 password: form.password,
@@ -64,8 +75,8 @@ export default function RegisterForm() {
                 id: userId, email: form.email, nome: form.nome, cognome: form.cognome,
                 avatar_url: form.avatar || null, ruolo: 1,
             });
-
             if (insertUserError) throw insertUserError;
+
             setSuccess(true);
         } catch (err: any) {
             setError(err.message || "Errore durante la registrazione.");
@@ -100,10 +111,7 @@ export default function RegisterForm() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {["nome", "cognome"].map((field) => (
                         <div key={field} className="relative">
-                            <FontAwesomeIcon
-                                icon={faUser}
-                                className="absolute left-3 top-1/2 -translate-y-1/2 icon-color text-base sm:text-lg"
-                            />
+                            <FontAwesomeIcon icon={faUser} className="absolute left-3 top-1/2 -translate-y-1/2 icon-color" />
                             <input
                                 name={field}
                                 placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
@@ -111,11 +119,7 @@ export default function RegisterForm() {
                                 onChange={handleChange}
                                 required
                                 autoComplete="off"
-                                className="w-full pl-10 pr-4 py-2.5 md:py-3 rounded-md border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                style={{
-                                    backgroundColor: "var(--color-background-light)",
-                                    color: "var(--color-text-light)",
-                                }}
+                                className="w-full pl-10 pr-4 py-2.5 md:py-3 rounded-md border"
                             />
                         </div>
                     ))}
@@ -124,10 +128,7 @@ export default function RegisterForm() {
                 {/* Email + Conferma Email */}
                 {["email", "confermaEmail"].map((field) => (
                     <div key={field} className="relative">
-                        <FontAwesomeIcon
-                            icon={faEnvelope}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 icon-color text-base sm:text-lg"
-                        />
+                        <FontAwesomeIcon icon={faEnvelope} className="absolute left-3 top-1/2 -translate-y-1/2 icon-color" />
                         <input
                             name={field}
                             type="email"
@@ -136,11 +137,7 @@ export default function RegisterForm() {
                             onChange={handleChange}
                             required
                             autoComplete="off"
-                            className="w-full pl-10 pr-4 py-2.5 md:py-3 rounded-md border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            style={{
-                                backgroundColor: "var(--color-background-light)",
-                                color: "var(--color-text-light)",
-                            }}
+                            className="w-full pl-10 pr-4 py-2.5 md:py-3 rounded-md border"
                         />
                     </div>
                 ))}
@@ -150,10 +147,7 @@ export default function RegisterForm() {
                 { field: "confermaPassword", show: showConfirmPassword, setShow: setShowConfirmPassword }]
                     .map(({ field, show, setShow }) => (
                         <div key={field} className="relative">
-                            <FontAwesomeIcon
-                                icon={show ? faLockOpen : faLock}
-                                className="absolute left-3 top-1/2 -translate-y-1/2 icon-color text-base sm:text-lg"
-                            />
+                            <FontAwesomeIcon icon={show ? faLockOpen : faLock} className="absolute left-3 top-1/2 -translate-y-1/2 icon-color" />
                             <input
                                 name={field}
                                 type={show ? "text" : "password"}
@@ -162,18 +156,9 @@ export default function RegisterForm() {
                                 onChange={handleChange}
                                 required
                                 autoComplete="new-password"
-                                className="w-full pl-10 pr-12 py-2.5 md:py-3 rounded-md border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                style={{
-                                    backgroundColor: "var(--color-background-light)",
-                                    color: "var(--color-text-light)",
-                                }}
+                                className="w-full pl-10 pr-12 py-2.5 md:py-3 rounded-md border"
                             />
-                            <button
-                                type="button"
-                                onClick={() => setShow(!show)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 icon-color hover-bg-theme p-1.5 rounded transition"
-                                aria-label="Mostra/Nascondi password"
-                            >
+                            <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2">
                                 <FontAwesomeIcon icon={show ? faEyeSlash : faEye} />
                             </button>
                         </div>
@@ -182,53 +167,43 @@ export default function RegisterForm() {
                 {/* Avatar Picker */}
                 <div className="space-y-2">
                     <label className="text-sm font-medium flex items-center gap-2 text-theme">
-                        <FontAwesomeIcon icon={faImage} />
-                        Seleziona un avatar (opzionale):
+                        <FontAwesomeIcon icon={faImage} /> Seleziona un avatar (opzionale):
                     </label>
                     <div className="flex flex-wrap gap-2">
-                        <div
-                            onClick={() => setForm((f) => ({ ...f, avatar: "" }))}
-                            className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold bg-theme text-theme cursor-pointer transition hover:ring-2 hover:ring-blue-300 ${form.avatar === "" ? "ring-2 ring-blue-500" : "opacity-70 hover:opacity-100"}`}
-
-
-
-                        >
+                        <div onClick={() => setForm((f) => ({ ...f, avatar: "" }))}
+                            className={`w-12 h-12 rounded-full flex items-center justify-center cursor-pointer ${form.avatar === "" ? "ring-2 ring-blue-500" : "opacity-70 hover:opacity-100"}`}>
                             N/A
                         </div>
                         {avatars.map((file) => {
                             const url = `${AVATAR_BASE_URL}${file}`;
                             return (
-                                <img
-                                    key={file}
-                                    src={url}
-                                    alt={file}
+                                <img key={file} src={url} alt={file}
                                     onClick={() => setForm((f) => ({ ...f, avatar: url }))}
-                                    className={`w-12 h-12 rounded-full object-cover cursor-pointer transition ${form.avatar === url ? "ring-2 ring-blue-500" : "opacity-70 hover:opacity-100"}`}
-                                />
+                                    className={`w-12 h-12 rounded-full object-cover cursor-pointer ${form.avatar === url ? "ring-2 ring-blue-500" : "opacity-70 hover:opacity-100"}`} />
                             );
                         })}
                     </div>
                 </div>
 
-                {error && (
-                    <p className="text-red-600 dark:text-red-400 text-sm text-center">{error}</p>
-                )}
+                <CaptchaStatus ready={captchaReady} />
+                {error && <p className="text-red-600 text-sm text-center">{error}</p>}
 
-                <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 sm:py-3 rounded-lg text-sm sm:text-base transition disabled:opacity-60 disabled:cursor-not-allowed"
-                >
+                <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white py-2 rounded-lg">
                     {loading ? "Registrazione in corso..." : "Registrati"}
                 </button>
 
-                <p className="text-center text-sm sm:text-base text-theme">
-                    Hai già un account?{" "}
-                    <Link to="/" className="text-blue-600 hover:underline">
-                        Accedi
-                    </Link>
+                <p className="text-center text-sm">
+                    Hai già un account? <Link to="/" className="text-blue-600 hover:underline">Accedi</Link>
                 </p>
             </form>
         </div>
+    );
+}
+
+export default function RegisterForm() {
+    return (
+        <GoogleReCaptchaProvider reCaptchaKey="6LdKArcrAAAAANmGpTkLa-GopiPqy1BUreHKmDfL">
+            <RegisterInnerForm />
+        </GoogleReCaptchaProvider>
     );
 }

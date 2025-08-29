@@ -49,9 +49,23 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
             setLoading(true);
             const { data: record } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
             if (record) {
+                // Se stiamo modificando una TASK, recupera anche il progetto collegato
+                if (table === "tasks") {
+                    const { data: link } = await supabase
+                        .from("progetti_task")
+                        .select("progetti_id")
+                        .eq("task_id", id)
+                        .maybeSingle();
+
+                    if (link) {
+                        record.progetto_id = link.progetti_id; // aggiungo a mano al form
+                    }
+                }
+
                 setForm(record);
                 setOriginale(record);
             }
+
 
             const opts: Record<string, any[]> = {};
             const joins: Record<string, string[]> = {};
@@ -111,6 +125,29 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
     const salva = async () => {
         let payload = { ...form };
         await supabase.from(table).update(payload).eq("id", id);
+        if (table === "tasks") {
+            const newProjId = form.progetto_id;
+
+            // Recupera il collegamento attuale
+            const { data: oldLink } = await supabase
+                .from("progetti_task")
+                .select("progetti_id")
+                .eq("task_id", id)
+                .maybeSingle();
+
+            if (oldLink?.progetti_id !== newProjId) {
+                // Rimuovi eventuale collegamento precedente
+                await supabase.from("progetti_task").delete().eq("task_id", id);
+
+                // Inserisci nuovo collegamento se esiste
+                if (newProjId) {
+                    await supabase.from("progetti_task").insert({
+                        progetti_id: newProjId,
+                        task_id: id,
+                    });
+                }
+            }
+        }
 
         for (const campo of config.campi) {
             if (campo.tipo === "join-many") {

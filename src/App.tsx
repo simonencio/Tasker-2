@@ -29,10 +29,16 @@ import ResetPassword from "./Pagine/ResetPassword";
 import Header from "./Header/Header";
 import Sidebar from "./Sidebar/Sidebar";
 import NotificheSidebar from "./Notifiche/NotificheSidebar";
-
+import MiniTaskCreatorModal from "./Creazione/MiniTaskCreatorModal";
+import MiniClientCreatorModal from "./Creazione/MiniClientCreatorModal";
+import MiniUserCreatorModal from "./Creazione/MiniUserCreatorModal";
+import MiniStatoCreatorModal from "./Creazione/MiniStatoCreatorModal";
+import MiniPrioritaCreatorModal from "./Creazione/MiniPrioritaCreatorModal";
+import MiniRuoloCreatorModal from "./Creazione/MiniRuoloCreatorModal";
 
 import DettaglioTask from "./GestioneTask/DettaglioTask";
 import Cestino from "./Pagine/Cestino";
+import ForgotPassword from "./Pagine/ForgotPassword";
 
 // Viste
 import ListaDinamica from "./Liste/ListaDinamica";
@@ -41,7 +47,7 @@ import BachecaDinamica from "./Liste/BachecaDinamica";
 
 import type { ResourceKey } from "./Liste/resourceConfigs";
 import { getPreferredView, type Vista } from "./Liste/viewPrefs";
-import GenericCreatorModal from "./Creazione/GenericCreatorModal";
+import MiniProjectCreatorModal from "./Creazione/MiniProjectCreatorModal";
 
 type ModalType = "project" | "tasks" | "client" | "user" | "stato" | "priorita" | "ruolo";
 
@@ -96,8 +102,11 @@ function AppContent() {
     const location = useLocation();
     const [userId, setUserId] = useState<string | null>(null);
 
-    const publicRoutes = ["/login", "/register", "/confirm-email", "/reset-password/"];
-    const isPublic = location.pathname.startsWith("/reset-password/") || publicRoutes.includes(location.pathname);
+
+    const isPublic =
+        location.pathname.startsWith("/reset-password") ||
+        ["/login", "/register", "/confirm-email", "/forgot-password"].includes(location.pathname);
+
 
     const [windowWidth, setWindowWidth] = useState<number>(window.innerWidth);
 
@@ -200,7 +209,11 @@ function AppContent() {
                         <Route path="/login" element={<LoginForm />} />
                         <Route path="/register" element={<RegisterForm />} />
                         <Route path="/confirm-email" element={<ConfirmEmailWelcome />} />
+                        <Route path="/reset-password" element={<ResetPassword />} />
                         <Route path="/reset-password/:userId" element={<ResetPassword />} />
+
+                        <Route path="/forgot-password" element={<ForgotPassword />} />
+
                     </Routes>
                 </main>
             ) : (
@@ -270,27 +283,26 @@ function AppContent() {
 
             {/* Modali con offset */}
             {activeModals.includes("project") && (
-                <GenericCreatorModal table="progetti" onClose={() => closeModal("project")} offsetIndex={getOffset("project")} />
+                <MiniProjectCreatorModal onClose={() => closeModal("project")} offsetIndex={getOffset("project")} />
             )}
             {activeModals.includes("tasks") && (
-                <GenericCreatorModal table="tasks" onClose={() => closeModal("tasks")} offsetIndex={getOffset("tasks")} />
+                <MiniTaskCreatorModal onClose={() => closeModal("tasks")} offsetIndex={getOffset("tasks")} />
             )}
             {activeModals.includes("client") && (
-                <GenericCreatorModal table="clienti" onClose={() => closeModal("client")} offsetIndex={getOffset("client")} />
+                <MiniClientCreatorModal onClose={() => closeModal("client")} offsetIndex={getOffset("client")} />
             )}
             {activeModals.includes("user") && (
-                <GenericCreatorModal table="utenti" onClose={() => closeModal("user")} offsetIndex={getOffset("user")} />
+                <MiniUserCreatorModal onClose={() => closeModal("user")} offsetIndex={getOffset("user")} />
             )}
             {activeModals.includes("stato") && (
-                <GenericCreatorModal table="stati" onClose={() => closeModal("stato")} offsetIndex={getOffset("stato")} />
+                <MiniStatoCreatorModal onClose={() => closeModal("stato")} offsetIndex={getOffset("stato")} />
             )}
             {activeModals.includes("priorita") && (
-                <GenericCreatorModal table="priorita" onClose={() => closeModal("priorita")} offsetIndex={getOffset("priorita")} />
+                <MiniPrioritaCreatorModal onClose={() => closeModal("priorita")} offsetIndex={getOffset("priorita")} />
             )}
             {activeModals.includes("ruolo") && (
-                <GenericCreatorModal table="ruoli" onClose={() => closeModal("ruolo")} offsetIndex={getOffset("ruolo")} />
+                <MiniRuoloCreatorModal onClose={() => closeModal("ruolo")} offsetIndex={getOffset("ruolo")} />
             )}
-
         </>
     );
 }

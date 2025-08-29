@@ -145,7 +145,7 @@ export const editorConfigs: Record<string, EditorConfig> = {
                 pick: { tabellaOther: "utenti", value: "id", label: (u) => `${u.nome} ${u.cognome}` },
             },
         ],
-        redirectPath: (form) => (form.slug ? `/progetti/${form.slug}` : null),
+        // ❌ rimosso redirectPath
         hooks: {
             afterSave: async ({ form, originale, joinOriginals, joinSelections, supabase, id }) => {
                 const oldMembri = joinOriginals.membri || [];
@@ -173,6 +173,21 @@ export const editorConfigs: Record<string, EditorConfig> = {
         campi: [
             { chiave: "nome", label: "Nome", tipo: "text" },
             { chiave: "slug", label: "Slug", tipo: "slug" },
+
+            // 👇 AGGIUNGI QUESTO BLOCCO
+            {
+                chiave: "progetto_id",
+                label: "Progetto",
+                tipo: "select",
+                sorgente: {
+                    tabella: "progetti",
+                    value: "id",
+                    label: "nome",
+                    where: [["deleted_at", "is", null]],
+                    orderBy: { colonna: "nome", asc: true }
+                },
+            },
+
             {
                 chiave: "stato_id",
                 label: "Stato",
@@ -196,7 +211,6 @@ export const editorConfigs: Record<string, EditorConfig> = {
                 pick: { tabellaOther: "utenti", value: "id", label: (u) => `${u.nome} ${u.cognome}` },
             },
         ],
-        redirectPath: (form) => (form.slug ? `/tasks/${form.slug}` : null),
         hooks: {
             afterSave: async ({ form, originale, joinOriginals, joinSelections, supabase, id }) => {
                 const oldAss = joinOriginals.assegnatari || [];
@@ -213,10 +227,12 @@ export const editorConfigs: Record<string, EditorConfig> = {
                     const modifiche: any[] = [];
                     if (form.nome !== originale.nome) modifiche.push({ campo: "nome", da: originale.nome, a: form.nome });
                     if (form.note !== originale.note) modifiche.push({ campo: "note", da: originale.note, a: form.note });
+                    if (form.progetto_id !== originale.progetto_id) modifiche.push({ campo: "progetto", da: originale.progetto_id, a: form.progetto_id });
                     if (modifiche.length > 0)
                         await notificaEvento("TASK_MODIFICATO", rimasti, autoreId, { task_id: id, taskNome: form.nome, modifiche });
                 }
             },
         },
     },
+
 };

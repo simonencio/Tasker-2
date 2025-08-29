@@ -93,125 +93,93 @@ export default function DettaglioTask() {
             setUtenteId(data.session?.user.id || null);
         })();
     }, []);
-    useEffect(() => {
-        if (!taskChatCommenti) return;
 
-        (async () => {
-            const { data, error } = await supabase
-                .from("commenti")
-                .select(`
-        id,
-        parent_id,
-        descrizione,
-        created_at,
-        utente:utente_id(id, nome, cognome, avatar_url),
-        destinatari:commenti_destinatari(utente_id(id, nome, cognome, avatar_url))
-      `)
-                .eq("task_id", taskChatCommenti.id)
-                .order("created_at", { ascending: true });
-
-            if (error) {
-                console.error("Errore caricamento commenti:", error);
-                setCommentiChat([]);
-            } else {
-                const normalizzati: Commento[] = (data || []).map((c: any) => ({
-                    id: c.id,
-                    parent_id: c.parent_id,
-                    descrizione: c.descrizione,
-                    created_at: c.created_at,
-                    utente: Array.isArray(c.utente) ? c.utente[0] : c.utente, // ✅ prendi il singolo utente
-                    destinatari: (c.destinatari || []).map((d: any) =>
-                        Array.isArray(d.utente_id) ? d.utente_id[0] : d.utente_id
-                    ),
-                }));
-                setCommentiChat(normalizzati);
-            }
-        })();
-    }, [taskChatCommenti]);
-
-
-    /* ------------------------ Fetch task/sottotask ------------------------ */
-    useEffect(() => {
+    /* ------------------------ Fetch centralizzato ------------------------ */
+    const fetchTaskData = async () => {
         const key = slug || id;
         if (!key) return;
-        (async () => {
-            const baseSelect = `
-        id,slug,nome,note,consegna,tempo_stimato,fine_task,created_at,modified_at,parent_id,
-        stato:stato_id(id,nome,colore),
-        priorita:priorita_id(id,nome),
-        progetti_task(progetti(id,nome)),
-        utenti_task(utenti(id,nome,cognome,avatar_url))
-      `;
-            const query = supabase.from("tasks").select(baseSelect).limit(1);
-            const { data, error } = slug
-                ? await query.eq("slug", slug).maybeSingle()
-                : await query.eq("id", id as string).maybeSingle();
-            if (error || !data) return;
 
-            const progettoPulito =
-                Array.isArray(data.progetti_task?.[0]?.progetti)
-                    ? data.progetti_task?.[0]?.progetti[0]
-                    : data.progetti_task?.[0]?.progetti ?? null;
+        const baseSelect = `
+            id,slug,nome,note,consegna,tempo_stimato,fine_task,created_at,modified_at,parent_id,
+            stato:stato_id(id,nome,colore),
+            priorita:priorita_id(id,nome),
+            progetti_task(progetti(id,nome)),
+            utenti_task(utenti(id,nome,cognome,avatar_url))
+        `;
 
-            const taskPulita: Task = {
-                id: data.id,
-                slug: data.slug ?? null,
-                nome: data.nome,
-                note: data.note,
-                consegna: data.consegna,
-                tempo_stimato: data.tempo_stimato,
-                fine_task: data.fine_task,
-                created_at: data.created_at,
-                modified_at: data.modified_at,
-                parent_id: data.parent_id,
-                stato: Array.isArray(data.stato) ? data.stato[0] : data.stato,
-                priorita: Array.isArray(data.priorita) ? data.priorita[0] : data.priorita,
-                progetto: progettoPulito,
-                assegnatari: (data.utenti_task || []).map((u: any) => u.utenti),
-            };
-            setTask(taskPulita);
+        const query = supabase.from("tasks").select(baseSelect).limit(1);
+        const { data, error } = slug
+            ? await query.eq("slug", slug).maybeSingle()
+            : await query.eq("id", id as string).maybeSingle();
+        if (error || !data) return;
 
-            if (progettoPulito?.id) {
-                const { data: membri, error: errM } = await supabase
-                    .from("utenti_progetti")
-                    .select(`utenti(id,nome,cognome,avatar_url)`)
-                    .eq("progetto_id", progettoPulito.id);
-                setUtentiProgetto(!errM && Array.isArray(membri) ? membri.map((r: any) => r.utenti).filter(Boolean) : []);
-            } else {
-                setUtentiProgetto([]);
-            }
+        const progettoPulito =
+            Array.isArray(data.progetti_task?.[0]?.progetti)
+                ? data.progetti_task?.[0]?.progetti[0]
+                : data.progetti_task?.[0]?.progetti ?? null;
 
-            const s = await supabase
-                .from("tasks")
-                .select(`
-          id,slug,nome,note,consegna,tempo_stimato,fine_task,created_at,modified_at,parent_id,
-          stato:stato_id(id,nome,colore),
-          priorita:priorita_id(id,nome),
-          utenti_task(utenti(id,nome,cognome,avatar_url))
-        `)
-                .is("deleted_at", null);
+        const taskPulita: Task = {
+            id: data.id,
+            slug: data.slug ?? null,
+            nome: data.nome,
+            note: data.note,
+            consegna: data.consegna,
+            tempo_stimato: data.tempo_stimato,
+            fine_task: data.fine_task,
+            created_at: data.created_at,
+            modified_at: data.modified_at,
+            parent_id: data.parent_id,
+            stato: Array.isArray(data.stato) ? data.stato[0] : data.stato,
+            priorita: Array.isArray(data.priorita) ? data.priorita[0] : data.priorita,
+            progetto: progettoPulito,
+            assegnatari: (data.utenti_task || []).map((u: any) => u.utenti),
+        };
+        setTask(taskPulita);
 
-            setSottoTasks(
-                s.error || !s.data
-                    ? []
-                    : s.data.map((t: any) => ({
-                        id: t.id,
-                        slug: t.slug ?? null,
-                        nome: t.nome ?? "—",
-                        note: t.note,
-                        consegna: t.consegna,
-                        tempo_stimato: t.tempo_stimato,
-                        fine_task: t.fine_task,
-                        created_at: t.created_at,
-                        modified_at: t.modified_at,
-                        parent_id: t.parent_id,
-                        stato: Array.isArray(t.stato) ? t.stato[0] : t.stato,
-                        priorita: Array.isArray(t.priorita) ? t.priorita[0] : t.priorita,
-                        progetto: null,
-                        assegnatari: t.utenti_task?.map((u: any) => u.utenti) ?? [],
-                    }))
-            );
-        })();
+        if (progettoPulito?.id) {
+            const { data: membri, error: errM } = await supabase
+                .from("utenti_progetti")
+                .select(`utenti(id,nome,cognome,avatar_url)`)
+                .eq("progetto_id", progettoPulito.id);
+            setUtentiProgetto(!errM && Array.isArray(membri) ? membri.map((r: any) => r.utenti).filter(Boolean) : []);
+        } else {
+            setUtentiProgetto([]);
+        }
+
+        const s = await supabase
+            .from("tasks")
+            .select(`
+                id,slug,nome,note,consegna,tempo_stimato,fine_task,created_at,modified_at,parent_id,
+                stato:stato_id(id,nome,colore),
+                priorita:priorita_id(id,nome),
+                utenti_task(utenti(id,nome,cognome,avatar_url))
+            `)
+            .is("deleted_at", null);
+
+        setSottoTasks(
+            s.error || !s.data
+                ? []
+                : s.data.map((t: any) => ({
+                    id: t.id,
+                    slug: t.slug ?? null,
+                    nome: t.nome ?? "—",
+                    note: t.note,
+                    consegna: t.consegna,
+                    tempo_stimato: t.tempo_stimato,
+                    fine_task: t.fine_task,
+                    created_at: t.created_at,
+                    modified_at: t.modified_at,
+                    parent_id: t.parent_id,
+                    stato: Array.isArray(t.stato) ? t.stato[0] : t.stato,
+                    priorita: Array.isArray(t.priorita) ? t.priorita[0] : t.priorita,
+                    progetto: null,
+                    assegnatari: t.utenti_task?.map((u: any) => u.utenti) ?? [],
+                }))
+        );
+    };
+
+    useEffect(() => {
+        fetchTaskData();
     }, [slug, id]);
 
     /* ------------------------ Durate ------------------------ */
@@ -245,27 +213,54 @@ export default function DettaglioTask() {
         (durateTask[taskId] || 0) + figliDiretti(taskId).reduce((tot, f) => tot + getDurataTotaleTask(f.id), 0);
 
     /* ------------------------ Timer ------------------------ */
-    const handleStartTimer = (t: Task) => setActiveTimer({ taskId: t.id, startTime: new Date() });
-    const handleStopTimer = async (t: Task) => {
-        if (!t || !utenteId || !activeTimer) return;
-        if (!t.progetto?.id) {
+    const handleStartTimer = async (t: Task) => {
+        if (activeTimer) {
+            // chiudo il timer precedente prima di aprirne uno nuovo
+            const oldTask = sottoTasks.find(st => st.id === activeTimer.taskId) || task;
+            if (oldTask) {
+                // ✅ imposto sempre il progetto della task principale
+                await handleStopTimer({ ...oldTask, progetto: task?.progetto }, activeTimer);
+            }
+        }
+        // avvio il nuovo timer
+        setActiveTimer({ taskId: t.id, startTime: new Date() });
+    };
+
+    const handleStopTimer = async (
+        t: Task,
+        timerData: { taskId: string; startTime: Date }
+    ) => {
+        if (!t || !utenteId || !timerData) return;
+
+        // ✅ recupero progetto dalla task principale se manca
+        const progettoId = t.progetto?.id || task?.progetto?.id;
+        if (!progettoId) {
             new Toast("Questa task non è collegata a nessun progetto", Toast.TYPE_ERROR, Toast.TIME_SHORT);
             setActiveTimer(null);
             return;
         }
+
         const fine = new Date();
-        const durata = Math.floor((fine.getTime() - activeTimer.startTime.getTime()) / 1000);
+        const durata = Math.floor((fine.getTime() - timerData.startTime.getTime()) / 1000);
+
         const { error } = await supabase.from("time_entries").insert({
             utente_id: utenteId,
-            progetto_id: t.progetto.id,
+            progetto_id: progettoId,
             task_id: t.id,
             nome: t.nome,
-            data_inizio: activeTimer.startTime.toISOString(),
+            data_inizio: timerData.startTime.toISOString(),
             data_fine: fine.toISOString(),
             durata
         });
+
         new Toast(error ? "Errore nel salvataggio" : "Tempo salvato", error ? Toast.TYPE_ERROR : Toast.TYPE_DONE);
-        setActiveTimer(null);
+
+        if (activeTimer?.taskId === t.id) {
+            setActiveTimer(null);
+        }
+
+        // aggiorno i dati per riflettere subito le nuove durate
+        await fetchTaskData();
     };
 
     /* ------------------------ Sotto-task ------------------------ */
@@ -303,29 +298,38 @@ export default function DettaglioTask() {
                         {completata && <FontAwesomeIcon icon={faCheckCircle} className="text-green-600" title="Completata" />}
                     </div>
                     <div className="flex-1 font-medium truncate">{t.nome}</div>
-                    <div className="w-28 flex justify-end items-center gap-3" onClick={e => e.stopPropagation()}>
-                        <button className="icon-color hover:text-blue-600" title="Modifica" onClick={() => setTaskDaModificare(t.id)}>
+                    <div className="w-28 flex justify-end items-center gap-3">
+                        <button
+                            className="icon-color hover:text-blue-600"
+                            title="Modifica"
+                            onClick={(e) => { e.stopPropagation(); setTaskDaModificare(t.id); }}
+                        >
                             <FontAwesomeIcon icon={faPen} />
                         </button>
                         <button
                             className={`icon-color ${activeTimer?.taskId === t.id ? "hover:text-red-600" : "hover:text-green-600"}`}
                             title={activeTimer?.taskId === t.id ? "Ferma timer" : "Avvia timer"}
-                            onClick={() =>
+                            onClick={(e) => {
+                                e.stopPropagation();
                                 activeTimer?.taskId === t.id
-                                    ? handleStopTimer({ ...t, progetto: task?.progetto })
-                                    : handleStartTimer({ ...t, progetto: task?.progetto })
-                            }
+                                    ? handleStopTimer({ ...t, progetto: task?.progetto }, activeTimer)
+                                    : handleStartTimer({ ...t, progetto: task?.progetto });
+                            }}
                         >
                             <FontAwesomeIcon icon={activeTimer?.taskId === t.id ? faStop : faPlay} />
                         </button>
                         <button
                             className="icon-color text-blue-600 hover:text-blue-500"
                             title="Apri commenti"
-                            onClick={() => setTaskChatCommenti(t)}
+                            onClick={(e) => { e.stopPropagation(); setTaskChatCommenti(t); }}
                         >
                             <FontAwesomeIcon icon={faCommentDots} />
                         </button>
-                        <button className="icon-color text-gray-400 cursor-not-allowed" title="Elimina (non implementato)">
+                        <button
+                            className="icon-color text-gray-400 cursor-not-allowed"
+                            title="Elimina (non implementato)"
+                            onClick={(e) => e.stopPropagation()}
+                        >
                             <FontAwesomeIcon icon={faTrash} />
                         </button>
                     </div>
@@ -420,7 +424,7 @@ export default function DettaglioTask() {
                     <button
                         onClick={() =>
                             activeTimer?.taskId === task.id
-                                ? handleStopTimer(task)
+                                ? handleStopTimer(task, activeTimer)
                                 : handleStartTimer(task)
                         }
                         className={`px-3 py-2 rounded-xl text-[15px] flex items-center gap-2 ${activeTimer?.taskId === task.id
@@ -458,7 +462,7 @@ export default function DettaglioTask() {
                 <GenericEditorModal
                     table="tasks"
                     id={taskDaModificare}
-                    onClose={() => setTaskDaModificare(null)}
+                    onClose={() => { setTaskDaModificare(null); fetchTaskData(); }}
                 />
             )}
             {taskChatCommenti && (
@@ -467,8 +471,8 @@ export default function DettaglioTask() {
                     utenteId={utenteId || ""}
                     taskId={taskChatCommenti.id}
                     utentiProgetto={utentiProgetto}
-                    onClose={() => setTaskChatCommenti(null)}
-                    onNuovoCommento={(c: Commento) => setCommentiChat(prev => [...prev, c])}
+                    onClose={() => { setTaskChatCommenti(null); fetchTaskData(); }}
+                    onNuovoCommento={(c: Commento) => { setCommentiChat(prev => [...prev, c]); fetchTaskData(); }}
                 />
             )}
         </div>
