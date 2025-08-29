@@ -20,7 +20,7 @@
   top: auto !important;
   transform: none !important;
   z-index: 9999 !important;
-  
+
   /* Layout */
   display: flex !important;
   align-items: center !important;
@@ -29,40 +29,40 @@
   max-width: 400px !important;
   width: auto !important;
   height: auto !important;
-  
+
   /* Stile visuale */
   background-color: #ffffff !important;
   color: #1f2937 !important;
   border: 1px solid #e5e7eb !important;
   border-radius: 16px !important;
-  box-shadow: 
+  box-shadow:
     0 10px 25px -5px rgba(0, 0, 0, 0.1),
     0 8px 10px -6px rgba(0, 0, 0, 0.1),
     0 0 0 1px rgba(255, 255, 255, 0.05) inset !important;
-  
+
   /* Typography */
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
   font-size: 15px !important;
   font-weight: 500 !important;
   line-height: 1.4 !important;
   text-align: left !important;
-  
+
   /* Visibilità */
   visibility: visible !important;
   opacity: 1 !important;
   pointer-events: auto !important;
-  
+
   /* Animazione */
   animation: toastSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
   transition: all 0.3s ease !important;
-  
+
   /* Backdrop blur */
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
 }
 
 /* Nascondi tutti gli elementi figli originali della libreria */
-.toast > *:not(.toast-content) {
+.toast>*:not(.toast-content) {
   display: none !important;
 }
 
@@ -116,7 +116,7 @@
   background-color: #ffffff !important;
   color: #065f46 !important;
   border-color: #10b981 !important;
-  box-shadow: 
+  box-shadow:
     0 10px 25px -5px rgba(16, 185, 129, 0.15),
     0 8px 10px -6px rgba(16, 185, 129, 0.1),
     0 0 0 1px rgba(16, 185, 129, 0.05) inset !important;
@@ -126,7 +126,7 @@
   background-color: #ffffff !important;
   color: #9f1239 !important;
   border-color: #ef4444 !important;
-  box-shadow: 
+  box-shadow:
     0 10px 25px -5px rgba(239, 68, 68, 0.15),
     0 8px 10px -6px rgba(239, 68, 68, 0.1),
     0 0 0 1px rgba(239, 68, 68, 0.05) inset !important;
@@ -136,7 +136,7 @@
   background-color: #ffffff !important;
   color: #92400e !important;
   border-color: #f59e0b !important;
-  box-shadow: 
+  box-shadow:
     0 10px 25px -5px rgba(245, 158, 11, 0.15),
     0 8px 10px -6px rgba(245, 158, 11, 0.1),
     0 0 0 1px rgba(245, 158, 11, 0.05) inset !important;
@@ -146,7 +146,7 @@
   background-color: #ffffff !important;
   color: #1e40af !important;
   border-color: #3b82f6 !important;
-  box-shadow: 
+  box-shadow:
     0 10px 25px -5px rgba(59, 130, 246, 0.15),
     0 8px 10px -6px rgba(59, 130, 246, 0.1),
     0 0 0 1px rgba(59, 130, 246, 0.05) inset !important;
@@ -158,10 +158,12 @@
     opacity: 0;
     transform: translateX(100%) scale(0.95);
   }
+
   60% {
     opacity: 1;
     transform: translateX(0) scale(1.02);
   }
+
   100% {
     opacity: 1;
     transform: translateX(0) scale(1);
@@ -175,25 +177,25 @@
 }
 
 .toast.success:hover {
-  box-shadow: 
+  box-shadow:
     0 12px 30px -5px rgba(16, 185, 129, 0.18),
     0 10px 15px -6px rgba(16, 185, 129, 0.15) !important;
 }
 
 .toast.error:hover {
-  box-shadow: 
+  box-shadow:
     0 12px 30px -5px rgba(239, 68, 68, 0.18),
     0 10px 15px -6px rgba(239, 68, 68, 0.15) !important;
 }
 
 .toast.warning:hover {
-  box-shadow: 
+  box-shadow:
     0 12px 30px -5px rgba(245, 158, 11, 0.18),
     0 10px 15px -6px rgba(245, 158, 11, 0.15) !important;
 }
 
 .toast.info:hover {
-  box-shadow: 
+  box-shadow:
     0 12px 30px -5px rgba(59, 130, 246, 0.18),
     0 10px 15px -6px rgba(59, 130, 246, 0.15) !important;
 }
@@ -216,25 +218,25 @@
     color: #f9fafb !important;
     border-color: #374151 !important;
   }
-  
+
   .toast.success {
     background-color: #1f2937 !important;
     color: #6ee7b7 !important;
     border-color: #10b981 !important;
   }
-  
+
   .toast.error {
     background-color: #1f2937 !important;
     color: #fca5a5 !important;
     border-color: #ef4444 !important;
   }
-  
+
   .toast.warning {
     background-color: #1f2937 !important;
     color: #fcd34d !important;
     border-color: #f59e0b !important;
   }
-  
+
   .toast.info {
     background-color: #1f2937 !important;
     color: #93c5fd !important;
@@ -260,7 +262,7 @@
 }
 
 /* Previeni elementi multipli */
-.toast[data-styled="true"] ~ .toast:not([data-styled]) {
+.toast[data-styled="true"]~.toast:not([data-styled]) {
   display: none !important;
 }
 
@@ -287,6 +289,24 @@
   /* Grigio medio */
   --color-icon-dark: #d1d5db;
   /* Grigio chiaro */
+
+  --cal-ok-bg: #e8f8ef;
+  /* ~green-100 custom (più leggibile) */
+  --cal-ok-border: #34d399;
+  /* green-400 */
+  --cal-ok-text: #065f46;
+
+  --cal-warn-bg: #fff4db;
+  /* yellow-100 spinto */
+  --cal-warn-border: #f59e0b;
+  /* amber-500 */
+  --cal-warn-text: #92400e;
+
+  --cal-danger-bg: #ffe4e6;
+  /* rose-100 */
+  --cal-danger-border: #ef4444;
+  /* red-500 */
+  --cal-danger-text: #7f1d1d;
 }
 
 /* 🌓 Stili per il tema chiaro */
@@ -299,7 +319,58 @@ html {
 html.dark {
   background-color: var(--color-background-dark);
   color: var(--color-text-dark);
+  /* in dark alziamo alpha per contrasto sul card-theme #2c3542 */
+  --cal-ok-bg: rgba(16, 185, 129, 0.18);
+  /* green-500 @ ~18% */
+  --cal-ok-border: #34d399;
+  --cal-ok-text: #a7f3d0;
+
+  --cal-warn-bg: rgba(245, 158, 11, 0.18);
+  /* amber-500 */
+  --cal-warn-border: #fbbf24;
+  --cal-warn-text: #fde68a;
+
+  --cal-danger-bg: rgba(239, 68, 68, 0.16);
+  /* red-500 */
+  --cal-danger-border: #f87171;
+  --cal-danger-text: #fecaca;
 }
+
+/* Applicate di solito alla BARRA HEADER del giorno (non all'intera card) */
+.cal-ok {
+  background-color: var(--cal-ok-bg);
+  border-top: 1px solid var(--cal-ok-border);
+  border-bottom: 1px solid var(--cal-ok-border);
+}
+
+.cal-warn {
+  background-color: var(--cal-warn-bg);
+  border-top: 1px solid var(--cal-warn-border);
+  border-bottom: 1px solid var(--cal-warn-border);
+}
+
+.cal-danger {
+  background-color: var(--cal-danger-bg);
+  border-top: 1px solid var(--cal-danger-border);
+  border-bottom: 1px solid var(--cal-danger-border);
+}
+
+/* Testo/pill del messaggio centrale mantiene il contrasto */
+.cal-ok .status-text {
+  color: var(--cal-ok-text);
+}
+
+.cal-warn .status-text {
+  color: var(--cal-warn-text);
+}
+
+.cal-danger .status-text {
+  color: var(--cal-danger-text);
+}
+
+/* Optional (accessibilità): micro pattern per distinguere a colpo d'occhio */
+html.dark .cal-warn { background-image: repeating-linear-gradient(45deg, transparent 0 10px, rgba(245,158,11,0.08) 10px 20px); }
+html.dark .cal-danger { background-image: repeating-linear-gradient(45deg, transparent 0 10px, rgba(239,68,68,0.07) 10px 20px); }
 
 /* ✅ Scrollbar invisibile */
 .hide-scrollbar::-webkit-scrollbar {
@@ -887,6 +958,7 @@ html.dark .link {
 .bg-chat-icon {
   @apply bg-blue-600 text-white;
 }
+
 html.dark .bg-chat-icon {
   @apply bg-blue-500 text-white;
 }
@@ -895,6 +967,7 @@ html.dark .bg-chat-icon {
 .bg-bolla-mio {
   @apply bg-blue-600 text-white;
 }
+
 html.dark .bg-bolla-mio {
   @apply bg-blue-700 text-white;
 }
@@ -908,6 +981,7 @@ html.dark .bg-bolla-mio {
 .badge-dest-altri {
   @apply bg-blue-50 border border-blue-500 text-blue-800;
 }
+
 html.dark .badge-dest-altri {
   @apply bg-blue-900/30 border border-blue-400 text-blue-200;
 }
@@ -916,12 +990,15 @@ html.dark .badge-dest-altri {
 .bg-quote {
   @apply bg-blue-200 border border-blue-500;
 }
+
 html.dark .bg-quote {
   @apply bg-blue-900/25 border border-blue-400;
 }
+
 .text-quote {
   @apply text-black;
 }
+
 html.dark .text-quote {
   @apply text-white;
 }
@@ -930,6 +1007,7 @@ html.dark .text-quote {
 .bg-bolla-mio .text-quote {
   @apply text-white;
 }
+
 html.dark .bg-bolla-mio .text-quote {
   @apply text-white;
 }
@@ -938,6 +1016,7 @@ html.dark .bg-bolla-mio .text-quote {
 .link-quote {
   @apply text-blue-600 hover:underline;
 }
+
 html.dark .link-quote {
   @apply text-blue-300;
 }
@@ -946,6 +1025,7 @@ html.dark .link-quote {
 .badge-dest-multiplo {
   @apply bg-blue-100 border border-blue-500 text-blue-800;
 }
+
 html.dark .badge-dest-multiplo {
   @apply bg-blue-900/35 border border-blue-400 text-blue-200;
 }
@@ -954,12 +1034,15 @@ html.dark .badge-dest-multiplo {
 .btn-invia {
   @apply bg-blue-600 text-white;
 }
+
 .btn-invia:hover {
   @apply bg-blue-700;
 }
+
 html.dark .btn-invia {
   @apply bg-blue-500;
 }
+
 html.dark .btn-invia:hover {
   @apply bg-blue-600;
 }
@@ -985,13 +1068,16 @@ html.dark .btn-invia:hover {
       sans-serif;
   }
 }
+
 .react-select__control {
   border-radius: 0.5rem;
   border: 1px solid var(--color-border, #ccc);
   min-height: 38px;
 }
+
 .react-select__menu {
-  z-index: 50; /* evita di finire sotto al modal */
+  z-index: 50;
+  /* evita di finire sotto al modal */
 }
 
 
@@ -1001,11 +1087,13 @@ html.dark .btn-invia:hover {
 
 /* Avatar placeholder senza immagine */
 .avatar-placeholder {
-  background-color: #3b82f6; /* blu-500 */
+  background-color: #3b82f6;
+  /* blu-500 */
   color: #fff;
 }
 
 html.dark .avatar-placeholder {
-  background-color: #2563eb; /* blu-600 in dark mode */
+  background-color: #2563eb;
+  /* blu-600 in dark mode */
   color: #f9fafb;
 }
