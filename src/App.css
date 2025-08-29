@@ -339,20 +339,17 @@ html.dark {
 /* Applicate di solito alla BARRA HEADER del giorno (non all'intera card) */
 .cal-ok {
   background-color: var(--cal-ok-bg);
-  border-top: 1px solid var(--cal-ok-border);
-  border-bottom: 1px solid var(--cal-ok-border);
+
 }
 
 .cal-warn {
   background-color: var(--cal-warn-bg);
-  border-top: 1px solid var(--cal-warn-border);
-  border-bottom: 1px solid var(--cal-warn-border);
+
 }
 
 .cal-danger {
   background-color: var(--cal-danger-bg);
-  border-top: 1px solid var(--cal-danger-border);
-  border-bottom: 1px solid var(--cal-danger-border);
+
 }
 
 /* Testo/pill del messaggio centrale mantiene il contrasto */
@@ -368,9 +365,47 @@ html.dark {
   color: var(--cal-danger-text);
 }
 
-/* Optional (accessibilità): micro pattern per distinguere a colpo d'occhio */
-html.dark .cal-warn { background-image: repeating-linear-gradient(45deg, transparent 0 10px, rgba(245,158,11,0.08) 10px 20px); }
-html.dark .cal-danger { background-image: repeating-linear-gradient(45deg, transparent 0 10px, rgba(239,68,68,0.07) 10px 20px); }
+/* Barra colorata che si adatta all'header del giorno */
+.cal-strip {
+  position: relative;
+  overflow: hidden;
+  /* evita sbordi */
+  border-top-left-radius: inherit;
+  /* rispetta il raggio del card */
+  border-top-right-radius: inherit;
+}
+
+/* Pseudo-elemento: riempie tutta l'area disponibile dell'header */
+.cal-strip::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* copre padding e larghezza */
+  z-index: 0;
+  /* dietro ai contenuti */
+  background: transparent;
+  /* definito dalle varianti sotto */
+}
+
+/* Varianti colore: solo background, niente strisce, niente bordi */
+.cal-strip.cal-ok::before {
+  background-color: var(--cal-ok-bg);
+}
+
+.cal-strip.cal-warn::before {
+  background-color: var(--cal-warn-bg);
+}
+
+.cal-strip.cal-danger::before {
+  background-color: var(--cal-danger-bg);
+}
+
+/* I contenuti dell'header restano sopra il colore */
+.cal-strip>* {
+  position: relative;
+  z-index: 1;
+}
+
 
 /* ✅ Scrollbar invisibile */
 .hide-scrollbar::-webkit-scrollbar {

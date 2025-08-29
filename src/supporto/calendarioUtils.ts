@@ -27,7 +27,8 @@ export const filtraTask = (
     giorno: Date,
     soloMieTask: boolean,
     utenteLoggatoId: string | null,
-    isAdmin?: boolean
+    isAdmin?: boolean,
+    mostraCompletate: boolean = true
 ) => {
     const gStart = startOfDay(giorno);
     const gEnd = addDays(gStart, 1);
@@ -38,11 +39,14 @@ export const filtraTask = (
         if (!due || !(due >= gStart && due < gEnd)) return false;
 
         // Filtro "solo mie" (se non sei admin)
-        if (soloMieTask && !isAdmin) {
+        if (soloMieTask) {
             const assegnataAllUtente =
                 !!t.utenti_task?.some((u: { utente?: { id?: string | null } }) => u?.utente?.id === utenteLoggatoId);
             if (!assegnataAllUtente) return false;
         }
+
+        // 3) Filtro "Completate": se disattivo, nascondi le task complete
+        if (!mostraCompletate && t.fine_task) return false;
 
         return true;
     });
@@ -107,80 +111,81 @@ export function getColorClass(
 }
 
 
-    export const getIconColor = (giorno: Date, oggi: Date) => {
-        const g = startOfDay(giorno);
-        const o = startOfDay(oggi);
-        if (isSameDay(g, o)) return 'icon-oggi';
-        if (isBefore(g, o)) return 'icon-passato';
-        return 'icon-futuro';
-    };
+
+export const getIconColor = (giorno: Date, oggi: Date) => {
+    const g = startOfDay(giorno);
+    const o = startOfDay(oggi);
+    if (isSameDay(g, o)) return 'icon-oggi';
+    if (isBefore(g, o)) return 'icon-passato';
+    return 'icon-futuro';
+};
 
 
-    export const getMessaggio = (giorno: Date, oggi: Date) => {
-        const g = startOfDay(giorno);
-        const o = startOfDay(oggi);
-        if (isSameDay(g, o)) return 'Ci sono task in scadenza oggi';
-        if (isBefore(g, o)) return 'Hai delle task scadute per questo giorno';
-        return 'Ci sono delle task in scadenza per questo giorno';
-    };
+export const getMessaggio = (giorno: Date, oggi: Date) => {
+    const g = startOfDay(giorno);
+    const o = startOfDay(oggi);
+    if (isSameDay(g, o)) return 'Ci sono task in scadenza oggi';
+    if (isBefore(g, o)) return 'Hai delle task scadute per questo giorno';
+    return 'Ci sono delle task in scadenza per questo giorno';
+};
 
-    export const calcolaSettimana = (base: Date): Date[] => {
-        const inizio = startOfWeek(base, { weekStartsOn: 1 });
-        return Array.from({ length: 7 }, (_, i) => addDays(inizio, i));
-    };
+export const calcolaSettimana = (base: Date): Date[] => {
+    const inizio = startOfWeek(base, { weekStartsOn: 1 });
+    return Array.from({ length: 7 }, (_, i) => addDays(inizio, i));
+};
 
-    export const calcolaMesePuro = (mese: Date): Date[] =>
-        eachDayOfInterval({
-            start: startOfMonth(mese),
-            end: endOfMonth(mese),
-        });
+export const calcolaMesePuro = (mese: Date): Date[] =>
+    eachDayOfInterval({
+        start: startOfMonth(mese),
+        end: endOfMonth(mese),
+    });
 
 
-    /** Popup scadenze: raggruppa SOLO task INCOMPLETE e scadute prima di oggi */
-    export function generaTaskScadute(
-        tasks: Task[],
-        oggi: Date = new Date()
-    ): { giorno: string; utenti: string[] }[] {
-        const todayStart = startOfDay(oggi);
-        const byDay = new Map<string, Set<string>>();
+/** Popup scadenze: raggruppa SOLO task INCOMPLETE e scadute prima di oggi */
+export function generaTaskScadute(
+    tasks: Task[],
+    oggi: Date = new Date()
+): { giorno: string; utenti: string[] }[] {
+    const todayStart = startOfDay(oggi);
+    const byDay = new Map<string, Set<string>>();
 
-        for (const t of tasks) {
-            if (t.fine_task) continue;                      // 🔴 escludi completate
-            const due = parseDueDate(t.consegna);
-            if (!due) continue;
-            if (!isBefore(due, todayStart)) continue;       // non è scaduta
+    for (const t of tasks) {
+        if (t.fine_task) continue;                      // 🔴 escludi completate
+        const due = parseDueDate(t.consegna);
+        if (!due) continue;
+        if (!isBefore(due, todayStart)) continue;       // non è scaduta
 
-            // Etichetta giorno (locale IT)
-            const dayLabel = format(due, "EEEE dd/MM", { locale: it })
-                .replace(/^./, c => c.toUpperCase());
+        // Etichetta giorno (locale IT)
+        const dayLabel = format(due, "EEEE dd/MM", { locale: it })
+            .replace(/^./, c => c.toUpperCase());
 
-            // Raccogli nomi utenti assegnati (fallback su "Senza assegnatario")
-            const utenti = (t as any).utenti_task?.map(
-                (u: any) => [u?.utente?.nome, u?.utente?.cognome].filter(Boolean).join(" ")
-            ).filter(Boolean) as string[] | undefined;
+        // Raccogli nomi utenti assegnati (fallback su "Senza assegnatario")
+        const utenti = (t as any).utenti_task?.map(
+            (u: any) => [u?.utente?.nome, u?.utente?.cognome].filter(Boolean).join(" ")
+        ).filter(Boolean) as string[] | undefined;
 
-            const names = (utenti && utenti.length ? utenti : ["Senza assegnatario"]);
-            if (!byDay.has(dayLabel)) byDay.set(dayLabel, new Set());
-            const set = byDay.get(dayLabel)!;
-            names.forEach(n => set.add(n));
-        }
-
-        // Converti in array ordinato per data (ricava data dall’etichetta)
-        const result = Array.from(byDay.entries()).map(([giorno, set]) => ({
-            giorno,
-            utenti: Array.from(set)
-        }));
-
-        // Ordina cronologicamente (ricostruendo una data parsabile)
-        result.sort((a, b) => {
-            // "EEEE dd/MM" → prendi "dd/MM"
-            const da = a.giorno.slice(-5), db = b.giorno.slice(-5);
-            const [daD, daM] = da.split("/").map(Number);
-            const [dbD, dbM] = db.split("/").map(Number);
-            const A = new Date(oggi.getFullYear(), daM - 1, daD).getTime();
-            const B = new Date(oggi.getFullYear(), dbM - 1, dbD).getTime();
-            return A - B;
-        });
-
-        return result;
+        const names = (utenti && utenti.length ? utenti : ["Senza assegnatario"]);
+        if (!byDay.has(dayLabel)) byDay.set(dayLabel, new Set());
+        const set = byDay.get(dayLabel)!;
+        names.forEach(n => set.add(n));
     }
+
+    // Converti in array ordinato per data (ricava data dall’etichetta)
+    const result = Array.from(byDay.entries()).map(([giorno, set]) => ({
+        giorno,
+        utenti: Array.from(set)
+    }));
+
+    // Ordina cronologicamente (ricostruendo una data parsabile)
+    result.sort((a, b) => {
+        // "EEEE dd/MM" → prendi "dd/MM"
+        const da = a.giorno.slice(-5), db = b.giorno.slice(-5);
+        const [daD, daM] = da.split("/").map(Number);
+        const [dbD, dbM] = db.split("/").map(Number);
+        const A = new Date(oggi.getFullYear(), daM - 1, daD).getTime();
+        const B = new Date(oggi.getFullYear(), dbM - 1, dbD).getTime();
+        return A - B;
+    });
+
+    return result;
+}
