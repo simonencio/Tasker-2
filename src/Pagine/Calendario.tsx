@@ -17,6 +17,7 @@ import {
 } from '../supporto/calendarioUtils';
 import type { Task } from '../supporto/tipi';
 import ToggleMie from '../GestioneProgetto/ToggleMie';
+import ToggleCompletate from '../GestioneProgetto/ToggleCompletate';
 
 export default function CalendarioProgetto() {
     // accetta sia :id che :slug (oltre al caso /calendario senza parametri)
@@ -28,6 +29,10 @@ export default function CalendarioProgetto() {
 
     const [utenteLoggatoId, setUtenteLoggatoId] = useState<string | null>(null);
     const [soloMieTask, setSoloMieTask] = useState(() => localStorage.getItem('calSoloMie') === '1');
+    // stato toggle "Completate" (mostra completate = true di default)
+    const [mostraCompletate, setMostraCompletate] = useState(
+        () => localStorage.getItem('calMostraCompletate') !== '0'
+    );
 
     const [isAdmin, setIsAdmin] = useState(false);
     // mappa: idTaskPadre -> aperto/chiuso
@@ -35,6 +40,8 @@ export default function CalendarioProgetto() {
 
     // tiene traccia delle task che stanno aggiornandosi (disabilita il doppio click)
     const [updating, setUpdating] = useState<Set<string>>(new Set());
+
+
 
 
 
@@ -54,6 +61,19 @@ export default function CalendarioProgetto() {
         });
         return () => { mounted = false };
     }, []);
+
+
+
+    // carica preferenza salvata (se vuoi separare come per 'Mie')
+    useEffect(() => {
+        const saved = localStorage.getItem('calMostraCompletate');
+        if (saved != null) setMostraCompletate(saved === '1');
+    }, []);
+
+    // salva quando cambia
+    useEffect(() => {
+        localStorage.setItem('calMostraCompletate', mostraCompletate ? '1' : '0');
+    }, [mostraCompletate]);
 
     // identifica projectId da slug (se serve)
     useEffect(() => {
@@ -170,7 +190,8 @@ export default function CalendarioProgetto() {
         });
     }
     const renderCard = (giorno: Date) => {
-        const tasks = filtraTask(taskList, giorno, soloMieTask, utenteLoggatoId, isAdmin);
+        const tasks = filtraTask(taskList, giorno, soloMieTask, utenteLoggatoId, isAdmin, mostraCompletate);
+
         const isExpanded = giornoSelezionato && expandedGiorno && giorno.toDateString() === expandedGiorno.toDateString();
 
 
@@ -182,7 +203,7 @@ export default function CalendarioProgetto() {
                         setExpandedGiorno(chiuso ? null : giorno);
                         setGiornoSelezionato(chiuso ? null : giorno);
                     }}
-                    className={`w-full flex items-center justify-between gap-3 px-4 py-5 sm:py-6 cursor-pointer ${tasks.length > 0 ? getColorClass(giorno, oggi, tasks) : ''}`}
+                    className={`w-full flex items-center justify-between gap-3 px-4 py-5 sm:py-6 cursor-pointer cal-strip ${tasks.length > 0 ? getColorClass(giorno, oggi, tasks) : ''}`}
                 >
                     <div className="text-base font-semibold whitespace-nowrap">
                         {format(giorno, 'EEEE dd/MM', { locale: it }).replace(/^./, c => c.toUpperCase())}
@@ -403,8 +424,9 @@ export default function CalendarioProgetto() {
             )} */}
 
             <div className="p-4 sm:p-6">
-                <div className="flex flex-row items-center justify-between flex-wrap gap-3 mb-6">
-                    <h1 className="text-2xl font-bold text-theme">📅 Calendario (settimanale)</h1>
+                <div className="flex items-center mb-6">
+                    <h1 className="text-2xl font-bold text-theme">📅 Calendario</h1>
+
                     {/*
                     {isAdmin && !projectId && (
                         // In vista globale manteniamo il toggle se sei admin
@@ -414,8 +436,14 @@ export default function CalendarioProgetto() {
                         <ToggleMie soloMieTask={soloMieTask} setSoloMieTask={setSoloMieTask} />
                     )}
                     */}
-
-                    <ToggleMie soloMieTask={soloMieTask} setSoloMieTask={setSoloMieTask} />
+                    {/* gruppo toggles a destra */}
+                    <div className="ml-auto flex items-center gap-4">
+                        <ToggleMie soloMieTask={soloMieTask} setSoloMieTask={setSoloMieTask} />
+                        <ToggleCompletate
+                            mostraCompletate={mostraCompletate}
+                            setMostraCompletate={setMostraCompletate}
+                        />
+                    </div>
                 </div>
 
                 {/* Navigazione settimana */}
@@ -478,6 +506,6 @@ export default function CalendarioProgetto() {
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }
