@@ -1,6 +1,7 @@
 // supporto/tipi.ts
 
 export type Task = {
+    utenti_task: any;
     id: string;
     nome: string;
     note?: string | null;

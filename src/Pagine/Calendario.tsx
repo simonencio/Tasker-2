@@ -78,36 +78,48 @@ export default function CalendarioProgetto() {
         });
     }, []);
 
-    // carica task (per progetto se ho projectId, altrimenti tutte)
+    // carica task (tutte da 'tasks' + left join su progetti_task -> progetti)
+    // se ho projectId, filtro per quel progetto; altrimenti includo anche le task senza progetto
     useEffect(() => {
         let alive = true;
         (async () => {
+            // Parto da 'tasks' per includere anche quelle non collegate a un progetto
             let query = supabase
-                .from('progetti_task')
-                .select(
-                    `progetti_id,
-                    progetto:progetti ( id, nome ),
-                    task:tasks (
+                .from('tasks')
+                .select(`
                     id, stato_id, parent_id, fine_task, nome, note, consegna, tempo_stimato,
                     stati (nome),
                     priorita (nome),
                     utenti_task:utenti_task (
-                    utente:utenti (id, nome, cognome)
+                    utente:utenti ( id, nome, cognome )
+                    ),
+                    link:progetti_task!left (
+                    progetti_id,
+                    progetti (
+                        id, nome
                     )
-                )
-            `);
+                    )
+                `);
 
-            if (projectId) query = query.eq('progetti_id', projectId);
+            // Se sto guardando un progetto specifico, filtro per quel progetto
+            if (projectId) {
+                query = query.eq('link.progetti_id', projectId);
+            }
 
             const { data, error } = await query;
             if (!alive) return;
+
             if (!error && data) {
+                // 'link' è un array (per sicurezza prendo il primo se presente)
                 setTaskList(
-                    data.map((r: any) => ({
-                        ...r.task,
-                        progetto_nome: r.progetto?.nome ?? null,
+                    (data as any[]).map((t: any) => ({
+                        ...t,
+                        progetto_nome: t.link?.[0]?.progetti?.nome ?? null,
                     }))
                 );
+            } else {
+                console.error('Errore caricamento tasks:', error);
+                setTaskList([]);
             }
         })();
         return () => { alive = false };
@@ -170,13 +182,13 @@ export default function CalendarioProgetto() {
                         setExpandedGiorno(chiuso ? null : giorno);
                         setGiornoSelezionato(chiuso ? null : giorno);
                     }}
-                    className={`w-full flex items-center justify-between gap-3 px-4 py-5 sm:py-6 cursor-pointer ${tasks.length > 0 ? getColorClass(giorno, oggi) : ''}`}
+                    className={`w-full flex items-center justify-between gap-3 px-4 py-5 sm:py-6 cursor-pointer ${tasks.length > 0 ? getColorClass(giorno, oggi, tasks) : ''}`}
                 >
                     <div className="text-base font-semibold whitespace-nowrap">
                         {format(giorno, 'EEEE dd/MM', { locale: it }).replace(/^./, c => c.toUpperCase())}
                     </div>
                     {tasks.length > 0 && (
-                        <div className="hidden sm:flex flex-1 text-center text-sm px-3 py-1 rounded-md items-center justify-center gap-2 bg-white/60 dark:bg-white/10 shadow-sm">
+                        <div className="hidden sm:flex flex-1 text-center text-sm px-3 py-1 rounded-md items-center justify-center gap-2 bg-white/60 dark:bg-white/10 shadow-sm status-text">
                             <FontAwesomeIcon icon={faTasks} className="icon-color w-4 h-4" />
                             <span className="truncate font-medium">{getMessaggio(giorno, oggi)}</span>
                         </div>

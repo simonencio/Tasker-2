@@ -197,7 +197,8 @@ export default function DettaglioProgetto() {
                     stato: r.task.stato,
                     priorita: r.task.priorita,
                     progetto: { id: progettoId!, nome: progetto?.nome || "", slug: progetto?.slug || slug || "" },
-                    assegnatari: r.task.utenti_task?.map((u: any) => u.utenti) ?? []
+                    assegnatari: r.task.utenti_task?.map((u: any) => u.utenti) ?? [],
+                    utenti_task: r.task.utenti_task ?? []
                 }));
                 setTaskList(tasksPulite);
             }
