@@ -123,6 +123,7 @@ export default function Home() {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDragCancel={() => setIsDragging(false)}
+        autoScroll={false}   // disattiva lo scroll oltre lo schermo
       >
         <SortableContext items={widgets.map(w => w.id)} strategy={rectSortingStrategy}>
           <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 ${isDragging ? 'transition-none' : 'transition-all'}`}>
@@ -159,13 +160,16 @@ export default function Home() {
         </button>
 
         {showPicker && (
-          <div className="absolute bottom-16 right-0 bg-white dark:bg-[#1f2937] rounded-lg p-4 w-48 shadow-lg">
-            <h2 className="text-lg font-bold mb-2">Aggiungi widget</h2>
+          <div
+            className="absolute bottom-16 right-0 dropdown-panel p-4 w-64 rounded-xl shadow-xl animate-scale-fade"
+          /* dropdown-panel gestisce già bg/colore/border per light & dark */
+          >
+            <h2 className="text-sm font-semibold mb-2 opacity-80">Aggiungi widget</h2>
             <ul className="space-y-2">
               <li>
                 <button
                   onClick={() => handleAddWidget('Progetti')}
-                  className="w-full text-left hover:bg-gray-100 dark:hover:bg-gray-800 px-2 py-1 rounded"
+                  className="dropdown-button hover-bg-theme rounded-md"
                 >
                   Progetti
                 </button>
@@ -173,7 +177,7 @@ export default function Home() {
               <li>
                 <button
                   onClick={() => handleAddWidget('Task')}
-                  className="w-full text-left hover:bg-gray-100 dark:hover:bg-gray-800 px-2 py-1 rounded"
+                  className="dropdown-button hover-bg-theme rounded-md"
                 >
                   Task
                 </button>
@@ -181,7 +185,7 @@ export default function Home() {
               <li>
                 <button
                   onClick={() => handleAddWidget('Metriche')}
-                  className="w-full text-left hover:bg-gray-100 dark:hover:bg-gray-800 px-2 py-1 rounded"
+                  className="dropdown-button hover-bg-theme rounded-md"
                 >
                   Metriche (settimanali)
                 </button>
@@ -189,21 +193,23 @@ export default function Home() {
               <li>
                 <button
                   onClick={() => handleAddWidget('Azioni')}
-                  className="w-full text-left hover:bg-gray-100 dark:hover:bg-gray-800 px-2 py-1 rounded"
+                  className="dropdown-button hover-bg-theme rounded-md"
                 >
                   Azioni rapide
                 </button>
               </li>
             </ul>
+
             <button
               onClick={() => setShowPicker(false)}
-              className="mt-3 w-full text-center text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 px-2 py-1 rounded"
+              className="mt-3 w-full dropdown-button rounded-md text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
             >
               Annulla
             </button>
           </div>
         )}
       </div>
+
     </div>
   );
 }
