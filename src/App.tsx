@@ -23,7 +23,7 @@ import { TimerOverlay } from "./Liste/config/TimerOverlay";
 
 
 
-import DettaglioProgetto from "./GestioneProgetto/DettaglioProgetto";
+import DettaglioProgetto from "./Dettagli/DettaglioProgetto";
 import CalendarioProgetto from "./Pagine/Calendario";
 // import BachecaProgetto from "./GestioneProgetto/BachecaProgetto";
 
@@ -38,7 +38,7 @@ import MiniStatoCreatorModal from "./Creazione/MiniStatoCreatorModal";
 import MiniPrioritaCreatorModal from "./Creazione/MiniPrioritaCreatorModal";
 import MiniRuoloCreatorModal from "./Creazione/MiniRuoloCreatorModal";
 
-import DettaglioTask from "./GestioneTask/DettaglioTask";
+import DettaglioTask from "./Dettagli/DettaglioTask";
 import Cestino from "./Pagine/Cestino";
 import ForgotPassword from "./Pagine/ForgotPassword";
 
@@ -52,6 +52,9 @@ import MiniProjectCreatorModal from "./Creazione/MiniProjectCreatorModal";
 import GenericEditorModal from "./Modifica/GenericEditorModal";
 import { createRoot } from "react-dom/client";
 import TimelineDinamica from "./Liste/TimelineDinamica";
+
+import DettaglioCliente from "./Dettagli/DettaglioCliente.tsx";
+
 
 type ModalType = "project" | "tasks" | "client" | "user" | "stato" | "priorita" | "ruolo";
 
@@ -300,6 +303,9 @@ function AppContent() {
                                 <Route path="/tasks/:slug" element={<DettaglioTask />} />
                                 <Route path="/tasks/id/:id" element={<RedirectTaskById />} />
                                 <Route path="/tasks/:id([0-9a-fA-F-]{36})" element={<RedirectTaskById />} />
+
+                                {/* Clienti */}
+                                <Route path="/clienti/:id" element={<DettaglioCliente />} />
 
                                 <Route path="/cestino" element={<Cestino />} />
                             </Routes>
