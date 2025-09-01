@@ -93,11 +93,13 @@ function ResourceRoute({ tipo, paramKey = "view" }: { tipo: ResourceKey; paramKe
         return getPreferredView(tipo, "list");
     })();
 
+
     if (view === "cards") return <CardDinamiche tipo={tipo} paramKey={paramKey} />;
-    if (view === "timeline") return <TimelineDinamica tipo={tipo} />;
+    if (view === "timeline") return <TimelineDinamica tipo={tipo} paramKey={paramKey} />;
 
     return <ListaDinamica tipo={tipo} paramKey={paramKey} />;
 }
+
 
 function AppContent() {
     const [loggedIn, setLoggedIn] = useState(false);

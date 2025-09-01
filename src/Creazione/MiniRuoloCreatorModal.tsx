@@ -3,6 +3,7 @@ import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUserShield, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
+import { resourceConfigs } from "../Liste/config";
 
 type Props = { onClose: () => void; offsetIndex?: number };
 
@@ -48,7 +49,22 @@ export default function MiniRuoloCreatorModal({ onClose, offsetIndex = 0 }: Prop
         }
 
         // 👇 notifica tutte le viste (lista, card, timeline) senza refresh
-        dispatchResourceEvent("add", "ruoli", { item: data });
+        try {
+            const rc: any = (resourceConfigs as any)["ruoli"];
+            const userResp = await supabase.auth.getUser();
+            const utenteId = userResp?.data?.user?.id ?? null;
+
+            let nuovo: any = data;
+            if (rc?.fetch) {
+                const all = await rc.fetch({ filtro: {}, utenteId });
+                nuovo = (all || []).find((x: any) => String(x.id) === String(data.id)) ?? data;
+            }
+
+            dispatchResourceEvent("add", "ruoli", { item: nuovo });
+        } catch {
+            dispatchResourceEvent("add", "ruoli", { item: data });
+        }
+
 
         setSuccess(true);
         reset();

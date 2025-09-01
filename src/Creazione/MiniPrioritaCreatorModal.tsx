@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFlag, faPalette, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { traduciColore } from "../supporto/traduzioniColori";
 import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
+import { resourceConfigs } from "../Liste/config";
 
 type Props = { onClose: () => void; offsetIndex?: number };
 
@@ -58,7 +59,22 @@ export default function MiniPrioritaCreatorModal({ onClose, offsetIndex = 0 }: P
         }
 
         // 👇 aggiorna subito tutte le viste senza refresh
-        + dispatchResourceEvent("add", "priorita", { item: data });
+        try {
+            const rc: any = (resourceConfigs as any)["priorita"];
+            const userResp = await supabase.auth.getUser();
+            const utenteId = userResp?.data?.user?.id ?? null;
+
+            let nuovo: any = data;
+            if (rc?.fetch) {
+                const all = await rc.fetch({ filtro: {}, utenteId });
+                nuovo = (all || []).find((x: any) => String(x.id) === String(data.id)) ?? data;
+            }
+
+            dispatchResourceEvent("add", "priorita", { item: nuovo });
+        } catch {
+            dispatchResourceEvent("add", "priorita", { item: data });
+        }
+
 
         setSuccess(true);
         reset();

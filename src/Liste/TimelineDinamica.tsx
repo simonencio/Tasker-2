@@ -2,6 +2,8 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPen, faUndo, faTrash } from "@fortawesome/free-solid-svg-icons";
 
 import { resourceConfigs, type ResourceKey } from "./resourceConfigs";
 import type { ResourceRenderCtx, ResourceConfig } from "./typesLista";
@@ -26,15 +28,17 @@ export default function TimelineDinamica<T extends { id: string | number }>({
     const cfg = cfgAny as ResourceConfig<T>;
 
     const {
-        utenteId,
-        items,
-        loading,
-        filtro,
-        setFiltro,
-        patchItem,
-        removeItem,
-        addItem,
+        utenteId, items, loading, filtro, setFiltro, patchItem, removeItem, addItem,
     } = useResourceData(cfg, { modalitaCestino });
+
+    // 🔎 Applica i filtri completamento
+    const filteredItems = items.filter((item: any) => {
+        if (filtro.soloCompletate) return !!item.fine_task;
+        if (filtro.soloNonCompletate) return !item.fine_task;
+        if (filtro.soloCompletati) return !!item.fine_progetto;
+        if (filtro.soloNonCompletati) return !item.fine_progetto;
+        return true;
+    });
 
     const ctx: ResourceRenderCtx<T> = {
         filtro,
@@ -49,7 +53,7 @@ export default function TimelineDinamica<T extends { id: string | number }>({
 
     const criterio = filtro.ordine ?? null;
 
-    const sorted = ordinaClientSide(items, criterio, (item: any, criterio: string) => {
+    const sorted = ordinaClientSide(filteredItems, criterio, (item: any, criterio: string) => {
         switch (criterio) {
             case "consegna_asc":
             case "consegna_desc":
@@ -72,6 +76,18 @@ export default function TimelineDinamica<T extends { id: string | number }>({
         }
     });
 
+    const handleRestore = async (id: string | number) => {
+        if (!cfg.cestino?.actions?.restore) return;
+        await cfg.cestino.actions.restore(id);
+        removeItem(id);
+    };
+
+    const handleHardDelete = async (id: string | number) => {
+        if (!cfg.cestino?.actions?.hardDelete) return;
+        if (!window.confirm("Eliminazione definitiva. Continuare?")) return;
+        await cfg.cestino.actions.hardDelete(id);
+        removeItem(id);
+    };
 
     return (
         <div className="px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto">
@@ -109,16 +125,10 @@ export default function TimelineDinamica<T extends { id: string | number }>({
                                 </span>
 
                                 {/* Card elemento */}
-                                <div
-                                    className="bg-theme border border-gray-200 dark:border-gray-600 p-4 rounded-xl shadow-sm hover:shadow-md transition cursor-pointer"
-                                    onClick={() =>
-                                        navigate(`/${tipo}/${(item as any).slug ?? item.id}`)
-                                    }
-                                >
+                                <div className="bg-theme border border-gray-200 dark:border-gray-600 p-4 rounded-xl shadow-sm hover:shadow-md transition">
                                     <div className="flex items-center justify-between">
                                         <p className="text-sm font-semibold">
-                                            {cfg.colonne[0]?.render?.(item, ctx) ??
-                                                (item as any).nome}
+                                            {cfg.colonne[0]?.render?.(item, ctx) ?? (item as any).nome}
                                         </p>
                                         <span className="text-xs text-gray-500 dark:text-gray-400">
                                             📅 {date}
@@ -130,6 +140,46 @@ export default function TimelineDinamica<T extends { id: string | number }>({
                                             {cfg.renderDettaglio(item, ctx)}
                                         </div>
                                     )}
+
+                                    {/* Azioni */}
+                                    <div
+                                        className={`mt-3 flex items-center ${modalitaCestino ? "justify-between" : "justify-end gap-3"
+                                            }`}
+                                    >
+                                        {modalitaCestino && cfg.cestino ? (
+                                            <>
+                                                <button
+                                                    onClick={() => handleRestore(item.id)}
+                                                    className="icon-color hover:text-green-600"
+                                                    title="Ripristina"
+                                                >
+                                                    <FontAwesomeIcon icon={faUndo} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleHardDelete(item.id)}
+                                                    className="icon-color hover:text-red-600"
+                                                    title="Elimina definitivamente"
+                                                >
+                                                    <FontAwesomeIcon icon={faTrash} />
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <>
+                                                {cfg.azioni?.(item, ctx)}
+                                                {cfg.renderModaleModifica && (
+                                                    <button
+                                                        onClick={() =>
+                                                            cfg.renderModaleModifica?.(String(item.id), () => { })
+                                                        }
+                                                        className="icon-color hover:text-blue-600"
+                                                        title="Modifica"
+                                                    >
+                                                        <FontAwesomeIcon icon={faPen} />
+                                                    </button>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             </motion.div>
                         );

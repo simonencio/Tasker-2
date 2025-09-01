@@ -119,9 +119,11 @@ export async function fetchUtenti() {
 }
 
 // 🔹 Tasks (con filtri opzionali)
+// 🔹 Tasks (con filtri opzionali)
 export async function fetchTasks(filtro: any = {}, utenteId?: string) {
     let taskIds: string[] = [];
 
+    // --- filtro su assegnatario
     if ((filtro.utente || filtro.soloMie) && utenteId) {
         const idFiltro = filtro.utente || utenteId;
         const { data } = await supabase.from("utenti_task").select("task_id").eq("utente_id", idFiltro);
@@ -129,6 +131,7 @@ export async function fetchTasks(filtro: any = {}, utenteId?: string) {
         if (taskIds.length === 0) return [];
     }
 
+    // --- filtro su progetto
     if (filtro.progetto) {
         const { data } = await supabase
             .from("progetti_task")
@@ -139,14 +142,15 @@ export async function fetchTasks(filtro: any = {}, utenteId?: string) {
         if (taskIds.length === 0) return [];
     }
 
+    // --- query principale con join
     const query = supabase
         .from("tasks")
         .select(`
       id, slug, nome, note, consegna, tempo_stimato, created_at, modified_at, fine_task, parent_id,
-      stato:stato_id (id, nome, colore),
-      priorita:priorita_id (id, nome),
-      progetti_task:progetti_task ( progetti ( id, nome ) ),
-      utenti_task ( utenti ( id, nome, cognome ) )
+      stato:stato_id ( id, nome, colore ),
+      priorita:priorita_id ( id, nome, colore ),
+      progetti_task ( progetti:progetti_id ( id, nome, slug ) ),
+      utenti_task ( utenti:utente_id ( id, nome, cognome, avatar_url ) )
     `)
         .is("deleted_at", null);
 
@@ -169,13 +173,16 @@ export async function fetchTasks(filtro: any = {}, utenteId?: string) {
         modified_at: item.modified_at,
         fine_task: item.fine_task,
         parent_id: item.parent_id,
-        stato: item.stato,
-        priorita: item.priorita,
-        progetto: item.progetti_task?.[0]?.progetti ?? null,
-        assegnatari: item.utenti_task?.map((u: any) => u.utenti) ?? [],
+        stato: Array.isArray(item.stato) ? item.stato[0] : item.stato,
+        priorita: Array.isArray(item.priorita) ? item.priorita[0] : item.priorita,
+        progetto: Array.isArray(item.progetti_task?.[0]?.progetti)
+            ? item.progetti_task[0].progetti[0]
+            : item.progetti_task?.[0]?.progetti ?? null,
+        assegnatari: (item.utenti_task || []).map((u: any) => Array.isArray(u.utenti) ? u.utenti[0] : u.utenti) ?? [],
         slug: item.slug,
     }));
 }
+
 
 // 🔹 Progetti
 export async function fetchProgetti(filtro: any = {}, utenteId?: string) {

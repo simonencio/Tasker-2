@@ -6,6 +6,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { supabase } from "../supporto/supabaseClient";
 import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
+import { resourceConfigs } from "../Liste/config";
 
 type Props = { onClose: () => void; offsetIndex?: number };
 type PopupField = "cognome" | "ruolo" | "avatar";
@@ -98,8 +99,23 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
 
             // 3) Aggiorna subito tutte le viste utenti
             if (nuovoUtente) {
-                dispatchResourceEvent("add", "utenti", { item: nuovoUtente });
+                try {
+                    const rc: any = (resourceConfigs as any)["utenti"];
+                    const userResp = await supabase.auth.getUser();
+                    const utenteId = userResp?.data?.user?.id ?? null;
+
+                    let nuovo: any = nuovoUtente;
+                    if (rc?.fetch) {
+                        const all = await rc.fetch({ filtro: {}, utenteId });
+                        nuovo = (all || []).find((x: any) => String(x.id) === String(nuovoUtente.id)) ?? nuovoUtente;
+                    }
+
+                    dispatchResourceEvent("add", "utenti", { item: nuovo });
+                } catch {
+                    dispatchResourceEvent("add", "utenti", { item: nuovoUtente });
+                }
             }
+
 
             setSuccess(true);
             reset();

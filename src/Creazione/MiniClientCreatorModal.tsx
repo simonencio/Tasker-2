@@ -8,6 +8,7 @@ import {
     faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
+import { resourceConfigs } from "../Liste/config";
 
 type Props = { onClose: () => void; offsetIndex?: number };
 type PopupField = "email" | "telefono" | "avatar";
@@ -74,7 +75,22 @@ export default function MiniClientCreatorModal({ onClose, offsetIndex = 0 }: Pro
         }
 
         // 👇 qui notifichiamo tutte le viste (Lista, Card, Timeline) senza refresh
-        dispatchResourceEvent("add", "clienti", { item: data });
+        try {
+            const rc: any = (resourceConfigs as any)["clienti"];
+            const userResp = await supabase.auth.getUser();
+            const utenteId = userResp?.data?.user?.id ?? null;
+
+            let nuovo: any = data;
+            if (rc?.fetch) {
+                const all = await rc.fetch({ filtro: {}, utenteId });
+                nuovo = (all || []).find((x: any) => String(x.id) === String(data.id)) ?? data;
+            }
+
+            dispatchResourceEvent("add", "clienti", { item: nuovo });
+        } catch {
+            dispatchResourceEvent("add", "clienti", { item: data });
+        }
+
 
 
         setSuccess(true);

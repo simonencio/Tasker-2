@@ -30,7 +30,23 @@ export default function ListaDinamica<T extends { id: string | number }>({
         { modalitaCestino }
     );
 
-    // 👇 extra dallo setup
+    const filteredItems = items.filter((item: any) => {
+        if (filtro.soloCompletate) {
+            return !!item.fine_task;
+        }
+        if (filtro.soloNonCompletate) {
+            return !item.fine_task;
+        }
+        if (filtro.soloCompletati) {
+            return !!item.fine_progetto;
+        }
+        if (filtro.soloNonCompletati) {
+            return !item.fine_progetto;
+        }
+        return true;
+    });
+
+    // setup extra opzionale
     const [extra, setExtra] = useState<any>(null);
     const disposeRef = useRef<null | (() => void)>(null);
 
@@ -57,7 +73,7 @@ export default function ListaDinamica<T extends { id: string | number }>({
         patchItem,
         removeItem,
         addItem: () => { },
-        extra, // 👈 adesso c’è
+        extra,
     };
 
     const headerTitle =
@@ -68,6 +84,7 @@ export default function ListaDinamica<T extends { id: string | number }>({
     const handleRestore = async (id: string | number) => {
         if (!config.cestino?.actions?.restore) return;
         await config.cestino.actions.restore(id);
+        // qui possiamo rimuovere solo la riga restaurata
         removeItem(id);
     };
 
@@ -75,7 +92,11 @@ export default function ListaDinamica<T extends { id: string | number }>({
         if (!config.cestino?.actions?.hardDelete) return;
         if (!window.confirm("Eliminazione definitiva. Continuare?")) return;
         await config.cestino.actions.hardDelete(id);
-        removeItem(id);
+        // ❌ non chiamiamo più removeItem qui,
+        // ✅ lasciamo che dispatchResourceEvent da hardDeleteRecursive aggiorni tutta la lista
+        if (!modalitaCestino) {
+            removeItem(id);
+        }
     };
 
     const [expandedId, setExpandedId] = useState<string | number | null>(null);
@@ -100,7 +121,7 @@ export default function ListaDinamica<T extends { id: string | number }>({
                 <div className="rounded-xl overflow-hidden shadow-md card-theme max-w-7xl mx-auto">
                     {/* intestazione tabella */}
                     <div className="hidden lg:flex px-4 py-2 text-xs font-semibold text-theme border-b border-gray-300 dark:border-gray-600">
-                        {config.colonne.map(col => (
+                        {config.colonne.map((col) => (
                             <div key={String(col.chiave)} className={col.className ?? "flex-1"}>
                                 {col.label}
                             </div>
@@ -109,7 +130,7 @@ export default function ListaDinamica<T extends { id: string | number }>({
                     </div>
 
                     {/* righe */}
-                    {items.map(item => {
+                    {filteredItems.map((item) => {
                         const isExpanded = expandedId === item.id;
                         return (
                             <div
@@ -121,7 +142,7 @@ export default function ListaDinamica<T extends { id: string | number }>({
                                     className="flex items-center px-4 py-3 text-sm text-theme cursor-pointer hover-bg-theme"
                                     onClick={() => setExpandedId(isExpanded ? null : item.id)}
                                 >
-                                    {config.colonne.map(col => (
+                                    {config.colonne.map((col) => (
                                         <div key={String(col.chiave)} className={col.className ?? "flex-1"}>
                                             {col.render ? col.render(item, ctx) : (item as any)[col.chiave as keyof T]}
                                         </div>

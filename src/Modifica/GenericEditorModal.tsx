@@ -6,6 +6,7 @@ import { faXmark, faUpload } from "@fortawesome/free-solid-svg-icons";
 import { editorConfigs, type CampoSelect, type CampoJoinMany } from "./editorConfigs";
 import { traduciColore, traduciColoreInverso } from "../supporto/traduzioniColori";
 import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
+import { resourceConfigs } from "../Liste/resourceConfigs"; // 👈 usare la stessa fetch della lista
 
 type Props = { table: keyof typeof editorConfigs; id: string; onClose: () => void };
 
@@ -53,6 +54,7 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
             const { data: record } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
 
             if (record) {
+                // mappa speciale tasks → progetto_id dalla pivot se presente
                 if (table === "tasks") {
                     const { data: link } = await supabase
                         .from("progetti_task")
@@ -85,7 +87,10 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
 
                 if (campo.tipo === "join-many") {
                     const c = campo as CampoJoinMany;
-                    const { data } = await supabase.from(c.join.tabellaJoin).select(c.join.otherKey).eq(c.join.thisKey, id);
+                    const { data } = await supabase
+                        .from(c.join.tabellaJoin)
+                        .select(c.join.otherKey)
+                        .eq(c.join.thisKey, id);
                     const values = (data || []).map((r: any) => r[c.join.otherKey]);
                     joins[campo.chiave] = values;
                     joinsOrig[campo.chiave] = values;
@@ -108,7 +113,7 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
             setLoading(false);
         };
         load();
-    }, [id, table]);
+    }, [id, table, config.campi]);
 
     const updateForm = (chiave: string, valore: any) => setForm((f) => ({ ...f, [chiave]: valore }));
 
@@ -120,12 +125,42 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
         });
     };
 
+    // 🔁 Refetch coerente con la lista (usa resourceConfigs.fetch, poi trova l'item per id)
+    const refetchRecordConFetchDellaLista = async (): Promise<any | null> => {
+        try {
+            const rc: any = (resourceConfigs as any)[table as string];
+            const utenteResp = await supabase.auth.getUser();
+            const utenteId = utenteResp?.data?.user?.id ?? null;
+
+            if (rc?.fetch) {
+                const all = await rc.fetch({ filtro: {}, utenteId });
+                const trovato = (all || []).find((x: any) => String(x.id) === String(id)) ?? null;
+                if (trovato) return trovato;
+            }
+        } catch {
+            // fallback sotto
+        }
+
+        // Fallback minimale (senza join): manteniamo la vecchia logica base
+        const { data: base } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
+        if (base && table === "tasks") {
+            const { data: link } = await supabase
+                .from("progetti_task")
+                .select("progetti_id")
+                .eq("task_id", id)
+                .maybeSingle();
+            if (link) base.progetto_id = link.progetti_id;
+        }
+        return base ?? null;
+    };
+
     const salva = async () => {
         setSaving(true);
         setSuccess(null);
         setError(null);
 
         try {
+            // 1) update tabella principale
             let payload = { ...form };
             delete payload.id;
             if (table === "tasks") delete payload.progetto_id;
@@ -133,9 +168,34 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
             const { error: errUpdate } = await supabase.from(table).update(payload).eq("id", id);
             if (errUpdate) throw errUpdate;
 
-            // aggiorna campi semplici subito
-            dispatchResourceEvent("update", table, { id, patch: payload });
+            // Aggiorna subito i campi semplici (merge) per reattività immediata
+            dispatchResourceEvent("update", table as string, { id, patch: payload });
 
+            // 2) sync join-many
+            for (const campo of config.campi) {
+                if (campo.tipo === "join-many") {
+                    const c = campo as CampoJoinMany;
+                    const prev = joinOriginals[campo.chiave] || [];
+                    const next = joinSelections[campo.chiave] || [];
+                    const daAggiungere = next.filter((x) => !prev.includes(x));
+                    const daRimuovere = prev.filter((x) => !next.includes(x));
+
+                    if (daRimuovere.length > 0) {
+                        await supabase
+                            .from(c.join.tabellaJoin)
+                            .delete()
+                            .eq(c.join.thisKey, id)
+                            .in(c.join.otherKey, daRimuovere);
+                    }
+                    if (daAggiungere.length > 0) {
+                        await supabase
+                            .from(c.join.tabellaJoin)
+                            .insert(daAggiungere.map((v) => ({ [c.join.thisKey]: id, [c.join.otherKey]: v })));
+                    }
+                }
+            }
+
+            // 3) caso speciale tasks: pivot progetto
             if (table === "tasks") {
                 const newProjId = form.progetto_id;
                 const { data: oldLink } = await supabase
@@ -152,42 +212,23 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
                 }
             }
 
-            for (const campo of config.campi) {
-                if (campo.tipo === "join-many") {
-                    const c = campo as CampoJoinMany;
-                    const prev = joinOriginals[campo.chiave] || [];
-                    const next = joinSelections[campo.chiave] || [];
-                    const daAggiungere = next.filter((x) => !prev.includes(x));
-                    const daRimuovere = prev.filter((x) => !next.includes(x));
-
-                    if (daRimuovere.length > 0) {
-                        await supabase.from(c.join.tabellaJoin).delete().eq(c.join.thisKey, id).in(c.join.otherKey, daRimuovere);
-                    }
-                    if (daAggiungere.length > 0) {
-                        await supabase.from(c.join.tabellaJoin).insert(
-                            daAggiungere.map((v) => ({ [c.join.thisKey]: id, [c.join.otherKey]: v }))
-                        );
-                    }
-                }
-            }
-
+            // 4) hook custom post-save
             if (config.hooks?.afterSave) {
                 await config.hooks.afterSave({ form, originale, joinOriginals, joinSelections, supabase, id });
             }
 
-            // 🔥 Refetch completo per aggiornare anche i dettagli
-            const { data: nuovo } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
+            // 5) 🔥 Refetch completo con la stessa fetch della lista (join & calcolati allineati)
+            const nuovo = await refetchRecordConFetchDellaLista();
             if (nuovo) {
-                // rimpiazza l'oggetto intero
-                dispatchResourceEvent("remove", table, { id });
-                dispatchResourceEvent("add", table, { item: nuovo });
+                dispatchResourceEvent("replace", table as string, { item: nuovo });
             }
+
 
             setSuccess("Salvato con successo ✅");
             setOriginale(form);
             setJoinOriginals(joinSelections);
         } catch (err: any) {
-            setError(err.message || "Errore durante il salvataggio");
+            setError(err?.message || "Errore durante il salvataggio");
         } finally {
             setSaving(false);
         }
@@ -331,9 +372,7 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
                                             return (
                                                 <label
                                                     key={valOpt}
-                                                    className={`px-2 py-1 rounded cursor-pointer border text-sm ${checked
-                                                        ? "selected-panel font-semibold"
-                                                        : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
+                                                    className={`px-2 py-1 rounded cursor-pointer border text-sm ${checked ? "selected-panel font-semibold" : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
                                                         }`}
                                                 >
                                                     <input
@@ -364,18 +403,9 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
             >
                 {saving ? (
                     <>
-                        <svg
-                            className="animate-spin h-5 w-5 text-white"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                        >
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                            ></path>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                         </svg>
                         Salvataggio...
                     </>

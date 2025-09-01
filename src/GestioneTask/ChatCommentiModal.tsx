@@ -1,14 +1,21 @@
 // src/components/ChatCommentiModal.tsx
 
-import { sameDay, useAutosize, useAutoScroll, formatDay, urlForAvatar, getInitials, PREVIEW_LEN, tronca, fullName, } from "./useChatCommenti";
+import {
+    sameDay,
+    useAutosize,
+    useAutoScroll,
+    formatDay,
+    urlForAvatar,
+    getInitials,
+    PREVIEW_LEN,
+    tronca,
+    fullName,
+} from "./useChatCommenti";
 
 import { useChatCommenti } from "./useChatCommenti";
 import type { Commento, Props, Utente } from "./tipi";
-// src/components/ChatCommentiModal.tsx
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTimes, faPaperPlane, faXmark, faReply, faFolderOpen } from "@fortawesome/free-solid-svg-icons";
-
-
+import { faTimes, faPaperPlane, faXmark, faReply } from "@fortawesome/free-solid-svg-icons";
 
 /* ---------------------------------------------------------------------------------------
    Modale Chat Commenti – UI “slim” con logica delegata all’hook
@@ -260,17 +267,8 @@ export default function ChatCommentiModal({
                                 />
                             </div>
 
-                            {/* Invia */}
-                            {/* Invia + Folder */}
-                            <div className="flex items-center shrink-0 gap-2">
-                                <button
-                                    className="p-0 m-0 bg-transparent border-0 inline-flex items-center justify-center"
-                                    aria-label="Apri cartella"
-                                    type="button"
-                                >
-                                    <FontAwesomeIcon icon={faFolderOpen} className="text-base sm:text-lg cursor-pointer hover:opacity-80" />
-                                </button>
-
+                            {/* Solo Invia */}
+                            <div className="flex items-center shrink-0">
                                 <button
                                     onClick={handleInvia}
                                     className={cx("p-0 m-0 bg-transparent border-0 inline-flex items-center justify-center", !canSend && "opacity-50 cursor-not-allowed")}
@@ -280,7 +278,6 @@ export default function ChatCommentiModal({
                                     <FontAwesomeIcon icon={faPaperPlane} className="text-base sm:text-lg cursor-pointer hover:opacity-80" />
                                 </button>
                             </div>
-
                         </div>
                     </div>
                 </div>
@@ -289,18 +286,10 @@ export default function ChatCommentiModal({
     );
 }
 
-
 //------------------------------------------------------------------//
 //---------------------parti della modale---------------------------//
 //------------------------------------------------------------------//
-/**
- * Auto-resize della textarea con limite massimo (px).
- * Se il testo è vuoto, la riporta all’altezza minima.
- */
 
-/**
- * Divisore giorno con tipografia e spaziature responsive.
- */
 export function DayDivider({ iso }: { iso: string }) {
     return (
         <div className="my-2.5 sm:my-3 md:my-4 flex items-center gap-2 sm:gap-3 md:gap-4">
@@ -313,9 +302,6 @@ export function DayDivider({ iso }: { iso: string }) {
     );
 }
 
-/**
- * Avatar con fallback iniziali. Dimensioni responsive di default.
- */
 export function Avatar({
     u,
     className = "h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-9",
@@ -345,9 +331,6 @@ export function Avatar({
     );
 }
 
-/**
- * Anteprima risposta (quote) con controlli responsive.
- */
 export function ReplyPreview({
     parent,
     expanded,
@@ -368,8 +351,7 @@ export function ReplyPreview({
             </div>
 
             <div
-                className={`whitespace-pre-line text-[12px] sm:text-[13px] md:text-sm text-quote leading-relaxed break-words break-all ${expanded ? "max-h-20 overflow-y-auto hide-scrollbar" : ""
-                    }`}
+                className={`whitespace-pre-line text-[12px] sm:text-[13px] md:text-sm text-quote leading-relaxed break-words break-all ${expanded ? "max-h-20 overflow-y-auto hide-scrollbar" : ""}`}
             >
                 {expanded ? full : tronca(full)}
                 {showToggle && (
@@ -386,17 +368,13 @@ export function ReplyPreview({
     );
 }
 
-/**
- * Menu menzioni: posizionamento/dimensioni responsive, scroll e width adattiva.
- * Aggiunta prop opzionale onActiveIndexChange per sincronizzare l’indice attivo (hover).
- */
 export function MentionMenu({
     visible,
     suggestions,
     activeIndex,
     alreadyHas,
     onPick,
-    onActiveIndexChange, // <-- nuova prop opzionale
+    onActiveIndexChange,
 }: {
     visible: boolean;
     suggestions: Utente[];
@@ -418,11 +396,10 @@ export function MentionMenu({
                     <button
                         type="button"
                         key={u.id}
-                        onMouseDown={(e) => e.preventDefault()} // evita blur della textarea
-                        onMouseEnter={() => onActiveIndexChange?.(idx)} // <-- aggiorna indice attivo
+                        onMouseDown={(e) => e.preventDefault()}
+                        onMouseEnter={() => onActiveIndexChange?.(idx)}
                         onClick={() => !already && onPick(u)}
-                        className={`w-full text-left px-3 py-2 text-[12px] sm:text-[13px] md:text-sm flex items-center gap-2 ${active ? "selected-panel" : "hover-bg-theme"
-                            }`}
+                        className={`w-full text-left px-3 py-2 text-[12px] sm:text-[13px] md:text-sm flex items-center gap-2 ${active ? "selected-panel" : "hover-bg-theme"}`}
                         title={`Menziona @${fullName(u)}`}
                         disabled={already}
                     >
@@ -457,10 +434,6 @@ export function MentionMenu({
     );
 }
 
-/**
- * Metadati messaggio: orario, ticks simulati e tasto Rispondi.
- * Tipografia/allineamenti responsive. Colori adattivi.
- */
 export function MessageMeta({
     created_at,
     isMine,
@@ -491,8 +464,7 @@ export function MessageMeta({
             ].join(" ")}
         >
             <button
-                className={`ml-1 text-[11px] sm:text-[12px] md:text-[13px] ${isMine ? replyTint.mine : replyTint.other
-                    } hover:underline inline-flex items-center gap-1`}
+                className={`ml-1 text-[11px] sm:text-[12px] md:text-[13px] ${isMine ? replyTint.mine : replyTint.other} hover:underline inline-flex items-center gap-1`}
                 onClick={onReply}
                 title="Rispondi"
             >
@@ -506,8 +478,7 @@ export function MessageMeta({
 
             {isMine ? (
                 <span
-                    className={`select-none tabular-nums ${justSent ? "opacity-70" : "opacity-100"
-                        } ${justSent ? "" : "font-semibold"}`}
+                    className={`select-none tabular-nums ${justSent ? "opacity-70" : "opacity-100"} ${justSent ? "" : "font-semibold"}`}
                     title={justSent ? "Inviato" : "Consegnato (simulato)"}
                 >
                     {ticks}

@@ -125,8 +125,34 @@ export const notificheTemplates: Record<string, Template> = {
         buildMsg: ({ progettoNome, count }) =>
             `${count ?? 0} time entries collegate al progetto "${progettoNome ?? ""}" sono state eliminate definitivamente`,
     },
-};
 
+    // --- HARD DELETE ALL (Svuota cestino) ---
+    HARD_DELETE_ALL_TASKS: {
+        buildMsg: () => `Tutte le task presenti nel cestino sono state eliminate definitivamente`,
+    },
+    HARD_DELETE_ALL_PROGETTI: {
+        buildMsg: () => `Tutti i progetti presenti nel cestino sono stati eliminati definitivamente`,
+    },
+    HARD_DELETE_ALL_UTENTI: {
+        buildMsg: () => `Tutti gli utenti presenti nel cestino sono stati eliminati definitivamente`,
+    },
+    HARD_DELETE_ALL_CLIENTI: {
+        buildMsg: () => `Tutti i clienti presenti nel cestino sono stati eliminati definitivamente`,
+    },
+    HARD_DELETE_ALL_STATI: {
+        buildMsg: () => `Tutti gli stati presenti nel cestino sono stati eliminati definitivamente`,
+    },
+    HARD_DELETE_ALL_PRIORITA: {
+        buildMsg: () => `Tutte le priorità presenti nel cestino sono state eliminate definitivamente`,
+    },
+    HARD_DELETE_ALL_RUOLI: {
+        buildMsg: () => `Tutti i ruoli presenti nel cestino sono stati eliminati definitivamente`,
+    },
+    HARD_DELETE_ALL_TIME_ENTRIES: {
+        buildMsg: () =>
+            `Tutte le time entries presenti nel cestino sono state eliminate definitivamente`,
+    },
+};
 
 /**
  * Funzione unica per inviare notifiche con template centralizzati

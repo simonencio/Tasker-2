@@ -1,4 +1,3 @@
-// src/Liste/IntestazioneLista.tsx
 import { useEffect, useMemo, useState, type ReactNode, type JSX } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -19,7 +18,7 @@ function mapIdNome(arr: any[], fullName = false) {
     }));
 }
 
-/** Switcher Vista — usa il paramKey specifico (default "view") */
+/** Switcher Vista */
 function VistaSwitcher({ tipo, paramKey = "view" }: { tipo: ResourceKey; paramKey?: string }) {
     const [searchParams, setSearchParams] = useSearchParams();
     const location = useLocation();
@@ -42,9 +41,19 @@ function VistaSwitcher({ tipo, paramKey = "view" }: { tipo: ResourceKey; paramKe
     const go = (v: Vista) => {
         setPreferredView(tipo, v);
         setVista(v);
+
         const sp = new URLSearchParams(location.search);
-        if (v === "list") sp.delete(paramKey);
-        else sp.set(paramKey, v);
+
+        if (paramKey !== "view") {
+            for (const key of Array.from(sp.keys())) {
+                if (key.startsWith("view_")) sp.delete(key);
+            }
+            if (v !== "list") sp.set(paramKey, v);
+        } else {
+            if (v === "list") sp.delete(paramKey);
+            else sp.set(paramKey, v);
+        }
+
         setSearchParams(sp, { replace: true });
     };
 
@@ -90,20 +99,34 @@ export default function IntestazioneLista({
     coloreIcona?: string;
     azioniExtra?: ReactNode;
     tipo: ResourceKey;
-    /** 👇 chiave querystring da usare per questa lista (indipendente per /altre-liste) */
     paramKey?: string;
     modalitaCestino?: boolean;
     dati?: any[];
     valore?: FiltroIntestazione;
     onChange?: (filtro: FiltroIntestazione) => void;
 }) {
-    // Toggles
-    const [soloMieTasks, setSoloMieTasks] = useState<boolean>(valore?.soloMieTasks ?? false);
-    const [soloMieProgetti, setSoloMieProgetti] = useState<boolean>(valore?.soloMieProgetti ?? false);
-    const [soloCompletate, setSoloCompletate] = useState<boolean>(valore?.soloCompletate ?? false);
-    const [soloCompletati, setSoloCompletati] = useState<boolean>(valore?.soloCompletati ?? false);
+    const PREF_KEY = `filtro_${tipo}`;
 
-    const [filtroAvanzato, setFiltroAvanzato] = useState<FiltroAvanzatoGenerico>(valore ?? {});
+    // Carico eventuale stato persistito
+    const loadPersisted = (): FiltroIntestazione => {
+        try {
+            const raw = localStorage.getItem(PREF_KEY);
+            return raw ? JSON.parse(raw) : {};
+        } catch {
+            return {};
+        }
+    };
+    const initial = { ...loadPersisted(), ...valore };
+
+    // Toggles
+    const [soloMieTasks, setSoloMieTasks] = useState<boolean>(initial?.soloMieTasks ?? false);
+    const [soloMieProgetti, setSoloMieProgetti] = useState<boolean>(initial?.soloMieProgetti ?? false);
+    const [soloCompletate, setSoloCompletate] = useState<boolean>(initial?.soloCompletate ?? false);
+    const [soloCompletati, setSoloCompletati] = useState<boolean>(initial?.soloCompletati ?? false);
+    const [soloNonCompletate, setSoloNonCompletate] = useState<boolean>(initial?.soloNonCompletate ?? false);
+    const [soloNonCompletati, setSoloNonCompletati] = useState<boolean>(initial?.soloNonCompletati ?? false);
+
+    const [filtroAvanzato, setFiltroAvanzato] = useState<FiltroAvanzatoGenerico>(initial ?? {});
     const [opzioniGlobali, setOpzioniGlobali] = useState<OpzioniGlobali>({});
     const [loadingGlobali, setLoadingGlobali] = useState(false);
 
@@ -120,7 +143,9 @@ export default function IntestazioneLista({
                 },
                 mostraToggleMie: true,
                 mostraToggleCompletate: true,
+                mostraToggleNonCompletate: true,
                 mostraToggleCompletati: false,
+                mostraToggleNonCompletati: false,
             };
         }
         if (tipo === "progetti") {
@@ -139,7 +164,9 @@ export default function IntestazioneLista({
                 },
                 mostraToggleMie: true,
                 mostraToggleCompletate: false,
+                mostraToggleNonCompletate: false,
                 mostraToggleCompletati: true,
+                mostraToggleNonCompletati: true,
             };
         }
         return {
@@ -147,10 +174,13 @@ export default function IntestazioneLista({
             estrattori: {} as Record<string, any>,
             mostraToggleMie: false,
             mostraToggleCompletate: false,
+            mostraToggleNonCompletate: false,
             mostraToggleCompletati: false,
+            mostraToggleNonCompletati: false,
         };
     }, [tipo]);
 
+    // carico opzioni globali
     useEffect(() => {
         if (modalitaCestino) return;
         const need = tipo === "tasks" || tipo === "progetti";
@@ -189,6 +219,7 @@ export default function IntestazioneLista({
         })();
     }, [tipo, modalitaCestino]);
 
+    // aggiorno filtro esterno + salvo su localStorage
     useEffect(() => {
         if (modalitaCestino) {
             onChange?.({});
@@ -199,11 +230,26 @@ export default function IntestazioneLista({
             soloMieTasks: tipo === "tasks" ? soloMieTasks : undefined,
             soloMieProgetti: tipo === "progetti" ? soloMieProgetti : undefined,
             soloCompletate: tipo === "tasks" ? soloCompletate : undefined,
+            soloNonCompletate: tipo === "tasks" ? soloNonCompletate : undefined,
             soloCompletati: tipo === "progetti" ? soloCompletati : undefined,
+            soloNonCompletati: tipo === "progetti" ? soloNonCompletati : undefined,
         };
         onChange?.(out);
+        try {
+            localStorage.setItem(PREF_KEY, JSON.stringify(out));
+        } catch { }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [soloMieTasks, soloMieProgetti, soloCompletate, soloCompletati, filtroAvanzato, tipo, modalitaCestino]);
+    }, [
+        soloMieTasks,
+        soloMieProgetti,
+        soloCompletate,
+        soloNonCompletate,
+        soloCompletati,
+        soloNonCompletati,
+        filtroAvanzato,
+        tipo,
+        modalitaCestino,
+    ]);
 
     return (
         <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
@@ -229,11 +275,23 @@ export default function IntestazioneLista({
                                                 ? setSoloMieProgetti((v) => !v)
                                                 : null
                                     }
-                                    className={`toggle-theme ${(tipo === "tasks" ? soloMieTasks : tipo === "progetti" ? soloMieProgetti : false) ? "active" : ""
+                                    className={`toggle-theme ${(tipo === "tasks"
+                                        ? soloMieTasks
+                                        : tipo === "progetti"
+                                            ? soloMieProgetti
+                                            : false)
+                                        ? "active"
+                                        : ""
                                         }`}
                                 >
                                     <div
-                                        className={`toggle-thumb ${(tipo === "tasks" ? soloMieTasks : tipo === "progetti" ? soloMieProgetti : false) ? "translate" : ""
+                                        className={`toggle-thumb ${(tipo === "tasks"
+                                            ? soloMieTasks
+                                            : tipo === "progetti"
+                                                ? soloMieProgetti
+                                                : false)
+                                            ? "translate"
+                                            : ""
                                             }`}
                                     />
                                 </div>
@@ -244,8 +302,24 @@ export default function IntestazioneLista({
                             <div className="flex items-center gap-2">
                                 <FontAwesomeIcon icon={faCheckCircle} className="w-5 h-5 text-green-600" />
                                 <span className="text-theme font-medium">Completate</span>
-                                <div onClick={() => setSoloCompletate((v) => !v)} className={`toggle-theme ${soloCompletate ? "active" : ""}`}>
+                                <div
+                                    onClick={() => setSoloCompletate((v) => !v)}
+                                    className={`toggle-theme ${soloCompletate ? "active" : ""}`}
+                                >
                                     <div className={`toggle-thumb ${soloCompletate ? "translate" : ""}`} />
+                                </div>
+                            </div>
+                        )}
+
+                        {config.mostraToggleNonCompletate && (
+                            <div className="flex items-center gap-2">
+                                <FontAwesomeIcon icon={faCheckCircle} className="w-5 h-5 text-red-600" />
+                                <span className="text-theme font-medium">Non completate</span>
+                                <div
+                                    onClick={() => setSoloNonCompletate((v) => !v)}
+                                    className={`toggle-theme ${soloNonCompletate ? "active" : ""}`}
+                                >
+                                    <div className={`toggle-thumb ${soloNonCompletate ? "translate" : ""}`} />
                                 </div>
                             </div>
                         )}
@@ -254,8 +328,24 @@ export default function IntestazioneLista({
                             <div className="flex items-center gap-2">
                                 <FontAwesomeIcon icon={faCheckCircle} className="w-5 h-5 text-green-600" />
                                 <span className="text-theme font-medium">Completati</span>
-                                <div onClick={() => setSoloCompletati((v) => !v)} className={`toggle-theme ${soloCompletati ? "active" : ""}`}>
+                                <div
+                                    onClick={() => setSoloCompletati((v) => !v)}
+                                    className={`toggle-theme ${soloCompletati ? "active" : ""}`}
+                                >
                                     <div className={`toggle-thumb ${soloCompletati ? "translate" : ""}`} />
+                                </div>
+                            </div>
+                        )}
+
+                        {config.mostraToggleNonCompletati && (
+                            <div className="flex items-center gap-2">
+                                <FontAwesomeIcon icon={faCheckCircle} className="w-5 h-5 text-red-600" />
+                                <span className="text-theme font-medium">Non completati</span>
+                                <div
+                                    onClick={() => setSoloNonCompletati((v) => !v)}
+                                    className={`toggle-theme ${soloNonCompletati ? "active" : ""}`}
+                                >
+                                    <div className={`toggle-thumb ${soloNonCompletati ? "translate" : ""}`} />
                                 </div>
                             </div>
                         )}
