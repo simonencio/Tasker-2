@@ -23,15 +23,16 @@ export default function CardDinamiche<T extends { id: string | number }>({
     const config = configAny as ResourceConfig<T>;
 
     const {
-        utenteId,
-        items,
-        loading,
-        filtro,
-        setFiltro,
-        patchItem,
-        removeItem,
-        addItem,
+        utenteId, items, loading, filtro, setFiltro, patchItem, removeItem, addItem,
     } = useResourceData(config, { modalitaCestino });
+
+    const filteredItems = items.filter((item: any) => {
+        if (filtro.soloCompletate) return !!item.fine_task;
+        if (filtro.soloNonCompletate) return !item.fine_task;
+        if (filtro.soloCompletati) return !!item.fine_progetto;
+        if (filtro.soloNonCompletati) return !item.fine_progetto;
+        return true;
+    });
 
     const ctx: ResourceRenderCtx<T> = {
         filtro,
@@ -80,15 +81,25 @@ export default function CardDinamiche<T extends { id: string | number }>({
                 <p className="text-center text-theme text-lg">Caricamento...</p>
             ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {items.map(item => (
+                    {filteredItems.map(item => (
                         <div key={String(item.id)} className="card-theme p-4 flex flex-col justify-between">
                             <div className="flex-1 space-y-2">
+                                {/* colonne principali */}
                                 {config.colonne.map(col => (
                                     <div key={String(col.chiave)} className="text-sm">
                                         {col.render ? col.render(item, ctx) : (item as any)[col.chiave as keyof T]}
                                     </div>
                                 ))}
+
+                                {/* dettaglio coerente */}
+                                {config.renderDettaglio && (
+                                    <div className="mt-2 text-xs text-gray-600 dark:text-gray-300">
+                                        {config.renderDettaglio(item, ctx)}
+                                    </div>
+                                )}
                             </div>
+
+                            {/* azioni */}
                             <div
                                 className={`mt-3 flex items-center ${modalitaCestino ? "justify-between" : "justify-end gap-3"
                                     }`}

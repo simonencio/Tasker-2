@@ -1,11 +1,24 @@
 // src/supporto/hardDeleteRecursive.ts
 import { supabase } from "./supabaseClient";
+import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
 
 /**
  * Esegue una DELETE definitiva su tabella/record specifico
+ * e notifica subito la UI
  */
 async function hardRemove(table: string, column: string, value: string) {
-    return supabase.from(table).delete().eq(column, value);
+    const { data, error } = await supabase
+        .from(table)
+        .delete()
+        .eq(column, value)
+        .select("id"); // ritorna gli id eliminati
+
+    if (!error && data) {
+        for (const row of data) {
+            dispatchResourceEvent(table as any, "delete", row.id);
+        }
+    }
+    return { data, error };
 }
 
 /**
@@ -87,12 +100,6 @@ export async function hardDeleteProgetto(progettoId: string): Promise<void> {
 /**
  * 🔹 3. Eliminazione definitiva di un Utente
  */
-/**
- * 🔹 3. Eliminazione definitiva di un Utente
- */
-/**
- * 🔹 3. Eliminazione definitiva di un Utente
- */
 export async function hardDeleteUtente(utenteId: string): Promise<void> {
     // Pulizia tabelle collegate (commenti, notifiche, ecc.)
     const { data: commenti } = await supabase
@@ -129,8 +136,6 @@ export async function hardDeleteUtente(utenteId: string): Promise<void> {
         throw new Error("Errore eliminazione definitiva: " + error);
     }
 }
-
-
 
 /**
  * 🔹 4. Eliminazione definitiva di un Cliente (con tutti i suoi progetti e task)

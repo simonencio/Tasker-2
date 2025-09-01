@@ -1,4 +1,3 @@
-// src/supporto/FiltriGenericiAvanzati.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DateRange, type Range } from "react-date-range";
 import { format, isAfter, isBefore } from "date-fns";
@@ -70,6 +69,17 @@ export default function FiltriGenericiAvanzati<T>({
     estrattori,
     opzioniGlobali,
 }: Props<T>) {
+    const PREF_KEY = `filtroAvanzato_${JSON.stringify(campi)}`;
+
+    const loadPersisted = (): FiltroAvanzatoGenerico => {
+        try {
+            const raw = localStorage.getItem(PREF_KEY);
+            return raw ? JSON.parse(raw) : {};
+        } catch {
+            return {};
+        }
+    };
+
     const [filtro, setFiltro] = useState<FiltroAvanzatoGenerico>({
         progetto: null,
         utente: null,
@@ -80,10 +90,11 @@ export default function FiltriGenericiAvanzati<T>({
         dataInizio: null,
         dataFine: null,
         ordine: null,
+        ...loadPersisted(),
     });
 
     const [rangeSelezionato, setRangeSelezionato] = useState<Range[]>([
-        { startDate: undefined, endDate: undefined, key: "selection" },
+        { startDate: filtro.dataInizio ? new Date(filtro.dataInizio) : undefined, endDate: filtro.dataFine ? new Date(filtro.dataFine) : undefined, key: "selection" },
     ]);
     const [mostraCalendario, setMostraCalendario] = useState(false);
     const calendarioRef = useRef<HTMLDivElement>(null);
@@ -116,16 +127,13 @@ export default function FiltriGenericiAvanzati<T>({
     // subset coerente con TUTTI i filtri tranne "escludi"
     const subsetFiltratoEscludendo = (escludi: FiltroChiave): T[] => {
         return dati.filter((row) => {
-            // progetto
             if (escludi !== "progetto" && filtro.progetto && estrattori.progetto) {
                 if (estrattori.progetto(row)?.id !== filtro.progetto) return false;
             }
-            // utente
             if (escludi !== "utente" && filtro.utente && estrattori.utente) {
                 const us = estrattori.utente(row) || [];
                 if (!us.some((u) => u.id === filtro.utente)) return false;
             }
-            // membri (tutti i selezionati devono essere presenti)
             if (
                 escludi !== "membri" &&
                 filtro.membri &&
@@ -136,15 +144,12 @@ export default function FiltriGenericiAvanzati<T>({
                 const ids = new Set(ms.map((m) => m.id));
                 if (!filtro.membri.every((id) => ids.has(id))) return false;
             }
-            // cliente
             if (escludi !== "cliente" && filtro.cliente && estrattori.cliente) {
                 if (estrattori.cliente(row)?.id !== filtro.cliente) return false;
             }
-            // stato
             if (escludi !== "stato" && filtro.stato != null && estrattori.stato) {
                 if (estrattori.stato(row)?.id !== filtro.stato) return false;
             }
-            // priorita
             if (
                 escludi !== "priorita" &&
                 filtro.priorita != null &&
@@ -152,7 +157,6 @@ export default function FiltriGenericiAvanzati<T>({
             ) {
                 if (estrattori.priorita(row)?.id !== filtro.priorita) return false;
             }
-            // date (range chiuso)
             if (
                 escludi !== "date" &&
                 (filtro.dataInizio || filtro.dataFine) &&
@@ -193,14 +197,11 @@ export default function FiltriGenericiAvanzati<T>({
         getter: ((d: T) => IdNome<K> | IdNome<K>[] | null) | undefined
     ): IdNome<K>[] => {
         if (!campoPresente(campo)) return [];
-        // nessun altro filtro attivo => mostra TUTTE le globali se presenti
         if (!altriFiltriAttivi(campo) && globali && globali.length) {
             return normalizeAndSort(globali);
         }
-        // altrimenti, calcola opzioni dal subset coerente con gli altri filtri
         const subset = subsetFiltratoEscludendo(campo);
         const dedotte = getter ? creaOpzioniDaDati(getter, subset) : [];
-        // se abbiamo globali, intersechiamo per coerenza con le anagrafiche
         if (globali && globali.length) {
             const allowed = new Set(globali.map((g) => g.id as any));
             return dedotte.filter((d) => allowed.has(d.id as any));
@@ -211,110 +212,32 @@ export default function FiltriGenericiAvanzati<T>({
     // opzioni pronte
     const opzioniProgetti = useMemo(
         () => getOpzioni("progetto", opzioniGlobali?.progetto, estrattori.progetto),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [
-            dati,
-            filtro.progetto,
-            filtro.utente,
-            filtro.membri?.length,
-            filtro.cliente,
-            filtro.stato,
-            filtro.priorita,
-            filtro.dataInizio,
-            filtro.dataFine,
-            opzioniGlobali?.progetto,
-        ]
+        [dati, filtro, opzioniGlobali?.progetto]
     );
 
     const opzioniUtenti = useMemo(
         () => getOpzioni("utente", opzioniGlobali?.utente, estrattori.utente),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [
-            dati,
-            filtro.progetto,
-            filtro.utente,
-            filtro.membri?.length,
-            filtro.cliente,
-            filtro.stato,
-            filtro.priorita,
-            filtro.dataInizio,
-            filtro.dataFine,
-            opzioniGlobali?.utente,
-        ]
+        [dati, filtro, opzioniGlobali?.utente]
     );
 
     const opzioniMembri = useMemo(
-        () =>
-            getOpzioni(
-                "membri",
-                opzioniGlobali?.membri ?? opzioniGlobali?.utente,
-                estrattori.membri
-            ),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [
-            dati,
-            filtro.progetto,
-            filtro.utente,
-            filtro.membri?.length,
-            filtro.cliente,
-            filtro.stato,
-            filtro.priorita,
-            filtro.dataInizio,
-            filtro.dataFine,
-            opzioniGlobali?.membri,
-            opzioniGlobali?.utente,
-        ]
+        () => getOpzioni("membri", opzioniGlobali?.membri ?? opzioniGlobali?.utente, estrattori.membri),
+        [dati, filtro, opzioniGlobali?.membri, opzioniGlobali?.utente]
     );
 
     const opzioniClienti = useMemo(
         () => getOpzioni("cliente", opzioniGlobali?.cliente, estrattori.cliente),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [
-            dati,
-            filtro.progetto,
-            filtro.utente,
-            filtro.membri?.length,
-            filtro.cliente,
-            filtro.stato,
-            filtro.priorita,
-            filtro.dataInizio,
-            filtro.dataFine,
-            opzioniGlobali?.cliente,
-        ]
+        [dati, filtro, opzioniGlobali?.cliente]
     );
 
     const opzioniStati = useMemo(
         () => getOpzioni("stato", opzioniGlobali?.stato, estrattori.stato),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [
-            dati,
-            filtro.progetto,
-            filtro.utente,
-            filtro.membri?.length,
-            filtro.cliente,
-            filtro.stato,
-            filtro.priorita,
-            filtro.dataInizio,
-            filtro.dataFine,
-            opzioniGlobali?.stato,
-        ]
+        [dati, filtro, opzioniGlobali?.stato]
     );
 
     const opzioniPriorita = useMemo(
         () => getOpzioni("priorita", opzioniGlobali?.priorita, estrattori.priorita),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [
-            dati,
-            filtro.progetto,
-            filtro.utente,
-            filtro.membri?.length,
-            filtro.cliente,
-            filtro.stato,
-            filtro.priorita,
-            filtro.dataInizio,
-            filtro.dataFine,
-            opzioniGlobali?.priorita,
-        ]
+        [dati, filtro, opzioniGlobali?.priorita]
     );
 
     // date → aggiorna filtro quando cambia il range
@@ -327,9 +250,12 @@ export default function FiltriGenericiAvanzati<T>({
         }));
     }, [rangeSelezionato]);
 
-    // propaga all'esterno
+    // propaga all'esterno + salva in localStorage
     useEffect(() => {
         onChange(filtro);
+        try {
+            localStorage.setItem(PREF_KEY, JSON.stringify(filtro));
+        } catch { }
     }, [filtro, onChange]);
 
     // chiusura calendario on click outside

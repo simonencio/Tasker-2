@@ -8,6 +8,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { inviaNotifica } from "../Notifiche/notificheUtils";
 import type { Cliente, Utente, Stato, Priorita, PopupType, MiniProjectModalProps } from "../supporto/types";
 import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
+import { resourceConfigs } from "../Liste/config";
 
 type Props = MiniProjectModalProps & { offsetIndex?: number };
 // helper in cima al file (fuori dal componente)
@@ -95,51 +96,72 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrore(null); setSuccess(false); setLoading(true);
-        if (!nome.trim()) {
-            setErrore("Il nome del progetto è obbligatorio.");
-            setLoading(false);
-            return;
-        }
 
-        const tempo_stimato = ore || minuti ? `${ore} hours ${minuti} minutes` : null;
-        const user = await supabase.auth.getUser();
+        try {
+            if (!nome.trim()) throw new Error("Il nome del progetto è obbligatorio.");
 
-        const { data: created, error } = await supabase
-            .from("progetti")
-            .insert({
-                nome,
-                slug: generaSlug(nome),            // 👈 aggiunto
-                note: note || null,
-                cliente_id: clienteId,
-                stato_id: statoId ? +statoId : null,
-                priorita_id: prioritaId ? +prioritaId : null,
-                consegna: consegna || null,
-                tempo_stimato,
-            })
-            .select()
-            .single();
+            const tempo_stimato = ore || minuti ? `${ore} hours ${minuti} minutes` : null;
+            const userResp = await supabase.auth.getUser();
 
+            // 1) Crea il progetto
+            const { data: created, error } = await supabase
+                .from("progetti")
+                .insert({
+                    nome,
+                    slug: generaSlug(nome),
+                    note: note || null,
+                    cliente_id: clienteId,
+                    stato_id: statoId ? +statoId : null,
+                    priorita_id: prioritaId ? +prioritaId : null,
+                    consegna: consegna || null,
+                    tempo_stimato,
+                })
+                .select()
+                .single();
 
-        if (error || !created) {
-            setErrore(error?.message || "Errore");
-            setLoading(false);
+            if (error || !created) throw new Error(error?.message || "Errore creazione progetto.");
+
+            const progettoId = created.id;
+
+            // 2) Inserisci membri in utenti_progetti
+            for (const u of utentiSelezionati) {
+                await supabase.from("utenti_progetti").insert({ progetto_id: progettoId, utente_id: u.id });
+                await inviaNotifica(
+                    "PROGETTO_ASSEGNATO",
+                    [u.id],
+                    `Sei stato assegnato al nuovo progetto: ${nome}`,
+                    userResp.data?.user?.id,
+                    { progetto_id: progettoId }
+                );
+            }
+
+            // 3) Refetch coerente con la lista (JOIN completi)
+            let nuovo: any = created;
+            try {
+                const rc: any = (resourceConfigs as any)["progetti"];
+                const utenteId = userResp?.data?.user?.id ?? null;
+                if (rc?.fetch) {
+                    const all = await rc.fetch({ filtro: {}, utenteId });
+                    nuovo = (all || []).find((x: any) => String(x.id) === String(created.id)) ?? created;
+                }
+            } catch (err) {
+                console.warn("Refetch progetto fallito, uso record base:", err);
+            }
+
+            // 4) Dispatch finale
+            dispatchResourceEvent("add", "progetti", { item: nuovo });
+
+            setSuccess(true);
+            reset();
+            setTimeout(() => setSuccess(false), 3000);
+        } catch (err: any) {
+            setErrore(err?.message || "Errore durante il salvataggio.");
             setTimeout(() => setErrore(null), 3000);
-            return;
+        } finally {
+            setLoading(false);
         }
-        // ⬇️ Notifica tutte le viste che un progetto nuovo è stato aggiunto
-        dispatchResourceEvent("add", "progetti", { item: created });
-
-        const progettoId = created.id;
-        for (const u of utentiSelezionati) {
-            await supabase.from("utenti_progetti").insert({ progetto_id: progettoId, utente_id: u.id });
-            await inviaNotifica("PROGETTO_ASSEGNATO", [u.id], `Sei stato assegnato al nuovo progetto: ${nome}`, user.data?.user?.id, { progetto_id: progettoId });
-        }
-
-        setSuccess(true);
-        reset();
-        setLoading(false);
-        setTimeout(() => setSuccess(false), 3000);
     };
+
 
     const baseInputClass = "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-theme text-theme";
 

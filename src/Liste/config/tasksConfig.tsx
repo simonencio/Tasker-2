@@ -219,14 +219,24 @@ export const tasksConfig: ResourceConfig<Task> = {
     },
 
     /* ================== DETTAGLIO ================== */
+    /* ================== DETTAGLIO ================== */
     renderDettaglio: (task) => (
         <div className="space-y-2">
             {task.progetto?.nome && <p>📁 Progetto: {task.progetto.nome}</p>}
-            {typeof task.tempo_stimato === "number" && <p>⏱️ Tempo stimato: {fmt.durata(task.tempo_stimato)}</p>}
+
+            {task.tempo_stimato && (
+                <p>⏱️ Tempo stimato: {typeof task.tempo_stimato === "string"
+                    ? task.tempo_stimato
+                    : fmt.durata(task.tempo_stimato)}
+                </p>
+            )}
+
             {task.assegnatari?.length ? (
                 <p>👥 Assegnata a: {task.assegnatari.map((u) => `${u.nome} ${u.cognome || ""}`).join(", ")}</p>
             ) : null}
+
             {task.note && <p>🗒️ {task.note}</p>}
         </div>
     ),
+
 };

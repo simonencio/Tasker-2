@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPalette, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { traduciColore } from "../supporto/traduzioniColori";
 import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
+import { resourceConfigs } from "../Liste/config";
 
 type Props = { onClose: () => void; offsetIndex?: number };
 
@@ -58,7 +59,22 @@ export default function MiniStatoCreatorModal({ onClose, offsetIndex = 0 }: Prop
         }
 
         // 👇 aggiorna tutte le viste col nuovo record
-        dispatchResourceEvent("add", "stati", { item: data });
+        try {
+            const rc: any = (resourceConfigs as any)["stati"];
+            const userResp = await supabase.auth.getUser();
+            const utenteId = userResp?.data?.user?.id ?? null;
+
+            let nuovo: any = data;
+            if (rc?.fetch) {
+                const all = await rc.fetch({ filtro: {}, utenteId });
+                nuovo = (all || []).find((x: any) => String(x.id) === String(data.id)) ?? data;
+            }
+
+            dispatchResourceEvent("add", "stati", { item: nuovo });
+        } catch {
+            dispatchResourceEvent("add", "stati", { item: data });
+        }
+
 
         setSuccess(true);
         reset();

@@ -8,6 +8,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { inviaNotifica } from "../Notifiche/notificheUtils";
 import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
+import { fetchTasks } from "../supporto/fetchData";
 
 type Stato = { id: number; nome: string };
 type Priorita = { id: number; nome: string };
@@ -176,7 +177,7 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
             const tempo = ore || minuti ? `${ore} hours ${minuti} minutes` : null;
             const slug = await generaSlugUnico(nome);
 
-            // 1) Crea la task (con slug e parent_id se subtask)
+            // 1) Crea la task
             const { data: createdTask, error: errInsert } = await supabase
                 .from("tasks")
                 .insert({
@@ -191,55 +192,18 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
                 })
                 .select()
                 .single();
+
             if (errInsert || !createdTask) throw new Error(errInsert?.message || "Errore creazione attività.");
-
             const taskId = createdTask.id;
-
-            // 👇 Aggiorna subito tutte le viste con la nuova task
-            dispatchResourceEvent("add", "tasks", { item: createdTask });
-
 
             // 2) Collega al progetto se presente
             if (progettoId) {
-                const { error: errPT } = await supabase
-                    .from("progetti_task")
-                    .insert({ task_id: taskId, progetti_id: progettoId });
-                if (errPT) throw errPT;
+                await supabase.from("progetti_task").insert({ task_id: taskId, progetti_id: progettoId });
             }
 
-
-            // 3) Associa assegnatari (e, se non partecipano al progetto, aggiungili)
+            // 3) Associa assegnatari
             for (const u of assegnatari) {
-                if (progettoId) {
-                    const { data: esiste, error: errCheck } = await supabase
-                        .from("utenti_progetti")
-                        .select("id")
-                        .eq("utente_id", u.id)
-                        .eq("progetto_id", progettoId)
-                        .maybeSingle();
-                    if (errCheck) throw errCheck;
-
-                    if (!esiste) {
-                        const { error: errAddUP } = await supabase
-                            .from("utenti_progetti")
-                            .insert({ utente_id: u.id, progetto_id: progettoId });
-                        if (errAddUP) throw errAddUP;
-
-                        inviaNotifica(
-                            "PROGETTO_ASSEGNATO",
-                            [u.id],
-                            `Sei stato assegnato al progetto con nuova attività: ${nome}`,
-                            userInfo.user?.id,
-                            { progetto_id: progettoId }
-                        );
-                    }
-                }
-
-                const { error: errUT } = await supabase
-                    .from("utenti_task")
-                    .insert({ utente_id: u.id, task_id: taskId });
-                if (errUT) throw errUT;
-
+                await supabase.from("utenti_task").insert({ utente_id: u.id, task_id: taskId });
                 inviaNotifica(
                     "TASK_ASSEGNATO",
                     [u.id],
@@ -248,6 +212,21 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
                     { progetto_id: progettoId || undefined, task_id: taskId }
                 );
             }
+
+            // 4) Refetch coerente con la lista (JOIN completi)
+            let nuovo: any = createdTask;
+            try {
+                const { data: auth } = await supabase.auth.getUser();
+                const utenteId = auth?.user?.id ?? null;
+                const all = await fetchTasks({}, utenteId ?? undefined);
+                const found = (all || []).find((x: any) => String(x.id) === String(taskId));
+                if (found) nuovo = found;
+            } catch (err) {
+                console.warn("Refetch task fallito, uso record base:", err);
+            }
+
+            // 5) Dispatch con record completo
+            dispatchResourceEvent("add", "tasks", { item: nuovo });
 
             setSuccess(true);
             reset();
@@ -259,6 +238,9 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
             setLoading(false);
         }
     };
+
+
+
 
     const baseInputClass = "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-theme text-theme";
 
