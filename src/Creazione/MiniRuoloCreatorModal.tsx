@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUserShield, faXmark } from "@fortawesome/free-solid-svg-icons";
+import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
 
 type Props = { onClose: () => void; offsetIndex?: number };
 
@@ -33,20 +34,28 @@ export default function MiniRuoloCreatorModal({ onClose, offsetIndex = 0 }: Prop
             return;
         }
 
-        const { error } = await supabase.from("ruoli").insert({ nome });
+        const { data, error } = await supabase
+            .from("ruoli")
+            .insert({ nome })
+            .select()
+            .single(); // 👈 prendiamo subito il record creato
 
-        if (error) {
-            setErrore(error.message);
+        if (error || !data) {
+            setErrore(error?.message || "Errore creazione ruolo");
             setLoading(false);
             setTimeout(() => setErrore(null), 3000);
             return;
         }
+
+        // 👇 notifica tutte le viste (lista, card, timeline) senza refresh
+        dispatchResourceEvent("add", "ruoli", { item: data });
 
         setSuccess(true);
         reset();
         setLoading(false);
         setTimeout(() => setSuccess(false), 3000);
     };
+
 
     const baseInputClass =
         "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-theme text-theme";

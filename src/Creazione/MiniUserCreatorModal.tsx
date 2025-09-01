@@ -1,9 +1,11 @@
+// src/Creazione/MiniUserCreatorModal.tsx
 import React, { useState, useEffect, type JSX } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
     faXmark, faEnvelope, faUserCheck, faUser, faShieldAlt, faImage,
 } from "@fortawesome/free-solid-svg-icons";
 import { supabase } from "../supporto/supabaseClient";
+import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
 
 type Props = { onClose: () => void; offsetIndex?: number };
 type PopupField = "cognome" | "ruolo" | "avatar";
@@ -25,6 +27,7 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
     const [success, setSuccess] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
 
+    // --- RESPONSIVE
     useEffect(() => {
         const resize = () => setIsMobile(window.innerWidth <= 768);
         resize();
@@ -32,18 +35,15 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
         return () => window.removeEventListener("resize", resize);
     }, []);
 
+    // --- CARICA RUOLI + REALTIME
     useEffect(() => {
         const fetchAll = async () => {
-            const [r] = await Promise.all([
-                supabase.from("ruoli").select("id,nome").is("deleted_at", null),
-            ]);
-            if (r.data) setRoles(r.data);
+            const { data } = await supabase.from("ruoli").select("id,nome").is("deleted_at", null);
+            if (data) setRoles(data);
         };
-
         fetchAll();
 
         const channel = supabase.channel("realtime_user_dropdowns");
-
         channel
             .on("postgres_changes", { event: "*", schema: "public", table: "ruoli" }, fetchAll)
             .subscribe();
@@ -58,6 +58,7 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
         setRuolo(0); setAvatarUrl(""); setPopupOpen(null);
     };
 
+    // --- SUBMIT
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrore(null); setSuccess(false); setLoading(true);
@@ -69,6 +70,7 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
         }
 
         try {
+            // 1) Edge function → crea user in auth + tabella
             const payload = {
                 email,
                 nome,
@@ -87,17 +89,32 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || "Errore creazione utente");
 
+            // 2) Recupera utente completo da db (join ruolo)
+            const { data: nuovoUtente } = await supabase
+                .from("utenti")
+                .select("id, nome, cognome, email, avatar_url, ruolo:ruolo (id, nome)")
+                .eq("id", json.user.id)
+                .single();
+
+            // 3) Aggiorna subito tutte le viste utenti
+            if (nuovoUtente) {
+                dispatchResourceEvent("add", "utenti", { item: nuovoUtente });
+            }
+
             setSuccess(true);
             reset();
+            setTimeout(() => setSuccess(false), 3000);
         } catch (err: any) {
             setErrore(err.message || "Errore generico");
+            setTimeout(() => setErrore(null), 3000);
         } finally {
             setLoading(false);
-            setTimeout(() => setSuccess(false), 3000);
         }
     };
 
-    const baseInputClass = "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-theme text-theme";
+    // --- STILI
+    const baseInputClass =
+        "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-theme text-theme";
 
     const popupInputs: Record<PopupField, JSX.Element> = {
         cognome: (
@@ -169,6 +186,7 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
         ? `min(calc(${offsetIndex} * 420px + 24px), calc(100% - 24px - 400px))`
         : "24px";
 
+    // --- RENDER
     return (
         <div
             className="fixed bottom-6 z-50 rounded-xl shadow-xl p-5 bg-white dark:bg-gray-800 modal-container"
@@ -201,7 +219,10 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
                 <FontAwesomeIcon icon={faXmark} />
             </button>
 
-            <h2 id="mini-user-modal-title" className="text-xl font-semibold mb-4 text-center text-theme">
+            <h2
+                id="mini-user-modal-title"
+                className="text-xl font-semibold mb-4 text-center text-theme"
+            >
                 Aggiungi Utente
             </h2>
 
@@ -244,8 +265,11 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
                                 key={field}
                                 type="button"
                                 aria-label={label}
-                                onClick={() => setPopupOpen((prev) => (prev === field ? null : field))}
-                                className={`focus:outline-none ${popupOpen === field ? active : color}`}
+                                onClick={() =>
+                                    setPopupOpen((prev) => (prev === field ? null : field))
+                                }
+                                className={`focus:outline-none ${popupOpen === field ? active : color
+                                    }`}
                             >
                                 <FontAwesomeIcon icon={icon} />
                             </button>
@@ -277,9 +301,16 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
 
                 {(errore || success) && (
                     <div className="text-center text-sm">
-                        {errore && <div className="text-red-600" role="alert">{errore}</div>}
+                        {errore && (
+                            <div className="text-red-600" role="alert">
+                                {errore}
+                            </div>
+                        )}
                         {success && (
-                            <div className="text-green-600 flex items-center justify-center" role="status">
+                            <div
+                                className="text-green-600 flex items-center justify-center"
+                                role="status"
+                            >
                                 <FontAwesomeIcon icon={faUserCheck} className="mr-2" />
                                 Utente creato e email inviata
                             </div>

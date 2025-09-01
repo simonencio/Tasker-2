@@ -7,6 +7,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { inviaNotifica } from "../Notifiche/notificheUtils";
+import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
 
 type Stato = { id: number; nome: string };
 type Priorita = { id: number; nome: string };
@@ -194,6 +195,10 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
 
             const taskId = createdTask.id;
 
+            // 👇 Aggiorna subito tutte le viste con la nuova task
+            dispatchResourceEvent("add", "tasks", { item: createdTask });
+
+
             // 2) Collega al progetto se presente
             if (progettoId) {
                 const { error: errPT } = await supabase
@@ -201,6 +206,7 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
                     .insert({ task_id: taskId, progetti_id: progettoId });
                 if (errPT) throw errPT;
             }
+
 
             // 3) Associa assegnatari (e, se non partecipano al progetto, aggiungili)
             for (const u of assegnatari) {

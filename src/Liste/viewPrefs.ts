@@ -1,6 +1,6 @@
 import type { ResourceKey } from "../Liste/resourceConfigs";
 
-export type Vista = "list" | "cards" | "board";
+export type Vista = "list" | "cards" | "timeline";
 
 const keyVista = (tipo: ResourceKey) => `vista_${tipo}`;
 const keyGroupBy = (tipo: ResourceKey) => `groupby_${tipo}`;
@@ -8,7 +8,7 @@ const keyGroupBy = (tipo: ResourceKey) => `groupby_${tipo}`;
 export function getPreferredView(tipo: ResourceKey, fallback: Vista = "list"): Vista {
     try {
         const v = localStorage.getItem(keyVista(tipo));
-        return v === "list" || v === "cards" || v === "board" ? v : fallback;
+        return v === "list" || v === "cards" || v === "timeline" ? v : fallback;
     } catch {
         return fallback;
     }

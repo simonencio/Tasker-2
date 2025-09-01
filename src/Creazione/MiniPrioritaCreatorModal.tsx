@@ -3,6 +3,7 @@ import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFlag, faPalette, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { traduciColore } from "../supporto/traduzioniColori";
+import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
 
 type Props = { onClose: () => void; offsetIndex?: number };
 
@@ -40,23 +41,31 @@ export default function MiniPrioritaCreatorModal({ onClose, offsetIndex = 0 }: P
 
         const coloreTradotto = colore ? traduciColore(colore) : null;
 
-        const { error } = await supabase.from("priorita").insert({
-            nome,
-            colore: coloreTradotto,
-        });
+        const { data, error } = await supabase
+            .from("priorita")
+            .insert({
+                nome,
+                colore: coloreTradotto,
+            })
+            .select()
+            .single();  // 👈 serve il record appena creato
 
-        if (error) {
-            setErrore(error.message);
+        if (error || !data) {
+            setErrore(error?.message || "Errore creazione priorità");
             setLoading(false);
             setTimeout(() => setErrore(null), 3000);
             return;
         }
+
+        // 👇 aggiorna subito tutte le viste senza refresh
+        + dispatchResourceEvent("add", "priorita", { item: data });
 
         setSuccess(true);
         reset();
         setLoading(false);
         setTimeout(() => setSuccess(false), 3000);
     };
+
 
     const baseInputClass =
         "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-theme text-theme";

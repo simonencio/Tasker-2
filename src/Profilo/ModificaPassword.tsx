@@ -2,33 +2,45 @@
 import { useState } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faChevronDown, faChevronUp } from "@fortawesome/free-solid-svg-icons";
+import { faChevronDown, faChevronUp, faEnvelope } from "@fortawesome/free-solid-svg-icons";
 import "toaster-js/default.css";
 import "../App.css";
-import { useToast } from '../supporto/useToast'
+import { useToast } from "../supporto/useToast";
 
 export default function ModificaPassword() {
   const toast = useToast();
   const [aperto, setAperto] = useState(false);
+  const [loading, setLoading] = useState(false);
+
   const toggleAperto = () => setAperto(!aperto);
 
-  const [password, setPassword] = useState("");
+  // 🔹 invio email reset già loggati
+  const inviaResetLink = async () => {
+    setLoading(true);
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user?.email) {
+        toast("Nessuna email trovata per l’utente", "error");
+        return;
+      }
 
-  const aggiornaPassword = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    const user = (await supabase.auth.getUser()).data.user;
-    if (!user) return;
+      const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
 
-    const { error: authError } = await supabase.auth.updateUser({ password });
-    const { error: utentiError } = await supabase
-      .from("utenti")
-      .update({ ultima_modifica_password: new Date().toISOString() })
-      .eq("id", user.id);
-
-    if (authError || utentiError) {
-      toast("Errore nel salvataggio", 'error');
-    } else {
-      toast("Password modificata con successo", 'success');
+      if (error) {
+        console.error("Errore resetPasswordForEmail:", error.message);
+        toast("Errore nell’invio del link", "error");
+      } else {
+        toast(
+          "Ti abbiamo inviato un’email con il link per resettare la password",
+          "success"
+        );
+      }
+    } catch (err) {
+      toast("Errore durante la richiesta di reset", "error");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -39,44 +51,24 @@ export default function ModificaPassword() {
         className="w-full flex justify-between items-center text-theme font-semibold text-xl focus:outline-none"
       >
         <span>Modifica Password</span>
-        <FontAwesomeIcon icon={aperto ? faChevronUp : faChevronDown} className="text-lg" />
+        <FontAwesomeIcon
+          icon={aperto ? faChevronUp : faChevronDown}
+          className="text-lg"
+        />
       </button>
 
       {aperto && (
-        <form autoComplete="off" onSubmit={aggiornaPassword}>
-          {/* Honeypot anti-autofill */}
-          <input
-            type="text"
-            name="username"
-            tabIndex={-1}
-            autoComplete="username"
-            aria-hidden="true"
-            style={{ position: "absolute", opacity: 0, height: 0, width: 0, pointerEvents: "none" }}
-          />
-          <input
-            type="password"
-            name="password"
-            tabIndex={-1}
-            autoComplete="current-password"
-            aria-hidden="true"
-            style={{ position: "absolute", opacity: 0, height: 0, width: 0, pointerEvents: "none" }}
-          />
-
-          <label className="block text-sm text-theme mb-1 mt-4">Nuova Password</label>
-          <input
-            type="password"
-            className="input-style w-full"
-            placeholder="Nuova password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="new-password"
-            name="nuova_password" // nome non convenzionale
-            spellCheck={false}
-          />
-          <button type="submit" className="mt-2 px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
-            Aggiorna Password
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={inviaResetLink}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-60"
+          >
+            <FontAwesomeIcon icon={faEnvelope} />
+            {loading ? "Invio..." : "Invia link reset"}
           </button>
-        </form>
+        </div>
       )}
     </div>
   );

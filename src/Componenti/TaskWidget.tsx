@@ -7,7 +7,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTasks } from "@fortawesome/free-solid-svg-icons";
 
 type Task = any;
-type Vista = "list" | "cards" | "board";
+type Vista = "list" | "cards" | "timeline";
 
 const VIEW_STORAGE_KEY = "widget_view_tasks";
 const MAX_ITEMS = 6;
@@ -22,7 +22,7 @@ export default function TaskWidget() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [view, setView] = useState<Vista>(() => {
     const v = localStorage.getItem(VIEW_STORAGE_KEY);
-    return v === "cards" || v === "board" ? v : "list";
+    return v === "cards" || v === "timeline" ? v : "list";
   });
 
   const [extra, setExtra] = useState<any>(null);
