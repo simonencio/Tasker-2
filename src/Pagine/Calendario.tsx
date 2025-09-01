@@ -1,6 +1,6 @@
 // 📅 src/GestioneProgetto/CalendarioProgetto.tsx
 import { useParams } from 'react-router-dom';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { supabase } from '../supporto/supabaseClient';
 import { format, addDays } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -42,6 +42,10 @@ export default function CalendarioProgetto() {
     const [updating, setUpdating] = useState<Set<string>>(new Set());
 
 
+    const REFETCH_DEBOUNCE_MS = 250;
+    const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // traccia l'origine dell'ultimo caricamento: 'initial' | 'manual' | 'background'
+    const lastLoadSourceRef = useRef<'initial' | 'manual' | 'background'>('initial');
 
 
 
@@ -63,6 +67,23 @@ export default function CalendarioProgetto() {
     }, []);
 
 
+
+    const scheduleRefetch = useCallback(() => {
+        if (refetchTimer.current) clearTimeout(refetchTimer.current);
+        refetchTimer.current = setTimeout(() => {
+            loadTasks(projectId, 'background');
+        }, REFETCH_DEBOUNCE_MS);
+    }, [projectId]);
+
+    // optional: pulizia timer quando il componente smonta o projectId cambia
+    useEffect(() => {
+        return () => {
+            if (refetchTimer.current) {
+                clearTimeout(refetchTimer.current);
+                refetchTimer.current = null;
+            }
+        };
+    }, [projectId]);
 
     // carica preferenza salvata (se vuoi separare come per 'Mie')
     useEffect(() => {
@@ -100,56 +121,123 @@ export default function CalendarioProgetto() {
 
     // carica task (tutte da 'tasks' + left join su progetti_task -> progetti)
     // se ho projectId, filtro per quel progetto; altrimenti includo anche le task senza progetto
+    // --- fetch riutilizzabile ---
+    async function loadTasks(currentProjectId: string | null, source: 'initial' | 'manual' | 'background' = 'background') {
+        // Parto da 'tasks' per includere anche quelle non collegate a un progetto
+        lastLoadSourceRef.current = source;
+        let query = supabase
+            .from('tasks')
+            .select(`
+                id, stato_id, parent_id, fine_task, nome, note, consegna, tempo_stimato,
+                stati (nome),
+                priorita (nome),
+                utenti_task:utenti_task (
+                    utente:utenti ( id, nome, cognome )
+                ),
+                link:progetti_task!left (
+                    progetti_id,
+                    progetti ( id, nome )
+                )
+            `);
+
+        if (currentProjectId) {
+            query = query.eq('link.progetti_id', currentProjectId);
+        }
+
+        const { data, error } = await query;
+        if (!error && data) {
+            setTaskList(
+                (data as any[]).map((t: any) => ({
+                    ...t,
+                    progetto_nome: t.link?.[0]?.progetti?.nome ?? null,
+                }))
+            );
+        } else {
+            console.error('Errore caricamento tasks:', error);
+            setTaskList([]);
+        }
+    }
+
+    // carica al mount/ quando cambia projectId
     useEffect(() => {
         let alive = true;
         (async () => {
-            // Parto da 'tasks' per includere anche quelle non collegate a un progetto
-            let query = supabase
-                .from('tasks')
-                .select(`
-                    id, stato_id, parent_id, fine_task, nome, note, consegna, tempo_stimato,
-                    stati (nome),
-                    priorita (nome),
-                    utenti_task:utenti_task (
-                    utente:utenti ( id, nome, cognome )
-                    ),
-                    link:progetti_task!left (
-                    progetti_id,
-                    progetti (
-                        id, nome
-                    )
-                    )
-                `);
-
-            // Se sto guardando un progetto specifico, filtro per quel progetto
-            if (projectId) {
-                query = query.eq('link.progetti_id', projectId);
-            }
-
-            const { data, error } = await query;
-            if (!alive) return;
-
-            if (!error && data) {
-                // 'link' è un array (per sicurezza prendo il primo se presente)
-                setTaskList(
-                    (data as any[]).map((t: any) => ({
-                        ...t,
-                        progetto_nome: t.link?.[0]?.progetti?.nome ?? null,
-                    }))
-                );
-            } else {
-                console.error('Errore caricamento tasks:', error);
-                setTaskList([]);
-            }
+            await loadTasks(projectId, 'initial');
         })();
         return () => { alive = false };
     }, [projectId]);
 
+    // Realtime: ascolta cambi su tasks (e progetti_task se filtriamo per progetto)
+    useEffect(() => {
+        // canale per tasks
+        const chTasks = supabase
+            .channel('realtime:tasks')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'tasks' },
+                (_payload) => {
+                    // Refetch “sicuro” (join, filtri, ecc.)
+                    scheduleRefetch(); // 👈 debounce
+                }
+            )
+            .subscribe();
+
+        // se stai guardando un progetto specifico, ascolta anche i link su progetti_task
+        const chLinks = projectId
+            ? supabase
+                .channel('realtime:progetti_task')
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'progetti_task' },
+                    (_payload) => {
+                        scheduleRefetch(); // 👈 debounce
+                    }
+                )
+                .subscribe()
+            : null;
+
+        return () => {
+            supabase.removeChannel(chTasks);
+            if (chLinks) supabase.removeChannel(chLinks);
+        };
+    }, [projectId, scheduleRefetch]);
+
+    //Rete di sicurezza: refetch su focus / visibilitychange / polling soft
+    useEffect(() => {
+        const onFocus = () => scheduleRefetch();
+        const onVis = () => {
+            if (document.visibilityState === 'visible') scheduleRefetch();
+        };
+
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVis);
+
+        // Poll “gentile” ogni 30 secondi
+        const pollId = setInterval(() => scheduleRefetch(), 30000);
+
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVis);
+            clearInterval(pollId);
+        };
+    }, [scheduleRefetch]);
+
+
     // popup scadute
     const [showPopupScadute, setShowPopupScadute] = useState(false);
     const [taskScadute, setTaskScadute] = useState<{ giorno: string; utenti: string[] }[]>([]);
+
     useEffect(() => {
-        if (!taskList.length || document.cookie.includes('hideExpiredPopup=true')) return;
+        // ❌ non mostrare se:
+        // - nessuna task
+        // - utente ha spuntato "non ricordarmelo oggi"
+        // - l'ultimo load è in background (realtime/poll/visibility/focus)
+        if (
+            !taskList.length ||
+            document.cookie.includes('hideExpiredPopup=true') ||
+            lastLoadSourceRef.current === 'background'
+        ) return;
+
         const lista = generaTaskScadute(taskList);
         if (lista.length) {
             setTaskScadute(lista);
@@ -211,7 +299,7 @@ export default function CalendarioProgetto() {
                     {tasks.length > 0 && (
                         <div className="hidden sm:flex flex-1 text-center text-sm px-3 py-1 rounded-md items-center justify-center gap-2 bg-white/60 dark:bg-white/10 shadow-sm status-text">
                             <FontAwesomeIcon icon={faTasks} className="icon-color w-4 h-4" />
-                            <span className="truncate font-medium">{getMessaggio(giorno, oggi)}</span>
+                            <span className="truncate font-medium cal-msg-text">{getMessaggio(giorno, oggi)}</span>
                         </div>
                     )}
                     <div className="text-sm text-theme/70 whitespace-nowrap font-medium">{tasks.length} task</div>

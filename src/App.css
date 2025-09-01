@@ -406,6 +406,16 @@ html.dark {
   z-index: 1;
 }
 
+/* Testo messaggi calendario leggibile in entrambi i temi */
+.cal-msg-text {
+  color: #111 !important; /* nero leggibile */
+}
+
+html.dark .cal-msg-text {
+  color: #f9fafb !important; /* bianco leggibile in dark */
+}
+
+
 
 /* ✅ Scrollbar invisibile */
 .hide-scrollbar::-webkit-scrollbar {
