@@ -15,7 +15,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 
 import { isUtenteAdmin } from "../supporto/ruolo";
-import ToggleMie from "./ToggleMie";
+import ToggleMie from "../GestioneProgetto/ToggleMie";
 import RenderSottoTask from "../supporto/SottoTask";
 import RenderCommento from "../supporto/RenderCommento";
 

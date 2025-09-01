@@ -13,8 +13,8 @@ import {
     faUsers
 } from "@fortawesome/free-solid-svg-icons";
 import { Toast } from "toaster-js";
-import ChatCommentiModal from "./ChatCommentiModal";
-import type { Commento } from "./tipi";
+import ChatCommentiModal from "../GestioneTask/ChatCommentiModal";
+import type { Commento } from "../GestioneTask/tipi";
 import {
     Chip,
     StatoBadge,
