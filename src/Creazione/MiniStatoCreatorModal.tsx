@@ -3,6 +3,7 @@ import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPalette, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { traduciColore } from "../supporto/traduzioniColori";
+import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
 
 type Props = { onClose: () => void; offsetIndex?: number };
 
@@ -40,23 +41,31 @@ export default function MiniStatoCreatorModal({ onClose, offsetIndex = 0 }: Prop
 
         const coloreTradotto = colore ? traduciColore(colore) : null;
 
-        const { error } = await supabase.from("stati").insert({
-            nome,
-            colore: coloreTradotto,
-        });
+        const { data, error } = await supabase
+            .from("stati")
+            .insert({
+                nome,
+                colore: coloreTradotto,
+            })
+            .select()
+            .single(); // 👈 recupera subito lo stato creato
 
-        if (error) {
-            setErrore(error.message);
+        if (error || !data) {
+            setErrore(error?.message || "Errore creazione stato");
             setLoading(false);
             setTimeout(() => setErrore(null), 3000);
             return;
         }
+
+        // 👇 aggiorna tutte le viste col nuovo record
+        dispatchResourceEvent("add", "stati", { item: data });
 
         setSuccess(true);
         reset();
         setLoading(false);
         setTimeout(() => setSuccess(false), 3000);
     };
+
 
     const baseInputClass =
         "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-theme text-theme";

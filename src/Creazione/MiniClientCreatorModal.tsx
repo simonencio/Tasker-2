@@ -7,6 +7,7 @@ import {
     faImage,
     faXmark,
 } from "@fortawesome/free-solid-svg-icons";
+import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
 
 type Props = { onClose: () => void; offsetIndex?: number };
 type PopupField = "email" | "telefono" | "avatar";
@@ -46,29 +47,42 @@ export default function MiniClientCreatorModal({ onClose, offsetIndex = 0 }: Pro
         setErrore(null);
         setSuccess(false);
         setLoading(true);
+
         if (!nome.trim()) {
             setErrore("Il nome del cliente è obbligatorio.");
             setLoading(false);
             return;
         }
-        const { error } = await supabase.from("clienti").insert({
-            nome,
-            note: note || null,
-            email: email || null,
-            telefono: telefono || null,
-            avatar_url: avatarUrl || null,
-        });
-        if (error) {
-            setErrore(error.message);
+
+        const { data, error } = await supabase
+            .from("clienti")
+            .insert({
+                nome,
+                note: note || null,
+                email: email || null,
+                telefono: telefono || null,
+                avatar_url: avatarUrl || null,
+            })
+            .select()
+            .single();   // 👈 importantissimo: ci serve il record appena creato
+
+        if (error || !data) {
+            setErrore(error?.message || "Errore creazione cliente");
             setLoading(false);
             setTimeout(() => setErrore(null), 3000);
             return;
         }
+
+        // 👇 qui notifichiamo tutte le viste (Lista, Card, Timeline) senza refresh
+        dispatchResourceEvent("add", "clienti", { item: data });
+
+
         setSuccess(true);
         reset();
         setLoading(false);
         setTimeout(() => setSuccess(false), 3000);
     };
+
 
     const baseInputClass =
         "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-theme text-theme";

@@ -10,7 +10,7 @@ let toastCounter = 0;
 
 const registerToastObserver = () => {
     if (isObserverRegistered) return;
-    
+
     const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
             if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
@@ -18,22 +18,22 @@ const registerToastObserver = () => {
                     if (node instanceof HTMLElement) {
                         // Cerca il toast più specificamente
                         const toast = node.classList?.contains('toast') ? node : node.querySelector?.('.toast');
-                        
+
                         if (toast instanceof HTMLElement && !toast.hasAttribute('data-styled')) {
                             // Marca come già processato per evitare duplicazioni
                             toast.setAttribute('data-styled', 'true');
-                            
+
                             const savedMessage = (window as any).lastToastMessage;
                             const savedType = (window as any).lastToastType;
-                            
+
                             if (savedMessage) {
                                 // Pulisci completamente il contenuto esistente
                                 toast.innerHTML = '';
                                 toast.className = 'toast';
-                                
+
                                 let icon = '';
                                 let typeClass = '';
-                                
+
                                 if (savedType === 'success') {
                                     icon = '<svg class="toast-icon toast-icon-success" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>';
                                     typeClass = 'success';
@@ -47,10 +47,10 @@ const registerToastObserver = () => {
                                     icon = '<svg class="toast-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>';
                                     typeClass = 'info';
                                 }
-                                
+
                                 // Applica la classe del tipo
                                 toast.classList.add(typeClass);
-                                
+
                                 // Crea il contenuto
                                 toast.innerHTML = `
                                     <div class="toast-content">
@@ -58,10 +58,10 @@ const registerToastObserver = () => {
                                         <span class="toast-message">${savedMessage}</span>
                                     </div>
                                 `;
-                                
+
                                 // Rimuovi tutti gli stili inline che potrebbero interferire
                                 toast.removeAttribute('style');
-                                
+
                                 // Forza gli stili importanti
                                 const styles = {
                                     position: 'fixed',
@@ -89,12 +89,12 @@ const registerToastObserver = () => {
                                     opacity: '1',
                                     pointerEvents: 'auto'
                                 };
-                                
+
                                 // Applica gli stili uno per uno
                                 Object.entries(styles).forEach(([property, value]) => {
                                     toast.style.setProperty(property, value, 'important');
                                 });
-                                
+
                                 // Applica stili specifici per tipo
                                 if (typeClass === 'success') {
                                     toast.style.setProperty('borderColor', '#10b981', 'important');
@@ -105,12 +105,15 @@ const registerToastObserver = () => {
                                 } else if (typeClass === 'warning') {
                                     toast.style.setProperty('borderColor', '#f59e0b', 'important');
                                     toast.style.setProperty('color', '#92400e', 'important');
+                                } else if (typeClass === 'info') {
+                                    toast.style.setProperty('borderColor', '#10b981', 'important');
+                                    toast.style.setProperty('color', '#065f46', 'important');        // testo blu scuro leggibile
                                 }
-                                
+
                                 // Pulisci le variabili globali
                                 delete (window as any).lastToastMessage;
                                 delete (window as any).lastToastType;
-                                
+
                                 // Auto-remove dopo 4 secondi
                                 setTimeout(() => {
                                     if (toast && toast.parentNode) {
@@ -131,18 +134,18 @@ const registerToastObserver = () => {
         });
     });
 
-    observer.observe(document.body, { 
-        childList: true, 
+    observer.observe(document.body, {
+        childList: true,
         subtree: true
     });
-    
+
     isObserverRegistered = true;
 };
 
-const showToast = (message: string, type: ToastType = 'info') => {
+export const showToast = (message: string, type: ToastType = 'info') => {
     // Incrementa il counter per evitare conflitti
     toastCounter++;
-    
+
     // Salva i dati per il MutationObserver
     (window as any).lastToastMessage = message;
     (window as any).lastToastType = type;
@@ -154,7 +157,7 @@ const showToast = (message: string, type: ToastType = 'info') => {
 export const useToast = () => {
     useEffect(() => {
         registerToastObserver();
-        
+
         // Cleanup function
         return () => {
             // Nota: non possiamo facilmente disconnettere l'observer

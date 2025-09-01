@@ -24,10 +24,15 @@ export type ResourceRenderCtx<T> = {
     setFiltro: (f: FiltroIntestazione) => void;
     items: T[];
     utenteId: string | null;
-    navigate: (to: string) => void; // compatibile con useNavigate()
+    navigate: (to: string) => void;
     extra?: any;
     patchItem?: (id: string | number, patch: Partial<T>) => void;
+    removeItem?: (id: string | number) => void;   // 👈 AGGIUNGI
+    addItem?: (item: T) => void;                  // 👈 AGGIUNGI
+    cestino?: CestinoConfig<T>;
 };
+
+
 
 /** Azioni per la modalità cestino */
 export type CestinoActions = {
@@ -56,7 +61,12 @@ export type ResourceConfig<T extends { id: string | number }> = {
     modalitaCestino?: boolean;
     setup?: (deps: { utenteId: string | null }) => { extra: any; dispose?: () => void };
     cestino?: CestinoConfig<T>;
+
+    // 👇 aggiungi per compatibilità con CardDinamiche e BachecaDinamica
+    card?: (item: T, ctx: ResourceRenderCtx<T>) => JSX.Element;
+    groupBy?: Record<string, GroupByDef>;
 };
+
 
 /** Tipi per bacheca/kanban */
 export type KanbanColumn = { key: string; label: string };

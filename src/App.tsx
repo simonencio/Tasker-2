@@ -18,7 +18,9 @@ import LoginForm from "./Pagine/LoginForm";
 import Home from "./Pagine/Home";
 import Profilo from "./Profilo/Profilo";
 // ⬇️ aggiungi
-import { ToastBridge, TimerOverlay } from "./Liste/resourceConfigs";
+import { ToastBridge } from "./Liste/config/common";
+import { TimerOverlay } from "./Liste/config/TimerOverlay";
+
 
 
 import DettaglioProgetto from "./GestioneProgetto/DettaglioProgetto";
@@ -43,11 +45,13 @@ import ForgotPassword from "./Pagine/ForgotPassword";
 // Viste
 import ListaDinamica from "./Liste/ListaDinamica";
 import CardDinamiche from "./Liste/CardDinamiche";
-import BachecaDinamica from "./Liste/BachecaDinamica";
 
 import type { ResourceKey } from "./Liste/resourceConfigs";
 import { getPreferredView, type Vista } from "./Liste/viewPrefs";
 import MiniProjectCreatorModal from "./Creazione/MiniProjectCreatorModal";
+import GenericEditorModal from "./Modifica/GenericEditorModal";
+import { createRoot } from "react-dom/client";
+import TimelineDinamica from "./Liste/TimelineDinamica";
 
 type ModalType = "project" | "tasks" | "client" | "user" | "stato" | "priorita" | "ruolo";
 
@@ -85,12 +89,13 @@ function ResourceRoute({ tipo, paramKey = "view" }: { tipo: ResourceKey; paramKe
 
     const view: Vista = (() => {
         const v = params.get(paramKey);
-        if (v === "list" || v === "cards" || v === "board") return v;
+        if (v === "list" || v === "cards" || v === "timeline") return v;
         return getPreferredView(tipo, "list");
     })();
 
     if (view === "cards") return <CardDinamiche tipo={tipo} paramKey={paramKey} />;
-    if (view === "board") return <BachecaDinamica tipo={tipo} paramKey={paramKey} />;
+    if (view === "timeline") return <TimelineDinamica tipo={tipo} />;
+
     return <ListaDinamica tipo={tipo} paramKey={paramKey} />;
 }
 
@@ -190,6 +195,28 @@ function AppContent() {
         };
 
     }, []);
+    // gestore globale per aprire la modale di modifica
+    useEffect(() => {
+        (window as any).__openMiniEdit = (table: string, id: string) => {
+            const container = document.createElement("div");
+            document.body.appendChild(container);
+
+            const root = createRoot(container);
+
+            const close = () => {
+                root.unmount();
+                container.remove();
+            };
+
+            root.render(<GenericEditorModal table={table} id={id} onClose={close} />);
+        };
+
+        return () => {
+            delete (window as any).__openMiniEdit;
+        };
+    }, []);
+
+
 
     return (
         <>
@@ -316,4 +343,3 @@ export default function App() {
         </Router>
     );
 }
-

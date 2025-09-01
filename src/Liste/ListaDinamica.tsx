@@ -1,23 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+// src/Liste/ListaDinamica.tsx
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPen, faUndo, faTrash } from "@fortawesome/free-solid-svg-icons";
 
 import IntestazioneLista from "./IntestazioneLista";
-import { supabase } from "../supporto/supabaseClient";
 import { resourceConfigs, type ResourceKey } from "./resourceConfigs";
-import type {
-    ResourceRenderCtx,
-    FiltroIntestazione,
-    ResourceConfig,
-} from "./typesLista";
+import type { ResourceRenderCtx, ResourceConfig } from "./typesLista";
+import { useResourceData } from "./useResourceData";
 
-/**
- * COMPONENTE UNICO “SCHELETRO”
- * - Legge la config da resourceConfigs[tipo] oppure da configOverride
- * - Esegue fetch/setup secondo la config
- * - Renderizza: Intestazione + Tabella + Azioni + Dettaglio + Modale (se definita in config)
- */
 export default function ListaDinamica<T extends { id: string | number }>({
     tipo,
     modalitaCestino = false,
@@ -27,103 +18,67 @@ export default function ListaDinamica<T extends { id: string | number }>({
     tipo: ResourceKey;
     modalitaCestino?: boolean;
     paramKey?: string;
-    configOverride?: ResourceConfig<any>; // 👈 FIX: accettiamo override di qualsiasi tipo
+    configOverride?: ResourceConfig<any>;
 }) {
     const navigate = useNavigate();
     const configAny = configOverride ?? (resourceConfigs[tipo] as any);
-    if (!configAny) {
-        return <p className="text-red-600">Config non trovata per tipo: {tipo}</p>;
-    }
+    if (!configAny) return <p className="text-red-600">Config non trovata per tipo: {tipo}</p>;
     const config = configAny as ResourceConfig<T>;
 
-    const [utenteId, setUtenteId] = useState<string | null>(null);
-    const [items, setItems] = useState<T[]>([]);
-    const patchItem = (id: string | number, patch: Partial<T>) => {
-        setItems((prev) =>
-            prev.map((it) => (String(it.id) === String(id) ? { ...it, ...patch } : it))
-        );
-    };
-
-    const [loading, setLoading] = useState(true);
-    const [filtro, setFiltro] = useState<FiltroIntestazione>({});
-    const [itemEspansoId, setItemEspansoId] = useState<string | null>(null);
-    const [itemDaModificareId, setItemDaModificareId] =
-        useState<string | null>(null);
-
-    // Recupero utente loggato
-    useEffect(() => {
-        supabase.auth.getUser().then(({ data: { user } }) => {
-            setUtenteId(user?.id ?? null);
-        });
-    }, []);
-
-    // setup extra opzionale dalla config (es. timer per tasks)
-    const setupResult = useMemo(
-        () => config.setup?.({ utenteId }) ?? { extra: undefined },
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [config, utenteId]
+    const { utenteId, items, loading, filtro, setFiltro, patchItem, removeItem } = useResourceData(
+        config,
+        { modalitaCestino }
     );
 
-    // cleanup del setup (listener, ecc.)
+    // 👇 extra dallo setup
+    const [extra, setExtra] = useState<any>(null);
+    const disposeRef = useRef<null | (() => void)>(null);
+
     useEffect(() => {
+        if (config.setup) {
+            const res = config.setup({ utenteId });
+            setExtra(res.extra ?? null);
+            disposeRef.current = res.dispose ?? null;
+        }
         return () => {
-            setupResult?.dispose?.();
-        };
-    }, [setupResult]);
-
-    // Scegli la fetch in base alla modalità
-    const fetchFn =
-        modalitaCestino && config.cestino?.fetch ? config.cestino.fetch : config.fetch;
-
-    // fetch dati
-    useEffect(() => {
-        let cancelled = false;
-        const run = async () => {
-            setLoading(true);
-            try {
-                const data = await fetchFn({ filtro: filtro ?? {}, utenteId });
-                if (!cancelled) setItems(data);
-            } finally {
-                if (!cancelled) setLoading(false);
+            if (disposeRef.current) {
+                disposeRef.current();
+                disposeRef.current = null;
             }
         };
-        run();
-        return () => {
-            cancelled = true;
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fetchFn, filtro, utenteId]);
+    }, [config, utenteId]);
 
-    // Context passato a tutte le render-fn della config
     const ctx: ResourceRenderCtx<T> = {
         filtro,
         setFiltro,
         items,
         utenteId,
         navigate,
-        extra: setupResult.extra,
         patchItem,
+        removeItem,
+        addItem: () => { },
+        extra, // 👈 adesso c’è
     };
 
-    // Titolo: prefisso "Cestino – " se siamo in cestino e il titolo è stringa
     const headerTitle =
         modalitaCestino && typeof config.titolo === "string"
             ? `Cestino – ${config.titolo.replace(/^Lista\s+/i, "")}`
             : config.titolo;
 
-    // Handlers cestino
     const handleRestore = async (id: string | number) => {
         if (!config.cestino?.actions?.restore) return;
         await config.cestino.actions.restore(id);
-        setItems((prev) => prev.filter((x) => String(x.id) !== String(id)));
+        removeItem(id);
     };
 
     const handleHardDelete = async (id: string | number) => {
         if (!config.cestino?.actions?.hardDelete) return;
         if (!window.confirm("Eliminazione definitiva. Continuare?")) return;
         await config.cestino.actions.hardDelete(id);
-        setItems((prev) => prev.filter((x) => String(x.id) !== String(id)));
+        removeItem(id);
     };
+
+    const [expandedId, setExpandedId] = useState<string | number | null>(null);
 
     return (
         <div className="p-4 sm:p-6 max-w-7xl mx-auto w-full">
@@ -133,9 +88,7 @@ export default function ListaDinamica<T extends { id: string | number }>({
                 coloreIcona={config.coloreIcona}
                 tipo={tipo}
                 paramKey={paramKey}
-                azioniExtra={
-                    !modalitaCestino && !config.useHeaderFilters ? config.azioniExtra : undefined
-                }
+                azioniExtra={!modalitaCestino ? config.azioniExtra : undefined}
                 modalitaCestino={modalitaCestino}
                 dati={config.useHeaderFilters ? items : undefined}
                 onChange={config.useHeaderFilters ? setFiltro : undefined}
@@ -147,7 +100,7 @@ export default function ListaDinamica<T extends { id: string | number }>({
                 <div className="rounded-xl overflow-hidden shadow-md card-theme max-w-7xl mx-auto">
                     {/* intestazione tabella */}
                     <div className="hidden lg:flex px-4 py-2 text-xs font-semibold text-theme border-b border-gray-300 dark:border-gray-600">
-                        {config.colonne.map((col) => (
+                        {config.colonne.map(col => (
                             <div key={String(col.chiave)} className={col.className ?? "flex-1"}>
                                 {col.label}
                             </div>
@@ -156,36 +109,27 @@ export default function ListaDinamica<T extends { id: string | number }>({
                     </div>
 
                     {/* righe */}
-                    {items.map((item) => {
-                        const itemId = String(item.id);
-                        const isOpen = itemEspansoId === itemId;
-
+                    {items.map(item => {
+                        const isExpanded = expandedId === item.id;
                         return (
                             <div
-                                key={itemId}
-                                className="border-t border-gray-200 dark:border-gray-700 hover-bg-theme"
+                                key={String(item.id)}
+                                className="border-t border-gray-200 dark:border-gray-700"
                             >
                                 {/* riga principale */}
                                 <div
-                                    className="flex items-center px-4 py-3 text-sm text-theme cursor-pointer"
-                                    onClick={() => setItemEspansoId(isOpen ? null : itemId)}
+                                    className="flex items-center px-4 py-3 text-sm text-theme cursor-pointer hover-bg-theme"
+                                    onClick={() => setExpandedId(isExpanded ? null : item.id)}
                                 >
-                                    {config.colonne.map((col) => (
-                                        <div
-                                            key={String(col.chiave)}
-                                            className={col.className ?? "flex-1"}
-                                        >
-                                            {col.render
-                                                ? col.render(item, ctx)
-                                                : (item as any)[col.chiave as keyof T]}
+                                    {config.colonne.map(col => (
+                                        <div key={String(col.chiave)} className={col.className ?? "flex-1"}>
+                                            {col.render ? col.render(item, ctx) : (item as any)[col.chiave as keyof T]}
                                         </div>
                                     ))}
 
-                                    {/* azioni per riga */}
+                                    {/* azioni */}
                                     <div
-                                        className={`w-36 flex items-center shrink-0 ${modalitaCestino
-                                            ? "justify-center gap-3"
-                                            : "justify-end gap-3"
+                                        className={`w-36 flex items-center shrink-0 ${modalitaCestino ? "justify-center gap-3" : "justify-end gap-3"
                                             }`}
                                         onClick={(e) => e.stopPropagation()}
                                     >
@@ -208,11 +152,11 @@ export default function ListaDinamica<T extends { id: string | number }>({
                                             </>
                                         ) : (
                                             <>
-                                                {config.azioni && config.azioni(item, ctx)}
-                                                {config.renderModaleModifica && !modalitaCestino && (
+                                                {config.azioni?.(item, ctx)}
+                                                {config.renderModaleModifica && (
                                                     <button
                                                         onClick={() =>
-                                                            setItemDaModificareId(itemId)
+                                                            config.renderModaleModifica?.(String(item.id), () => { })
                                                         }
                                                         className="icon-color hover:text-blue-600"
                                                         title="Modifica"
@@ -225,9 +169,9 @@ export default function ListaDinamica<T extends { id: string | number }>({
                                     </div>
                                 </div>
 
-                                {/* dettaglio espandibile */}
-                                {isOpen && config.renderDettaglio && (
-                                    <div className="animate-scale-fade px-6 pb-4 text-sm text-theme space-y-1">
+                                {/* dettaglio espanso */}
+                                {isExpanded && config.renderDettaglio && (
+                                    <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800 text-sm">
                                         {config.renderDettaglio(item, ctx)}
                                     </div>
                                 )}
@@ -236,13 +180,6 @@ export default function ListaDinamica<T extends { id: string | number }>({
                     })}
                 </div>
             )}
-
-            {/* modale modifica — non in cestino */}
-            {itemDaModificareId &&
-                !modalitaCestino &&
-                config.renderModaleModifica?.(itemDaModificareId, () =>
-                    setItemDaModificareId(null)
-                )}
         </div>
     );
 }

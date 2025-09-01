@@ -7,6 +7,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { inviaNotifica } from "../Notifiche/notificheUtils";
 import type { Cliente, Utente, Stato, Priorita, PopupType, MiniProjectModalProps } from "../supporto/types";
+import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
 
 type Props = MiniProjectModalProps & { offsetIndex?: number };
 // helper in cima al file (fuori dal componente)
@@ -125,6 +126,8 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
             setTimeout(() => setErrore(null), 3000);
             return;
         }
+        // ⬇️ Notifica tutte le viste che un progetto nuovo è stato aggiunto
+        dispatchResourceEvent("add", "progetti", { item: created });
 
         const progettoId = created.id;
         for (const u of utentiSelezionati) {

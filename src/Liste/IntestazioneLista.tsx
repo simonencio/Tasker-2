@@ -26,7 +26,7 @@ function VistaSwitcher({ tipo, paramKey = "view" }: { tipo: ResourceKey; paramKe
 
     const readView = (): Vista => {
         const v = searchParams.get(paramKey);
-        if (v === "cards" || v === "board" || v === "list") return v;
+        if (v === "cards" || v === "timeline" || v === "list") return v;
         return getPreferredView(tipo, "list");
     };
 
@@ -68,7 +68,7 @@ function VistaSwitcher({ tipo, paramKey = "view" }: { tipo: ResourceKey; paramKe
         <div className="flex items-center gap-2">
             <Btn v="list" label="Lista" />
             <Btn v="cards" label="Schede" />
-            <Btn v="board" label="Bacheca" />
+            <Btn v="timeline" label="Timeline" />
         </div>
     );
 }

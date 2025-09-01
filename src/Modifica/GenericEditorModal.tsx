@@ -1,10 +1,11 @@
+// src/Modifica/GenericEditorModal.tsx
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark, faUpload } from "@fortawesome/free-solid-svg-icons";
 import { editorConfigs, type CampoSelect, type CampoJoinMany } from "./editorConfigs";
 import { traduciColore, traduciColoreInverso } from "../supporto/traduzioniColori";
-import { useNavigate } from "react-router-dom";
+import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
 
 type Props = { table: keyof typeof editorConfigs; id: string; onClose: () => void };
 
@@ -35,7 +36,6 @@ const ModalFrame: React.FC<{ title: string; onClose: () => void; children: React
 
 const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
     const config = editorConfigs[table];
-    const navigate = useNavigate();
 
     const [loading, setLoading] = useState(true);
     const [form, setForm] = useState<Record<string, any>>({});
@@ -43,29 +43,27 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
     const [options, setOptions] = useState<Record<string, any[]>>({});
     const [joinSelections, setJoinSelections] = useState<Record<string, string[]>>({});
     const [joinOriginals, setJoinOriginals] = useState<Record<string, string[]>>({});
+    const [saving, setSaving] = useState(false);
+    const [success, setSuccess] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const load = async () => {
             setLoading(true);
             const { data: record } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
+
             if (record) {
-                // Se stiamo modificando una TASK, recupera anche il progetto collegato
                 if (table === "tasks") {
                     const { data: link } = await supabase
                         .from("progetti_task")
                         .select("progetti_id")
                         .eq("task_id", id)
                         .maybeSingle();
-
-                    if (link) {
-                        record.progetto_id = link.progetti_id; // aggiungo a mano al form
-                    }
+                    if (link) record.progetto_id = link.progetti_id;
                 }
-
                 setForm(record);
                 setOriginale(record);
             }
-
 
             const opts: Record<string, any[]> = {};
             const joins: Record<string, string[]> = {};
@@ -123,58 +121,75 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
     };
 
     const salva = async () => {
-        let payload = { ...form };
-        await supabase.from(table).update(payload).eq("id", id);
-        if (table === "tasks") {
-            const newProjId = form.progetto_id;
+        setSaving(true);
+        setSuccess(null);
+        setError(null);
 
-            // Recupera il collegamento attuale
-            const { data: oldLink } = await supabase
-                .from("progetti_task")
-                .select("progetti_id")
-                .eq("task_id", id)
-                .maybeSingle();
+        try {
+            let payload = { ...form };
+            delete payload.id;
+            if (table === "tasks") delete payload.progetto_id;
 
-            if (oldLink?.progetti_id !== newProjId) {
-                // Rimuovi eventuale collegamento precedente
-                await supabase.from("progetti_task").delete().eq("task_id", id);
+            const { error: errUpdate } = await supabase.from(table).update(payload).eq("id", id);
+            if (errUpdate) throw errUpdate;
 
-                // Inserisci nuovo collegamento se esiste
-                if (newProjId) {
-                    await supabase.from("progetti_task").insert({
-                        progetti_id: newProjId,
-                        task_id: id,
-                    });
+            // aggiorna campi semplici subito
+            dispatchResourceEvent("update", table, { id, patch: payload });
+
+            if (table === "tasks") {
+                const newProjId = form.progetto_id;
+                const { data: oldLink } = await supabase
+                    .from("progetti_task")
+                    .select("progetti_id")
+                    .eq("task_id", id)
+                    .maybeSingle();
+
+                if (oldLink?.progetti_id !== newProjId) {
+                    await supabase.from("progetti_task").delete().eq("task_id", id);
+                    if (newProjId) {
+                        await supabase.from("progetti_task").insert({ progetti_id: newProjId, task_id: id });
+                    }
                 }
             }
-        }
 
-        for (const campo of config.campi) {
-            if (campo.tipo === "join-many") {
-                const c = campo as CampoJoinMany;
-                const prev = joinOriginals[campo.chiave] || [];
-                const next = joinSelections[campo.chiave] || [];
-                const daAggiungere = next.filter((x) => !prev.includes(x));
-                const daRimuovere = prev.filter((x) => !next.includes(x));
-                if (daRimuovere.length > 0) {
-                    await supabase.from(c.join.tabellaJoin).delete().eq(c.join.thisKey, id).in(c.join.otherKey, daRimuovere);
-                }
-                if (daAggiungere.length > 0) {
-                    await supabase.from(c.join.tabellaJoin).insert(
-                        daAggiungere.map((v) => ({ [c.join.thisKey]: id, [c.join.otherKey]: v }))
-                    );
+            for (const campo of config.campi) {
+                if (campo.tipo === "join-many") {
+                    const c = campo as CampoJoinMany;
+                    const prev = joinOriginals[campo.chiave] || [];
+                    const next = joinSelections[campo.chiave] || [];
+                    const daAggiungere = next.filter((x) => !prev.includes(x));
+                    const daRimuovere = prev.filter((x) => !next.includes(x));
+
+                    if (daRimuovere.length > 0) {
+                        await supabase.from(c.join.tabellaJoin).delete().eq(c.join.thisKey, id).in(c.join.otherKey, daRimuovere);
+                    }
+                    if (daAggiungere.length > 0) {
+                        await supabase.from(c.join.tabellaJoin).insert(
+                            daAggiungere.map((v) => ({ [c.join.thisKey]: id, [c.join.otherKey]: v }))
+                        );
+                    }
                 }
             }
-        }
 
-        if (config.hooks?.afterSave) {
-            await config.hooks.afterSave({ form, originale, joinOriginals, joinSelections, supabase, id });
-        }
+            if (config.hooks?.afterSave) {
+                await config.hooks.afterSave({ form, originale, joinOriginals, joinSelections, supabase, id });
+            }
 
-        onClose();
-        if (config.redirectPath) {
-            const redirect = config.redirectPath(form, originale || undefined);
-            if (redirect) navigate(redirect, { replace: true });
+            // 🔥 Refetch completo per aggiornare anche i dettagli
+            const { data: nuovo } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
+            if (nuovo) {
+                // rimpiazza l'oggetto intero
+                dispatchResourceEvent("remove", table, { id });
+                dispatchResourceEvent("add", table, { item: nuovo });
+            }
+
+            setSuccess("Salvato con successo ✅");
+            setOriginale(form);
+            setJoinOriginals(joinSelections);
+        } catch (err: any) {
+            setError(err.message || "Errore durante il salvataggio");
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -217,15 +232,12 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
                             return (
                                 <div key={campo.chiave} className="col-span-1">
                                     <label className="text-sm font-semibold mb-1 block">{campo.label}</label>
-                                    <div className="relative">
-                                        <input
-                                            type="date"
-                                            value={val || ""}
-                                            onChange={(e) => updateForm(campo.chiave, e.target.value)}
-                                            className="w-full input-style pr-10"
-                                        />
-
-                                    </div>
+                                    <input
+                                        type="date"
+                                        value={val || ""}
+                                        onChange={(e) => updateForm(campo.chiave, e.target.value)}
+                                        className="w-full input-style pr-10"
+                                    />
                                 </div>
                             );
                         case "time":
@@ -319,7 +331,9 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
                                             return (
                                                 <label
                                                     key={valOpt}
-                                                    className={`px-2 py-1 rounded cursor-pointer border text-sm ${checked ? "selected-panel font-semibold" : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
+                                                    className={`px-2 py-1 rounded cursor-pointer border text-sm ${checked
+                                                        ? "selected-panel font-semibold"
+                                                        : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
                                                         }`}
                                                 >
                                                     <input
@@ -342,9 +356,36 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
                 })}
             </div>
 
-            <button onClick={salva} className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 mt-6">
-                Salva modifiche
+            <button
+                onClick={salva}
+                disabled={saving}
+                className={`w-full py-2 rounded-md mt-6 flex items-center justify-center gap-2 ${saving ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 text-white"
+                    }`}
+            >
+                {saving ? (
+                    <>
+                        <svg
+                            className="animate-spin h-5 w-5 text-white"
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                        >
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                            ></path>
+                        </svg>
+                        Salvataggio...
+                    </>
+                ) : (
+                    "Salva modifiche"
+                )}
             </button>
+
+            {success && <p className="text-green-600 mt-2 text-sm">{success}</p>}
+            {error && <p className="text-red-600 mt-2 text-sm">{error}</p>}
         </ModalFrame>
     );
 };
