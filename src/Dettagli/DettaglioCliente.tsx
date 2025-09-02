@@ -11,6 +11,8 @@ import {
 import { Chip, MetaField, Section } from "../supporto/ui";
 import GenericEditorModal from "../Modifica/GenericEditorModal";
 import type { Progetto /*, Cliente*/ } from "../supporto/tipi";
+import { useToast } from "../supporto/useToast";
+
 
 /** Tipizzazione locale super-semplice per evitare rogne */
 type ClienteLite = {
@@ -34,6 +36,8 @@ type Credenziale = {
   modified_at?: string;
 };
 
+
+
 export default function DettaglioCliente() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -51,6 +55,8 @@ export default function DettaglioCliente() {
   const [saving, setSaving] = useState(false);
   const [showPwdId, setShowPwdId] = useState<number | null>(null);
 
+  const toast = useToast();
+
   const [form, setForm] = useState<Partial<Credenziale>>({
     nome: "",
     username: "",
@@ -58,6 +64,61 @@ export default function DettaglioCliente() {
     password: "",
     note: "",
   });
+
+  // quali righe sono in editing
+  const [editingIds, setEditingIds] = useState<Set<number>>(new Set());
+  // snapshot dei valori originali per poter fare "Annulla"
+  const [credSnapshot, setCredSnapshot] = useState<Record<number, Credenziale>>({});
+
+
+  // Funzioni di editing inline 
+  const startEdit = (row: Credenziale) => {
+    // apre la sezione credenziali se chiusa
+    setOpenCredenziali(true);
+    // apre la riga di quella credenziale se chiusa
+    setOpenCredRowIds(prev => new Set(prev).add(row.id));
+    // entra in modalità editing
+    setEditingIds(prev => new Set(prev).add(row.id));
+    // snapshot per Annulla
+    setCredSnapshot(prev => ({ ...prev, [row.id]: { ...row } }));
+  };
+
+  const cancelEdit = (idRow: number) => {
+    // ripristina i valori originali
+    const snap = credSnapshot[idRow];
+    if (snap) {
+      setCredenziali(prev => prev.map(c => (c.id === idRow ? { ...snap } : c)));
+    }
+    setEditingIds(prev => {
+      const next = new Set(prev);
+      next.delete(idRow);
+      return next;
+    });
+    setCredSnapshot(prev => {
+      const { [idRow]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const saveEdit = async (row: Credenziale) => {
+    await handleUpdate(row); // riusa la tua funzione
+    // riordina in base al (nuovo) nome
+    setCredenziali(prev => applySort(prev));
+    setEditingIds(prev => {
+      const next = new Set(prev);
+      next.delete(row.id);
+      return next;
+    });
+    setCredSnapshot(prev => {
+      const { [row.id]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const byNome = (a: Credenziale, b: Credenziale) =>
+    (a.nome ?? "").localeCompare(b.nome ?? "", undefined, { sensitivity: "base" });
+
+  const applySort = (arr: Credenziale[]) => [...arr].sort(byNome);
 
 
   // --- Cliente ---
@@ -110,7 +171,7 @@ export default function DettaglioCliente() {
         .select("id, cliente_id, nome, username, email, password, note, created_at, modified_at")
         .eq("cliente_id", id)
         .is("deleted_at", null)
-        .order("created_at", { ascending: false });
+        .order("nome", { ascending: true });
 
       if (!alive) return;
       if (!error && data) setCredenziali(data as Credenziale[]);
@@ -138,36 +199,57 @@ export default function DettaglioCliente() {
       .single();
 
     setSaving(false);
-    if (error) return; // qui puoi lanciare un toast se vuoi
+    if (error) {
+      toast("Errore nell’aggiunta della credenziale", "error");
+      return;
+    }
     if (data) {
-      setCredenziali(prev => [data as Credenziale, ...prev]);
+      setCredenziali(prev => applySort([data as Credenziale, ...prev]));
       setAdding(false);
       resetForm();
+      toast("Credenziale aggiunta con successo", "success")
     }
   };
 
   const handleDelete = async (row: Credenziale) => {
     if (!window.confirm(`Eliminare la credenziale "${row.nome}"?`)) return;
-    await supabase
+    const { error } = await supabase
       .from("clienti_credenziali")
       .update({ deleted_at: new Date().toISOString() })
       .eq("id", row.id);
-    setCredenziali(prev => prev.filter(c => c.id !== row.id));
+
+    if (error) {
+      toast("Errore durante l’eliminazione", "error");
+      return;
+    }
+    setCredenziali(prev => applySort(prev.filter(c => c.id !== row.id)));
+    toast("Credenziale eliminata", "success");
   };
 
+
   const handleUpdate = async (row: Credenziale) => {
-    // salva inline eventuali modifiche (nome/username/email/password/note)
     const { id: credId, ...rest } = row;
     const { error } = await supabase
       .from("clienti_credenziali")
       .update({ ...rest, modified_at: new Date().toISOString() })
       .eq("id", credId);
-    if (error) return; // toast opzionale
+
+    if (error) {
+      toast("Errore nel salvataggio", "error");
+      return;
+    }
+    toast("Modifica salvata", "success");;
   };
+
 
   const copyToClipboard = async (text?: string | null) => {
     if (!text) return;
-    try { await navigator.clipboard.writeText(text); } catch { /* opzionale: toast errore */ }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast("Elemento copiato!", "success");
+    } catch {
+      toast("Errore durante la copia", "error");
+    }
   };
 
   if (loading) return <div className="p-6 text-theme">Caricamento...</div>;
@@ -268,7 +350,7 @@ export default function DettaglioCliente() {
 
             {!adding && openCredenziali && (
               <button
-                onClick={() => setAdding(true)}
+                onClick={() => { setOpenCredenziali(true); setAdding(true); }}
                 className="px-3 py-2 rounded-xl bg-green-600 text-white hover:bg-green-500 text-[15px] inline-flex items-center gap-2"
                 title="Aggiungi credenziale"
               >
@@ -377,8 +459,8 @@ export default function DettaglioCliente() {
                       type="submit"
                       disabled={saving || !form.nome?.trim()}
                       className={`px-3 py-2 rounded-xl text-[15px] inline-flex items-center gap-2 ${saving || !form.nome?.trim()
-                          ? "bg-gray-400 text-white cursor-not-allowed"
-                          : "bg-blue-600 text-white hover:bg-blue-500"
+                        ? "bg-gray-400 text-white cursor-not-allowed"
+                        : "bg-blue-600 text-white hover:bg-blue-500"
                         }`}
                     >
                       <FontAwesomeIcon icon={faSave} /> Salva
@@ -397,14 +479,25 @@ export default function DettaglioCliente() {
                     return (
                       <div key={row.id} className="rounded-xl border border-theme/20 card-theme overflow-hidden">
                         {/* Header riga: click = toggle dettagli */}
-                        <button
-                          type="button"
+                        <div
+                          role="button"
+                          tabIndex={0}
                           onClick={() => {
                             setOpenCredRowIds(prev => {
                               const next = new Set(prev);
                               next.has(row.id) ? next.delete(row.id) : next.add(row.id);
                               return next;
                             });
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setOpenCredRowIds(prev => {
+                                const next = new Set(prev);
+                                next.has(row.id) ? next.delete(row.id) : next.add(row.id);
+                                return next;
+                              });
+                            }
                           }}
                           className="w-full px-4 py-2 flex items-center justify-between gap-3 text-left hover-bg-theme"
                           aria-expanded={isOpen}
@@ -419,41 +512,43 @@ export default function DettaglioCliente() {
                           </span>
 
                           <div className="flex items-center gap-2">
-                            <button
-                              className="icon-color hover:text-red-600"
-                              title="Elimina"
-                              onClick={(e) => { e.stopPropagation(); handleDelete(row); }}
-                            >
-                              <FontAwesomeIcon icon={faTrash} />
-                            </button>
-                            <button
-                              className="icon-color"
-                              title="Copia tutto"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyToClipboard(
-                                  [
-                                    `Nome: ${row.nome}`,
-                                    row.username ? `Username: ${row.username}` : "",
-                                    row.email ? `Email: ${row.email}` : "",
-                                    row.password ? `Password: ${row.password}` : "",
-                                    row.note ? `Note: ${row.note}` : "",
-                                  ].filter(Boolean).join("\n")
-                                );
-                              }}
-                            >
-                              <FontAwesomeIcon icon={faCopy} />
-                            </button>
-                            <button
-                              className="icon-color"
-                              onClick={(e) => { e.stopPropagation(); setShowPwdId(prev => prev === row.id ? null : row.id); }}
-                              title={showPwdId === row.id ? "Nascondi dettagli sensibili" : "Mostra dettagli sensibili"}
-                            >
-                              <FontAwesomeIcon icon={showPwdId === row.id ? faEyeSlash : faEye} />
-                            </button>
+                            {!editingIds.has(row.id) ? (
+                              <>
+                                <button
+                                  className="icon-color hover:text-yellow-600"
+                                  title="Modifica"
+                                  onClick={(e) => { e.stopPropagation(); startEdit(row); }}
+                                >
+                                  <FontAwesomeIcon icon={faPen} />
+                                </button>
+                                <button
+                                  className="icon-color hover:text-red-600"
+                                  title="Elimina"
+                                  onClick={(e) => { e.stopPropagation(); handleDelete(row); }}
+                                >
+                                  <FontAwesomeIcon icon={faTrash} />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  className="icon-color hover:text-blue-600"
+                                  title="Salva"
+                                  onClick={(e) => { e.stopPropagation(); saveEdit(row); }}
+                                >
+                                  <FontAwesomeIcon icon={faSave} />
+                                </button>
+                                <button
+                                  className="icon-color hover:text-gray-400"
+                                  title="Annulla"
+                                  onClick={(e) => { e.stopPropagation(); cancelEdit(row.id); }}
+                                >
+                                  <FontAwesomeIcon icon={faTimes} />
+                                </button>
+                              </>
+                            )}
                           </div>
-                        </button>
-
+                        </div>
                         {/* Dettagli riga (solo se aperta) */}
                         {isOpen && (
                           <div className="px-4 py-3 border-t border-theme/20 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -473,7 +568,7 @@ export default function DettaglioCliente() {
                                     const v = e.target.value;
                                     setCredenziali(prev => prev.map(c => c.id === row.id ? { ...c, username: v } : c));
                                   }}
-                                  onBlur={() => handleUpdate(credenziali.find(c => c.id === row.id)!)}
+                                  readOnly={!editingIds.has(row.id)}
                                   name={`cred_username_${row.id}`}
                                   autoComplete="off"
                                   spellCheck={false}
@@ -495,7 +590,7 @@ export default function DettaglioCliente() {
                                     const v = e.target.value;
                                     setCredenziali(prev => prev.map(c => c.id === row.id ? { ...c, email: v } : c));
                                   }}
-                                  onBlur={() => handleUpdate(credenziali.find(c => c.id === row.id)!)}
+                                  readOnly={!editingIds.has(row.id)}
                                   name={`cred_email_${row.id}`}
                                   autoComplete="off"
                                   inputMode="email"
@@ -519,7 +614,7 @@ export default function DettaglioCliente() {
                                     const v = e.target.value;
                                     setCredenziali(prev => prev.map(c => c.id === row.id ? { ...c, password: v } : c));
                                   }}
-                                  onBlur={() => handleUpdate(credenziali.find(c => c.id === row.id)!)}
+                                  readOnly={!editingIds.has(row.id)}
                                   name={`cred_password_${row.id}`}
                                   autoComplete="new-password"
                                   spellCheck={false}
@@ -547,7 +642,7 @@ export default function DettaglioCliente() {
                                   const v = e.target.value;
                                   setCredenziali(prev => prev.map(c => c.id === row.id ? { ...c, note: v } : c));
                                 }}
-                                onBlur={() => handleUpdate(credenziali.find(c => c.id === row.id)!)}
+                                readOnly={!editingIds.has(row.id)}
                                 name={`cred_note_${row.id}`}
                                 autoComplete="off"
                                 spellCheck={false}
