@@ -63,8 +63,8 @@ export default function Sidebar({
                     title="Torna alla Home"
                 >
                     <img
-                        src={theme === "dark" ? "/kalimero_logo2.png" : "/kalimero_logo.png"}
-                        alt="Logo Kalimero"
+                        src={theme === "dark" ? "/tasker_logo_finale.png" : "/tasker_logo_finale_2.png"}
+                        alt="Logo Tasker"
                         className="h-8 sm:h-9 md:h-10 lg:h-11 xl:h-12"
                     />
                 </button>
