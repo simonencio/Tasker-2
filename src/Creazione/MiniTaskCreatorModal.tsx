@@ -3,7 +3,7 @@ import React, { useEffect, useState, type JSX } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import {
     faFlag, faSignal, faCalendarDays, faClock,
-    faUserPlus, faBuilding, faXmark, faSitemap
+    faUserPlus, faBuilding, faXmark, faSitemap, faCopy,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { inviaNotifica } from "../Notifiche/notificheUtils";
@@ -14,7 +14,7 @@ type Stato = { id: number; nome: string };
 type Priorita = { id: number; nome: string };
 type Progetto = { id: string; nome: string };
 type Utente = { id: string; nome: string; cognome: string };
-type PopupType = "stato" | "priorita" | "consegna" | "tempo" | "progetto" | "utente" | "parent";
+type PopupType = "stato" | "priorita" | "consegna" | "tempo" | "progetto" | "utente" | "parent" | "modello";
 type Props = { onClose: () => void; offsetIndex?: number };
 
 export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props) {
@@ -40,10 +40,26 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
     const [success, setSuccess] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
 
+    const [taskTemplateList, setTaskTemplateList] = useState<Array<{ id: string; nome: string }>>([]);
+    const [selectedTaskTemplateId, setSelectedTaskTemplateId] = useState<string>("");
+    const [saveAsTaskTemplate, setSaveAsTaskTemplate] = useState(false);
+    const [taskTemplateName, setTaskTemplateName] = useState("");
+
+
     // SOTTO-TASK
     const [isSubtask, setIsSubtask] = useState(false);
     const [parentId, setParentId] = useState<string>("");
     const [parentOptions, setParentOptions] = useState<Array<{ id: string; nome: string }>>([]);
+
+
+    const reloadTemplateTasks = async () => {
+        const { data } = await supabase
+            .from("templates_tasks")
+            .select("id,nome")
+            .order("nome", { ascending: true });
+        setTaskTemplateList(data || []);
+    };
+
 
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -52,6 +68,7 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
         return () => window.removeEventListener("resize", handleResize);
     }, []);
 
+    // 1) Dropdown base + canale realtime (stati, priorità, progetti, utenti)
     useEffect(() => {
         Promise.all([
             supabase.from("stati").select("id, nome").is("deleted_at", null),
@@ -85,10 +102,22 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
             })
             .subscribe();
 
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        return () => { supabase.removeChannel(channel); };
     }, []);
+
+    // 2) Carica templates iniziali
+    useEffect(() => {
+        reloadTemplateTasks();
+    }, []);
+
+    // 3) Realtime sui templates_tasks
+    useEffect(() => {
+        const ch = supabase.channel("realtime_templates_tasks");
+        ch.on("postgres_changes", { event: "*", schema: "public", table: "templates_tasks" }, reloadTemplateTasks)
+            .subscribe();
+        return () => { supabase.removeChannel(ch); };
+    }, []);
+
 
     useEffect(() => {
         if (!progettoId) return;
@@ -228,6 +257,43 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
             // 5) Dispatch con record completo
             dispatchResourceEvent("add", "tasks", { item: nuovo });
 
+            // 6) (OPZIONALE) Salva come modello
+            if (saveAsTaskTemplate) {
+                const tempoTemplate = ore || minuti ? `${ore} hours ${minuti} minutes` : null;
+
+                try {
+                    const { data: tpl, error: e1 } = await supabase
+                        .from("templates_tasks")
+                        .insert({
+                            nome: taskTemplateName?.trim() || nome.trim(),
+                            note: note || null,
+                            default_stato_id: statoId ? +statoId : null,
+                            default_priorita_id: prioritaId ? +prioritaId : null,
+                            consegna_offset_days: consegna
+                                ? Math.round((new Date(consegna).getTime() - Date.now()) / 86400000)
+                                : null,
+                            default_tempo_stimato: tempoTemplate,
+                        })
+                        .select("id")
+                        .single();
+
+                    if (!e1 && tpl?.id && assegnatari.length) {
+                        await supabase
+                            .from("templates_tasks_utenti")
+                            .insert(assegnatari.map(u => ({ template_task_id: tpl.id, utente_id: u.id })));
+                    }
+
+                    // aggiorna lista subito (senza aspettare realtime)
+                    await reloadTemplateTasks();
+                    // seleziona il nuovo modello in UI
+                    if (!e1 && tpl?.id) setSelectedTaskTemplateId(tpl.id);
+
+                } catch (tplErr: any) {
+                    console.warn("Salvataggio modello task fallito:", tplErr?.message || tplErr);
+                }
+            }
+
+
             setSuccess(true);
             reset();
             setTimeout(() => setSuccess(false), 3000);
@@ -359,6 +425,52 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
                 )}
             </div>
         ),
+        modello: (
+            <div className="space-y-1 max-h-60">
+                {taskTemplateList.map((tpl) => (
+                    <div
+                        key={tpl.id}
+                        onClick={async () => {
+                            setSelectedTaskTemplateId(tpl.id);
+                            setPopupOpen(null);
+                            const { data } = await supabase
+                                .from("templates_tasks")
+                                .select("*, templates_tasks_utenti(utente_id)")
+                                .eq("id", tpl.id)
+                                .maybeSingle();
+                            if (!data) return;
+
+                            setNome(data.nome || "");
+                            setNote(data.note || "");
+                            setStatoId(data.default_stato_id ? String(data.default_stato_id) : "");
+                            setPrioritaId(data.default_priorita_id ? String(data.default_priorita_id) : "");
+
+                            if (data.consegna_offset_days != null) {
+                                const d = new Date();
+                                d.setDate(d.getDate() + data.consegna_offset_days);
+                                setConsegna(d.toISOString().slice(0, 10));
+                            }
+                            if (data.default_tempo_stimato) {
+                                const m = data.default_tempo_stimato.match(/(\d+)\s*hours?\s*(\d+)\s*minutes?/i);
+                                setOre(m ? +m[1] : 0);
+                                setMinuti(m ? +m[2] : 0);
+                            }
+                            if (Array.isArray(data.templates_tasks_utenti)) {
+                                const ids = data.templates_tasks_utenti.map((r: any) => r.utente_id);
+                                setAssegnatari(utenti.filter(u => ids.includes(u.id)));
+                            }
+                        }}
+                        className={`cursor-pointer px-2 py-1 rounded border ${selectedTaskTemplateId === tpl.id
+                            ? "selected-panel font-semibold"
+                            : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
+                            }`}
+                    >
+                        {tpl.nome}
+                    </div>
+                ))}
+            </div>
+        ),
+
     };
 
     const popupButtons: { icon: any; popup: PopupType; color: string; active: string; title: string }[] = [
@@ -369,6 +481,9 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
         { icon: faBuilding, popup: "progetto", color: "text-cyan-400", active: "text-cyan-600", title: "Progetto" },
         { icon: faUserPlus, popup: "utente", color: "text-green-400", active: "text-green-600", title: "Assegnatari" },
         { icon: faSitemap, popup: "parent", color: "text-pink-400", active: "text-pink-600", title: "Sotto-task" },
+
+        { icon: faCopy, popup: "modello", color: "text-indigo-400", active: "text-indigo-600", title: "Modello" },
+
     ];
 
     const computedLeft = offsetIndex
@@ -448,6 +563,25 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
                         {success && <div className="text-green-600">✅ Attività creata</div>}
                     </div>
                 )}
+
+                {saveAsTaskTemplate && (
+                    <input
+                        className={baseInputClass}
+                        placeholder="Nome modello task"
+                        value={taskTemplateName}
+                        onChange={e => setTaskTemplateName(e.target.value)}
+                    />
+                )}
+
+                <div className="flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        id="saveTaskTpl"
+                        checked={saveAsTaskTemplate}
+                        onChange={e => setSaveAsTaskTemplate(e.target.checked)}
+                    />
+                    <label htmlFor="saveTaskTpl">Salva questa attività come modello</label>
+                </div>
 
                 <div>
                     <button
