@@ -7,6 +7,7 @@ import { utentiConfig } from "./utentiConfig";
 import { progettiConfig } from "./progettiConfig";
 import { tasksConfig } from "./tasksConfig";
 import { timeEntriesConfig } from "./timeEntriesConfig";
+import { tasksSubConfig } from "./tasksSubConfig";
 
 export const resourceConfigs = {
     stati: statiConfig,
@@ -17,6 +18,8 @@ export const resourceConfigs = {
     progetti: progettiConfig,
     tasks: tasksConfig,
     time_entries: timeEntriesConfig,
+    tasks_sub: tasksSubConfig,   // 👈 aggiunto
+
 };
 
 export type ResourceKey = keyof typeof resourceConfigs;

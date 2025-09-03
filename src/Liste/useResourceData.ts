@@ -7,7 +7,10 @@ import type { ResourceConfig, FiltroIntestazione } from "./typesLista";
  */
 export function useResourceData<T extends { id: string | number }>(
     config: ResourceConfig<T>,
-    { modalitaCestino = false }: { modalitaCestino?: boolean } = {}
+    {
+        modalitaCestino = false,
+        paramKey,
+    }: { modalitaCestino?: boolean; paramKey?: string } = {}
 ) {
     const [utenteId, setUtenteId] = useState<string | null>(null);
     const [items, setItems] = useState<T[]>([]);
@@ -16,24 +19,24 @@ export function useResourceData<T extends { id: string | number }>(
 
     // Helpers
     const patchItem = (id: string | number, patch: Partial<T>) => {
-        setItems(prev =>
-            prev.map(it => (String(it.id) === String(id) ? { ...it, ...patch } : it))
+        setItems((prev) =>
+            prev.map((it) => (String(it.id) === String(id) ? { ...it, ...patch } : it))
         );
     };
 
     const removeItem = (id: string | number) => {
-        setItems(prev => prev.filter(it => String(it.id) !== String(id)));
+        setItems((prev) => prev.filter((it) => String(it.id) !== String(id)));
     };
 
     const addItem = (item: T) => {
-        setItems(prev => [...prev, item]);
+        setItems((prev) => [...prev, item]);
     };
 
     const replaceItem = (item: T) => {
-        setItems(prev => {
-            const exists = prev.some(it => String(it.id) === String(item.id));
+        setItems((prev) => {
+            const exists = prev.some((it) => String(it.id) === String(item.id));
             return exists
-                ? prev.map(it => (String(it.id) === String(item.id) ? item : it))
+                ? prev.map((it) => (String(it.id) === String(item.id) ? item : it))
                 : [...prev, item]; // fallback se non esiste
         });
     };
@@ -63,7 +66,11 @@ export function useResourceData<T extends { id: string | number }>(
         (async () => {
             try {
                 setLoading(true);
-                const data = await fetchFn({ filtro: filtro ?? {}, utenteId });
+                const data = await fetchFn({
+                    filtro: filtro ?? {},
+                    utenteId,
+                    paramKey, // 👈 adesso lo passiamo al config
+                });
                 if (!alive) return;
                 setItems(data);
             } finally {
@@ -73,7 +80,7 @@ export function useResourceData<T extends { id: string | number }>(
         return () => {
             alive = false;
         };
-    }, [fetchFn, filtro, utenteId]);
+    }, [fetchFn, filtro, utenteId, paramKey]); // 👈 dipendenze aggiornate
 
     // 🔔 Listener globale
     useEffect(() => {

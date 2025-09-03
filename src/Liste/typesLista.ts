@@ -41,7 +41,11 @@ export type CestinoActions = {
 };
 
 export type CestinoConfig<T> = {
-    fetch: (args: { filtro: FiltroIntestazione; utenteId: string | null }) => Promise<T[]>;
+    fetch: (args: {
+        filtro: FiltroIntestazione;
+        utenteId: string | null;
+        paramKey?: string;              // 👈 aggiunto
+    }) => Promise<T[]>;
     actions: CestinoActions;
 };
 
@@ -51,7 +55,11 @@ export type ResourceConfig<T extends { id: string | number }> = {
     titolo: string | JSX.Element;
     icona: any;
     coloreIcona: string;
-    fetch: (args: { filtro: FiltroIntestazione; utenteId: string | null }) => Promise<T[]>;
+    fetch: (args: {
+        filtro: FiltroIntestazione;
+        utenteId: string | null;
+        paramKey?: string;              // 👈 aggiunto
+    }) => Promise<T[]>;
     useHeaderFilters?: boolean;
     colonne: Colonna<T>[];
     azioni?: (item: T, ctx: ResourceRenderCtx<T>) => JSX.Element;
@@ -59,10 +67,13 @@ export type ResourceConfig<T extends { id: string | number }> = {
     renderModaleModifica?: (id: string, onClose: () => void) => JSX.Element;
     azioniExtra?: JSX.Element;
     modalitaCestino?: boolean;
-    setup?: (deps: { utenteId: string | null }) => { extra: any; dispose?: () => void };
+    setup?: (deps: { utenteId: string | null }) => {
+        extra: any;
+        dispose?: () => void;
+    };
     cestino?: CestinoConfig<T>;
-
-    // 👇 aggiungi per compatibilità con CardDinamiche e BachecaDinamica
+    filtroIniziale?: Partial<FiltroIntestazione>;
+    // 👇 per compatibilità con CardDinamiche e BachecaDinamica
     card?: (item: T, ctx: ResourceRenderCtx<T>) => JSX.Element;
     groupBy?: Record<string, GroupByDef>;
 };

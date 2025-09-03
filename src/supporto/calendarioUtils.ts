@@ -3,7 +3,6 @@ import {
     isBefore,
     startOfDay,
     addDays,
-    endOfDay,
     startOfWeek,
     startOfMonth,
     endOfMonth,
@@ -22,14 +21,16 @@ function parseDueDate(d: string | Date | null | undefined): Date | null {
     return isNaN(dt as unknown as number) ? null : dt;
 }
 
-export const filtraTask = (
-    taskList: Task[],
+// versione generica: preserva i campi extra come "progetto_nome"
+export const filtraTask = <T extends Task>(
+    taskList: T[],
     giorno: Date,
     soloMieTask: boolean,
     utenteLoggatoId: string | null,
-    isAdmin?: boolean,
+    _isAdmin?: boolean,
     mostraCompletate: boolean = true
-) => {
+): T[] => {
+
     const gStart = startOfDay(giorno);
     const gEnd = addDays(gStart, 1);
 
@@ -67,7 +68,6 @@ export function getColorClass(
     const gStart = startOfDay(giorno);
     const gEnd = addDays(gStart, 1);
     const todayStart = startOfDay(oggi);
-    const tomorrowStart = addDays(todayStart, 1);
     const dayAfterTomorrowStart = addDays(todayStart, 2);
 
     // Considera solo le task effettivamente "di quel giorno" (robusto anche se

@@ -15,7 +15,8 @@ async function hardRemove(table: string, column: string, value: string) {
 
     if (!error && data) {
         for (const row of data) {
-            dispatchResourceEvent(table as any, "delete", row.id);
+            dispatchResourceEvent("remove", table as any, row.id);
+
         }
     }
     return { data, error };

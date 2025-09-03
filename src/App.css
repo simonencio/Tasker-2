@@ -849,12 +849,167 @@ html.dark .rdrDayPassive:hover {
 
 
 
+/* ✅ Border adattivo chiaro/scuro */
+.border-theme {
+  border-color: #e5e7eb; /* gray-200 */
+}
+html.dark .border-theme {
+  border-color: #374151; /* gray-700 */
+}
 
 
+/* ✅ Icone semantiche adattive al tema */
+
+/* Successo (verde) */
+.icon-success {
+  color: #16a34a; /* green-600 */
+}
+html.dark .icon-success {
+  color: #4ade80; /* green-400 */
+}
+
+/* Errore / Danger (rosso) */
+.icon-danger {
+  color: #dc2626; /* red-600 */
+}
+html.dark .icon-danger {
+  color: #f87171; /* red-400 */
+}
+
+/* Warning (giallo/ambra) */
+.icon-warning {
+  color: #d97706; /* amber-600 */
+}
+html.dark .icon-warning {
+  color: #fbbf24; /* amber-400 */
+}
+
+/* Info (blu) */
+.icon-info {
+  color: #2563eb; /* blue-600 */
+}
+html.dark .icon-info {
+  color: #60a5fa; /* blue-400 */
+}
 
 
+/* ✅ Tutto ciò che è .clickable e le sue icone interne diventano cliccabili */
+.clickable {
+  cursor: pointer;
+}
 
+.clickable svg,
+.clickable .fa-icon {
+  cursor: pointer;
+}
 
+/* 🎨 Palette icone azione */
+.icon-edit {
+  color: #2563eb; /* blu-600 */
+}
+html.dark .icon-edit {
+  color: #60a5fa; /* blu-400 */
+}
+
+.icon-delete {
+  color: #dc2626; /* rosso-600 */
+}
+html.dark .icon-delete {
+  color: #f87171; /* rosso-400 */
+}
+
+.icon-restore {
+  color: #16a34a; /* verde-600 */
+}
+html.dark .icon-restore {
+  color: #4ade80; /* verde-400 */
+}
+
+.icon-complete {
+  color: #059669; /* emerald-600 */
+}
+html.dark .icon-complete {
+  color: #34d399; /* emerald-400 */
+}
+
+.icon-play {
+  color: #22c55e; /* green-500 */
+}
+html.dark .icon-play {
+  color: #86efac; /* green-300 */
+}
+
+.icon-stop {
+  color: #e11d48; /* rose-600 */
+}
+html.dark .icon-stop {
+  color: #fb7185; /* rose-400 */
+}
+
+.icon-folder {
+  color: #7c3aed; /* violet-600 */
+}
+html.dark .icon-folder {
+  color: #a78bfa; /* violet-400 */
+}
+
+.icon-navigate {
+  color: #0d9488; /* teal-600 */
+}
+html.dark .icon-navigate {
+  color: #5eead4; /* teal-400 */
+}
+
+/* Effetto hover + zoom */
+.icon-action {
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+.icon-action:hover {
+  transform: scale(1.2);
+}
+/* Tooltip custom con data-tooltip */
+.tooltip {
+  position: relative;
+  overflow: visible !important; /* evita che il ::after venga tagliato */
+}
+
+.tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 130%; /* sopra l’icona */
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 1000;
+}
+
+/* freccetta sotto il tooltip */
+.tooltip::before {
+  content: "";
+  position: absolute;
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: rgba(0, 0, 0, 0.85) transparent transparent transparent;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 999;
+}
+
+.tooltip:hover::after,
+.tooltip:hover::before {
+  opacity: 1;
+}
 
 
 /* 📅 Celle calendario */
@@ -1142,3 +1297,65 @@ html.dark .avatar-placeholder {
   /* blu-600 in dark mode */
   color: #f9fafb;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Palette colori barre Gantt */
+.gantt-bar-blue {
+  background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
+}
+.gantt-bar-green {
+  background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+}
+.gantt-bar-violet {
+  background: linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%);
+}
+.gantt-bar-orange {
+  background: linear-gradient(90deg, #f97316 0%, #fb923c 100%);
+}
+.gantt-bar-pink {
+  background: linear-gradient(90deg, #ec4899 0%, #f472b6 100%);
+}
+.gantt-bar-teal {
+  background: linear-gradient(90deg, #14b8a6 0%, #2dd4bf 100%);
+}
+.bg-weekend {
+  background-color: rgba(255, 0, 0, 0.08); /* rosso chiaro per weekend */
+}
+html.dark .bg-weekend {
+  background-color: rgba(255, 100, 100, 0.12);
+}
+

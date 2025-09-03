@@ -1,4 +1,4 @@
-import { faAddressBook, faEnvelope, faPhone, faStickyNote, faUpRightFromSquare } from "@fortawesome/free-solid-svg-icons";
+import { faAddressBook, faEnvelope, faPhone, faStickyNote } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { fetchClienti, fetchClientiDeleted, cestinoActions } from "../../supporto/fetchData";
 import { softDeleteCliente } from "../../supporto/softDeleteRecursive";
@@ -33,14 +33,7 @@ export const clientiConfig: ResourceConfig<Cliente> = {
     azioni: (cliente, ctx) => (
         <>
             {azioni.edit(() => (window as any).__openMiniEdit("clienti", cliente.id))}
-            {/* Nuova icona per aprire DettaglioCliente */}
-            <button
-                className="icon-color hover:text-blue-600"
-                title="Dettaglio Cliente"
-                onClick={() => ctx.navigate(`/clienti/${cliente.id}`)}
-            >
-                <FontAwesomeIcon icon={faUpRightFromSquare} />
-            </button>
+            {azioni.dettaglioCliente(() => ctx.navigate(`/clienti/${cliente.id}`))}
             {azioni.trashSoft(async () => {
                 if (!window.confirm("Eliminare questo cliente?")) return;
                 await softDeleteCliente(cliente.id);
