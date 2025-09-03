@@ -182,6 +182,62 @@ export async function fetchTasks(filtro: any = {}, utenteId?: string) {
         slug: item.slug,
     }));
 }
+// 🔹 Cliente con progetti e credenziali
+export async function fetchClienteDettaglioBySlugOrId({
+    slug,
+    id,
+}: { slug?: string | null; id?: string | null }) {
+    const base = supabase
+        .from("clienti")
+        .select(`
+          id, nome, email, telefono, avatar_url, note,
+          progetti:progetti (
+            id, nome, slug, consegna,
+            stato:stato_id ( id, nome, colore ),
+            priorita:priorita_id ( id, nome )
+          ),
+          credenziali:clienti_credenziali (
+            id, cliente_id, nome, username, email, password, note, created_at, modified_at, deleted_at
+          )
+        `)
+        .limit(1);
+
+    const { data, error } = slug
+        ? await base.eq("slug", slug!).maybeSingle()
+        : await base.eq("id", id!).maybeSingle();
+
+    if (error || !data) return null;
+
+    return {
+        id: data.id,
+        nome: data.nome,
+        email: data.email ?? null,
+        telefono: data.telefono ?? null,
+        avatar_url: data.avatar_url ?? null,
+        note: data.note ?? null,
+        progetti: (data.progetti || []).map((p: any) => ({
+            id: p.id,
+            nome: p.nome,
+            slug: p.slug,
+            consegna: p.consegna,
+            stato: Array.isArray(p.stato) ? p.stato[0] : p.stato,
+            priorita: Array.isArray(p.priorita) ? p.priorita[0] : p.priorita,
+        })),
+        credenziali: (data.credenziali || [])
+            .filter((c: any) => !c.deleted_at)
+            .map((c: any) => ({
+                id: c.id,
+                cliente_id: c.cliente_id,
+                nome: c.nome,
+                username: c.username,
+                email: c.email,
+                password: c.password,
+                note: c.note,
+                created_at: c.created_at,
+                modified_at: c.modified_at,
+            })),
+    } as const;
+}
 
 
 // 🔹 Progetti

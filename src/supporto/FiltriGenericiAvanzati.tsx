@@ -1,3 +1,4 @@
+// src/supporto/FiltriGenericiAvanzati.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DateRange, type Range } from "react-date-range";
 import { format, isAfter, isBefore } from "date-fns";
@@ -14,7 +15,6 @@ type CampoFiltro =
     | "date"
     | "ordine";
 
-// 👇 Chiavi logiche per filtrare (nota "date" non è una keyof del filtro)
 type FiltroChiave =
     | "progetto"
     | "utente"
@@ -49,13 +49,12 @@ type Props<T> = {
         cliente?: (d: T) => IdNome<string> | null;
         stato?: (d: T) => IdNome<number> | null;
         priorita?: (d: T) => IdNome<number> | null;
-        consegna?: (d: T) => string | null; // ISO date string
+        consegna?: (d: T) => string | null;
     };
-    /** Cataloghi completi da DB: mostrati finché nessun altro filtro è attivo */
     opzioniGlobali?: {
         progetto?: IdNome<string>[];
         utente?: IdNome<string>[];
-        membri?: IdNome<string>[]; // se omesso, fallback a utente
+        membri?: IdNome<string>[];
         cliente?: IdNome<string>[];
         stato?: IdNome<number>[];
         priorita?: IdNome<number>[];
@@ -94,12 +93,15 @@ export default function FiltriGenericiAvanzati<T>({
     });
 
     const [rangeSelezionato, setRangeSelezionato] = useState<Range[]>([
-        { startDate: filtro.dataInizio ? new Date(filtro.dataInizio) : undefined, endDate: filtro.dataFine ? new Date(filtro.dataFine) : undefined, key: "selection" },
+        {
+            startDate: filtro.dataInizio ? new Date(filtro.dataInizio) : undefined,
+            endDate: filtro.dataFine ? new Date(filtro.dataFine) : undefined,
+            key: "selection",
+        },
     ]);
     const [mostraCalendario, setMostraCalendario] = useState(false);
     const calendarioRef = useRef<HTMLDivElement>(null);
 
-    // utils
     const normalizeAndSort = <K extends string | number>(arr: IdNome<K>[]) =>
         [...arr].sort((a, b) =>
             a.nome.localeCompare(b.nome, "it", { sensitivity: "base" })
@@ -124,7 +126,6 @@ export default function FiltriGenericiAvanzati<T>({
     const campoPresente = (c: FiltroChiave) =>
         (c === "date" && campi.includes("date")) || campi.includes(c as CampoFiltro);
 
-    // subset coerente con TUTTI i filtri tranne "escludi"
     const subsetFiltratoEscludendo = (escludi: FiltroChiave): T[] => {
         return dati.filter((row) => {
             if (escludi !== "progetto" && filtro.progetto && estrattori.progetto) {
@@ -150,11 +151,7 @@ export default function FiltriGenericiAvanzati<T>({
             if (escludi !== "stato" && filtro.stato != null && estrattori.stato) {
                 if (estrattori.stato(row)?.id !== filtro.stato) return false;
             }
-            if (
-                escludi !== "priorita" &&
-                filtro.priorita != null &&
-                estrattori.priorita
-            ) {
+            if (escludi !== "priorita" && filtro.priorita != null && estrattori.priorita) {
                 if (estrattori.priorita(row)?.id !== filtro.priorita) return false;
             }
             if (
@@ -167,14 +164,12 @@ export default function FiltriGenericiAvanzati<T>({
                 const d = new Date(ds);
                 if (filtro.dataInizio && isBefore(d, new Date(filtro.dataInizio)))
                     return false;
-                if (filtro.dataFine && isAfter(d, new Date(filtro.dataFine)))
-                    return false;
+                if (filtro.dataFine && isAfter(d, new Date(filtro.dataFine))) return false;
             }
             return true;
         });
     };
 
-    // vero se almeno UN altro filtro (diverso da 'campo') è attivo
     const altriFiltriAttivi = (campo: FiltroChiave): boolean => {
         const flags = {
             progetto: !!filtro.progetto,
@@ -209,38 +204,32 @@ export default function FiltriGenericiAvanzati<T>({
         return dedotte;
     };
 
-    // opzioni pronte
     const opzioniProgetti = useMemo(
         () => getOpzioni("progetto", opzioniGlobali?.progetto, estrattori.progetto),
         [dati, filtro, opzioniGlobali?.progetto]
     );
-
     const opzioniUtenti = useMemo(
         () => getOpzioni("utente", opzioniGlobali?.utente, estrattori.utente),
         [dati, filtro, opzioniGlobali?.utente]
     );
-
     const opzioniMembri = useMemo(
-        () => getOpzioni("membri", opzioniGlobali?.membri ?? opzioniGlobali?.utente, estrattori.membri),
+        () =>
+            getOpzioni("membri", opzioniGlobali?.membri ?? opzioniGlobali?.utente, estrattori.membri),
         [dati, filtro, opzioniGlobali?.membri, opzioniGlobali?.utente]
     );
-
     const opzioniClienti = useMemo(
         () => getOpzioni("cliente", opzioniGlobali?.cliente, estrattori.cliente),
         [dati, filtro, opzioniGlobali?.cliente]
     );
-
     const opzioniStati = useMemo(
         () => getOpzioni("stato", opzioniGlobali?.stato, estrattori.stato),
         [dati, filtro, opzioniGlobali?.stato]
     );
-
     const opzioniPriorita = useMemo(
         () => getOpzioni("priorita", opzioniGlobali?.priorita, estrattori.priorita),
         [dati, filtro, opzioniGlobali?.priorita]
     );
 
-    // date → aggiorna filtro quando cambia il range
     useEffect(() => {
         const { startDate, endDate } = rangeSelezionato[0];
         setFiltro((prev) => ({
@@ -250,7 +239,6 @@ export default function FiltriGenericiAvanzati<T>({
         }));
     }, [rangeSelezionato]);
 
-    // propaga all'esterno + salva in localStorage
     useEffect(() => {
         onChange(filtro);
         try {
@@ -258,7 +246,6 @@ export default function FiltriGenericiAvanzati<T>({
         } catch { }
     }, [filtro, onChange]);
 
-    // chiusura calendario on click outside
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             if (
@@ -277,15 +264,13 @@ export default function FiltriGenericiAvanzati<T>({
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4 mb-6 w-full">
             {campi.includes("progetto") && (
                 <select
-                    className="input-style"
+                    className="input-style cursor-pointer"
                     value={filtro.progetto || ""}
-                    onChange={(e) =>
-                        setFiltro((p) => ({ ...p, progetto: e.target.value || null }))
-                    }
+                    onChange={(e) => setFiltro((p) => ({ ...p, progetto: e.target.value || null }))}
                 >
-                    <option value="">📁 Tutti i progetti</option>
+                    <option value="" className="cursor-pointer">📁 Tutti i progetti</option>
                     {opzioniProgetti.map((p) => (
-                        <option key={p.id} value={String(p.id)}>
+                        <option key={p.id} value={String(p.id)} className="cursor-pointer">
                             {p.nome}
                         </option>
                     ))}
@@ -294,15 +279,13 @@ export default function FiltriGenericiAvanzati<T>({
 
             {campi.includes("utente") && (
                 <select
-                    className="input-style"
+                    className="input-style cursor-pointer"
                     value={filtro.utente || ""}
-                    onChange={(e) =>
-                        setFiltro((p) => ({ ...p, utente: e.target.value || null }))
-                    }
+                    onChange={(e) => setFiltro((p) => ({ ...p, utente: e.target.value || null }))}
                 >
-                    <option value="">🧑‍💼 Tutti gli utenti</option>
+                    <option value="" className="cursor-pointer">🧑‍💼 Tutti gli utenti</option>
                     {opzioniUtenti.map((u) => (
-                        <option key={u.id} value={String(u.id)}>
+                        <option key={u.id} value={String(u.id)} className="cursor-pointer">
                             {u.nome}
                         </option>
                     ))}
@@ -313,19 +296,17 @@ export default function FiltriGenericiAvanzati<T>({
                 <div className="relative membri-dropdown">
                     <select
                         multiple
-                        className="input-style"
+                        className="input-style cursor-pointer"
                         value={filtro.membri}
                         onChange={(e) =>
                             setFiltro((p) => ({
                                 ...p,
-                                membri: Array.from(e.target.selectedOptions).map(
-                                    (o) => o.value
-                                ),
+                                membri: Array.from(e.target.selectedOptions).map((o) => o.value),
                             }))
                         }
                     >
                         {opzioniMembri.map((m) => (
-                            <option key={m.id} value={String(m.id)}>
+                            <option key={m.id} value={String(m.id)} className="cursor-pointer">
                                 {m.nome}
                             </option>
                         ))}
@@ -335,15 +316,13 @@ export default function FiltriGenericiAvanzati<T>({
 
             {campi.includes("cliente") && (
                 <select
-                    className="input-style"
+                    className="input-style cursor-pointer"
                     value={filtro.cliente || ""}
-                    onChange={(e) =>
-                        setFiltro((p) => ({ ...p, cliente: e.target.value || null }))
-                    }
+                    onChange={(e) => setFiltro((p) => ({ ...p, cliente: e.target.value || null }))}
                 >
-                    <option value="">👥 Tutti i clienti</option>
+                    <option value="" className="cursor-pointer">👥 Tutti i clienti</option>
                     {opzioniClienti.map((c) => (
-                        <option key={c.id} value={String(c.id)}>
+                        <option key={c.id} value={String(c.id)} className="cursor-pointer">
                             {c.nome}
                         </option>
                     ))}
@@ -352,7 +331,7 @@ export default function FiltriGenericiAvanzati<T>({
 
             {campi.includes("stato") && (
                 <select
-                    className="input-style"
+                    className="input-style cursor-pointer"
                     value={filtro.stato ?? ""}
                     onChange={(e) =>
                         setFiltro((p) => ({
@@ -361,9 +340,9 @@ export default function FiltriGenericiAvanzati<T>({
                         }))
                     }
                 >
-                    <option value="">📊 Tutti gli stati</option>
+                    <option value="" className="cursor-pointer">📊 Tutti gli stati</option>
                     {opzioniStati.map((s) => (
-                        <option key={s.id} value={String(s.id)}>
+                        <option key={s.id} value={String(s.id)} className="cursor-pointer">
                             {s.nome}
                         </option>
                     ))}
@@ -372,7 +351,7 @@ export default function FiltriGenericiAvanzati<T>({
 
             {campi.includes("priorita") && (
                 <select
-                    className="input-style"
+                    className="input-style cursor-pointer"
                     value={filtro.priorita ?? ""}
                     onChange={(e) =>
                         setFiltro((p) => ({
@@ -381,9 +360,9 @@ export default function FiltriGenericiAvanzati<T>({
                         }))
                     }
                 >
-                    <option value="">⏫ Tutte le priorità</option>
+                    <option value="" className="cursor-pointer">⏫ Tutte le priorità</option>
                     {opzioniPriorita.map((p) => (
-                        <option key={p.id} value={String(p.id)}>
+                        <option key={p.id} value={String(p.id)} className="cursor-pointer">
                             {p.nome}
                         </option>
                     ))}
@@ -395,7 +374,7 @@ export default function FiltriGenericiAvanzati<T>({
                     <button
                         type="button"
                         onClick={() => setMostraCalendario((prev) => !prev)}
-                        className="input-style w-full text-start whitespace-nowrap "
+                        className="input-style w-full text-start whitespace-nowrap cursor-pointer"
                     >
                         📅{" "}
                         {filtro.dataInizio && filtro.dataFine
@@ -414,9 +393,7 @@ export default function FiltriGenericiAvanzati<T>({
                                 editableDateInputs
                                 onChange={(item) => {
                                     const { startDate, endDate, key } = item.selection;
-                                    setRangeSelezionato([
-                                        { startDate, endDate, key: key ?? "selection" },
-                                    ]);
+                                    setRangeSelezionato([{ startDate, endDate, key: key ?? "selection" }]);
                                 }}
                                 moveRangeOnFirstSelection={false}
                                 ranges={[
@@ -428,24 +405,16 @@ export default function FiltriGenericiAvanzati<T>({
                                 ]}
                                 showDateDisplay={false}
                                 rangeColors={["#2563eb"]}
-                                className="popup-panel text-theme border rounded shadow-xl"
+                                className="popup-panel text-theme border rounded shadow-xl cursor-pointer"
                             />
                             <div className="flex justify-end px-4 py-2">
                                 <button
-                                    className="text-sm text-red-600 hover:underline"
+                                    className="text-sm text-red-600 hover:underline cursor-pointer"
                                     onClick={() => {
                                         setRangeSelezionato([
-                                            {
-                                                startDate: undefined,
-                                                endDate: undefined,
-                                                key: "selection",
-                                            },
+                                            { startDate: undefined, endDate: undefined, key: "selection" },
                                         ]);
-                                        setFiltro((p) => ({
-                                            ...p,
-                                            dataInizio: null,
-                                            dataFine: null,
-                                        }));
+                                        setFiltro((p) => ({ ...p, dataInizio: null, dataFine: null }));
                                         setMostraCalendario(false);
                                     }}
                                 >
@@ -459,26 +428,25 @@ export default function FiltriGenericiAvanzati<T>({
 
             {campi.includes("ordine") && (
                 <select
-                    className="input-style"
+                    className="input-style cursor-pointer"
                     value={filtro.ordine || ""}
-                    onChange={(e) =>
-                        setFiltro((p) => ({ ...p, ordine: e.target.value || null }))
-                    }
+                    onChange={(e) => setFiltro((p) => ({ ...p, ordine: e.target.value || null }))}
                 >
-                    <option value="">🔀 Ordina per...</option>
-                    <option value="consegna_asc">📈 Data crescente</option>
-                    <option value="consegna_desc">📉 Data decrescente</option>
-                    <option value="priorita_urgente">🔥 Più urgente</option>
-                    <option value="priorita_meno_urgente">🧊 Meno urgente</option>
-                    <option value="stato_az">🔤 Stato A-Z</option>
-                    <option value="stato_za">🔡 Stato Z-A</option>
-                    <option value="nome_az">🔤 Nome A-Z</option>
-                    <option value="nome_za">🔡 Nome Z-A</option>
+                    <option value="" className="cursor-pointer">🔀 Ordina per...</option>
+                    <option value="consegna_asc" className="cursor-pointer">📈 Data crescente</option>
+                    <option value="consegna_desc" className="cursor-pointer">📉 Data decrescente</option>
+                    <option value="priorita_urgente" className="cursor-pointer">🔥 Più urgente</option>
+                    <option value="priorita_meno_urgente" className="cursor-pointer">🧊 Meno urgente</option>
+                    <option value="stato_az" className="cursor-pointer">🔤 Stato A-Z</option>
+                    <option value="stato_za" className="cursor-pointer">🔡 Stato Z-A</option>
+                    <option value="nome_az" className="cursor-pointer">🔤 Nome A-Z</option>
+                    <option value="nome_za" className="cursor-pointer">🔡 Nome Z-A</option>
                 </select>
             )}
         </div>
     );
 }
+
 
 /* ===========================
    ORDINAMENTO GENERICO

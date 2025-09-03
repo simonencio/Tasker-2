@@ -8,7 +8,13 @@ import { traduciColore, traduciColoreInverso } from "../supporto/traduzioniColor
 import { dispatchResourceEvent } from "../Liste/config/azioniConfig";
 import { resourceConfigs } from "../Liste/resourceConfigs"; // 👈 usare la stessa fetch della lista
 
-type Props = { table: keyof typeof editorConfigs; id: string; onClose: () => void };
+type Props = {
+    table: keyof typeof editorConfigs;
+    id: string;
+    onClose: () => void;
+    onSaved?: () => void;   // 👈 aggiungi questa riga
+};
+
 
 const Loading = () => (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
@@ -35,7 +41,8 @@ const ModalFrame: React.FC<{ title: string; onClose: () => void; children: React
     </div>
 );
 
-const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
+const GenericEditorModal: React.FC<Props> = ({ table, id, onClose, onSaved }) => {
+
     const config = editorConfigs[table];
 
     const [loading, setLoading] = useState(true);
@@ -222,6 +229,11 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose }) => {
             if (nuovo) {
                 dispatchResourceEvent("replace", table as string, { item: nuovo });
             }
+            // 👇 qui richiami il callback subito dopo il salvataggio
+            if (onSaved) {
+                onSaved();
+            }
+
 
 
             setSuccess("Salvato con successo ✅");

@@ -1,16 +1,17 @@
 // supporto/tipi.ts
 
 export type Task = {
-    utenti_task: any;
+    utenti_task?: any;
     id: string;
+    slug: string; // ✅ aggiunto per URL e navigazione
     nome: string;
     note?: string | null;
     consegna?: string | null;
     tempo_stimato?: string | null;
     fine_task?: string | null;
-    created_at: string;
-    modified_at: string;
-    parent_id?: string | null; // ✅ Campo aggiunto per indicare se è una sotto-task
+    created_at?: string;
+    modified_at?: string;
+    parent_id?: string | null; // ✅ Campo per sotto-task
     stato?: {
         id: number;
         nome: string;
@@ -23,7 +24,7 @@ export type Task = {
     progetto?: {
         id: string;
         nome: string;
-        slug: string; // ✅ aggiunto anche qui perché spesso nel dettaglio task serve
+        slug?: string;   // 👈 facciamolo opzionale
     } | null;
     assegnatari: {
         id: string;

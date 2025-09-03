@@ -23,12 +23,19 @@ export default function TimelineDinamica<T extends { id: string | number }>({
     const navigate = useNavigate();
     const cfgAny = resourceConfigs[tipo] as any;
     if (!cfgAny) {
-        return <p className="text-red-600">Config non trovata per tipo: {tipo}</p>;
+        return <p className="text-danger">Config non trovata per tipo: {tipo}</p>;
     }
     const cfg = cfgAny as ResourceConfig<T>;
 
     const {
-        utenteId, items, loading, filtro, setFiltro, patchItem, removeItem, addItem,
+        utenteId,
+        items,
+        loading,
+        filtro,
+        setFiltro,
+        patchItem,
+        removeItem,
+        addItem,
     } = useResourceData(cfg, { modalitaCestino });
 
     // 🔎 Applica i filtri completamento
@@ -58,19 +65,15 @@ export default function TimelineDinamica<T extends { id: string | number }>({
             case "consegna_asc":
             case "consegna_desc":
                 return item.consegna ?? null;
-
             case "priorita_urgente":
             case "priorita_meno_urgente":
                 return item.priorita?.id ?? null;
-
             case "stato_az":
             case "stato_za":
                 return item.stato?.nome ?? "";
-
             case "nome_az":
             case "nome_za":
                 return item.nome ?? "";
-
             default:
                 return null;
         }
@@ -105,11 +108,12 @@ export default function TimelineDinamica<T extends { id: string | number }>({
             {loading ? (
                 <p className="text-center text-theme py-8">Caricamento…</p>
             ) : (
-                <div className="relative border-l border-gray-300 dark:border-gray-600 ml-4 mt-6">
+                <div className="relative border-l border-theme ml-4 mt-6">
                     {sorted.map((item, idx) => {
-                        const date = item && (item as any).consegna
-                            ? format(new Date((item as any).consegna), "dd MMM yyyy")
-                            : "—";
+                        const date =
+                            item && (item as any).consegna
+                                ? format(new Date((item as any).consegna), "dd MMM yyyy")
+                                : "—";
 
                         return (
                             <motion.div
@@ -125,18 +129,18 @@ export default function TimelineDinamica<T extends { id: string | number }>({
                                 </span>
 
                                 {/* Card elemento */}
-                                <div className="bg-theme border border-gray-200 dark:border-gray-600 p-4 rounded-xl shadow-sm hover:shadow-md transition">
+                                <div className="bg-theme border border-theme p-4 rounded-xl shadow-sm hover:shadow-md transition">
                                     <div className="flex items-center justify-between">
-                                        <p className="text-sm font-semibold">
+                                        <p className="text-sm font-semibold text-theme">
                                             {cfg.colonne[0]?.render?.(item, ctx) ?? (item as any).nome}
                                         </p>
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        <span className="text-xs text-theme opacity-80">
                                             📅 {date}
                                         </span>
                                     </div>
 
                                     {cfg.renderDettaglio && (
-                                        <div className="mt-2 text-xs text-gray-600 dark:text-gray-300">
+                                        <div className="mt-2 text-xs text-theme opacity-80">
                                             {cfg.renderDettaglio(item, ctx)}
                                         </div>
                                     )}
@@ -150,17 +154,17 @@ export default function TimelineDinamica<T extends { id: string | number }>({
                                             <>
                                                 <button
                                                     onClick={() => handleRestore(item.id)}
-                                                    className="icon-color hover:text-green-600"
+                                                    className="icon-color hover:icon-success clickable"
                                                     title="Ripristina"
                                                 >
-                                                    <FontAwesomeIcon icon={faUndo} />
+                                                    <FontAwesomeIcon icon={faUndo} className="clickable" />
                                                 </button>
                                                 <button
                                                     onClick={() => handleHardDelete(item.id)}
-                                                    className="icon-color hover:text-red-600"
+                                                    className="icon-color hover:icon-danger clickable"
                                                     title="Elimina definitivamente"
                                                 >
-                                                    <FontAwesomeIcon icon={faTrash} />
+                                                    <FontAwesomeIcon icon={faTrash} className="clickable" />
                                                 </button>
                                             </>
                                         ) : (
@@ -171,10 +175,10 @@ export default function TimelineDinamica<T extends { id: string | number }>({
                                                         onClick={() =>
                                                             cfg.renderModaleModifica?.(String(item.id), () => { })
                                                         }
-                                                        className="icon-color hover:text-blue-600"
+                                                        className="icon-color hover:icon-info clickable"
                                                         title="Modifica"
                                                     >
-                                                        <FontAwesomeIcon icon={faPen} />
+                                                        <FontAwesomeIcon icon={faPen} className="clickable" />
                                                     </button>
                                                 )}
                                             </>

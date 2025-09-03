@@ -1,29 +1,32 @@
 // src/Dettagli/DettaglioCliente.tsx
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faPen, faFolder, faStickyNote, faChevronDown,
-  faKey, faPlus, faTrash, faCopy, faEye, faEyeSlash, faSave, faTimes
+  faPen,
+  faFolder,
+  faStickyNote,
+  faChevronDown,
+  faKey,
+  faPlus,
+  faTrash,
+  faCopy,
+  faEye,
+  faEyeSlash,
+  faSave,
+  faTimes,
 } from "@fortawesome/free-solid-svg-icons";
 
 import { Chip, MetaField, Section } from "../supporto/ui";
 import GenericEditorModal from "../Modifica/GenericEditorModal";
-import type { Progetto /*, Cliente*/ } from "../supporto/tipi";
 import { useToast } from "../supporto/useToast";
+import type { Progetto, Cliente } from "../Liste/typesLista";
+import { fetchClienteDettaglioBySlugOrId } from "../supporto/fetchData";
+import { supabase } from "../supporto/supabaseClient";
 
-
-/** Tipizzazione locale super-semplice per evitare rogne */
-type ClienteLite = {
-  id: string;
-  nome: string;
-  email?: string | null;
-  telefono?: string | null;
-  note?: string | null;
-  avatar_url?: string | null;
-};
-
+/* -------------------------------
+   Tipi locali
+--------------------------------*/
 type Credenziale = {
   id: number;
   cliente_id: string;
@@ -36,26 +39,39 @@ type Credenziale = {
   modified_at?: string;
 };
 
+/* -------------------------------
+   Utility eventi
+--------------------------------*/
+function dispatchResourceEvent<T>(
+  action: "add" | "update" | "remove" | "replace",
+  resource: string,
+  payload: T
+) {
+  const ev = new CustomEvent(`${resource}:${action}`, { detail: payload });
+  window.dispatchEvent(ev);
+}
 
-
+/* -------------------------------
+   Component
+--------------------------------*/
 export default function DettaglioCliente() {
-  const { id } = useParams<{ id: string }>();
+  const { id, slug } = useParams<{ id: string; slug: string }>();
   const navigate = useNavigate();
 
-  const [cliente, setCliente] = useState<ClienteLite | null>(null);
+  const [cliente, setCliente] = useState<Cliente | null>(null);
   const [progetti, setProgetti] = useState<Progetto[]>([]);
+  const [credenziali, setCredenziali] = useState<Credenziale[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [modaleAperta, setModaleAperta] = useState(false);
-  const [openProgetti, setOpenProgetti] = useState(true);
 
+  const [openProgetti, setOpenProgetti] = useState(true);
   const [openCredenziali, setOpenCredenziali] = useState(true);
-  const [openCredRowIds, setOpenCredRowIds] = useState<Set<number>>(new Set()); // 👈 dropdown per riga
-  const [credenziali, setCredenziali] = useState<Credenziale[]>([]);
+  const [openCredRowIds, setOpenCredRowIds] = useState<Set<number>>(new Set());
+
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showPwdId, setShowPwdId] = useState<number | null>(null);
-
-  const toast = useToast();
 
   const [form, setForm] = useState<Partial<Credenziale>>({
     nome: "",
@@ -65,121 +81,201 @@ export default function DettaglioCliente() {
     note: "",
   });
 
-  // quali righe sono in editing
+  // editing inline
   const [editingIds, setEditingIds] = useState<Set<number>>(new Set());
-  // snapshot dei valori originali per poter fare "Annulla"
-  const [credSnapshot, setCredSnapshot] = useState<Record<number, Credenziale>>({});
+  const [credSnapshot, setCredSnapshot] = useState<Record<number, Credenziale>>(
+    {}
+  );
+
+  const toast = useToast();
+
+  /* -------------------------------
+     Load cliente + progetti + credenziali
+  --------------------------------*/
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const data = await fetchClienteDettaglioBySlugOrId({
+        id: id ?? null,
+        slug: slug ?? null,
+      });
+      if (!alive) return;
+      if (data) {
+        setCliente({
+          id: data.id,
+          nome: data.nome,
+          email: data.email,
+          telefono: data.telefono,
+          avatar_url: data.avatar_url,
+          note: data.note,
+        });
+        setProgetti(data.progetti as Progetto[]);
+        setCredenziali(data.credenziali as Credenziale[]);
+      }
+      setLoading(false);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [id, slug]);
+
+  /* -------------------------------
+     Listener eventi locali
+  --------------------------------*/
+  useEffect(() => {
+    // credenziali
+    function onAdd(ev: CustomEvent) {
+      const row = ev.detail as Credenziale;
+      if (row.cliente_id !== id) return;
+      setCredenziali((prev) => [...prev, row]);
+    }
+    function onUpdate(ev: CustomEvent) {
+      const row = ev.detail as Credenziale;
+      if (row.cliente_id !== id) return;
+      setCredenziali((prev) => prev.map((c) => (c.id === row.id ? row : c)));
+    }
+    function onRemove(ev: CustomEvent) {
+      const row = ev.detail as Credenziale;
+      if (row.cliente_id !== id) return;
+      setCredenziali((prev) => prev.filter((c) => c.id !== row.id));
+    }
+
+    // cliente update/replace
+    function onClienteUpdate(ev: CustomEvent) {
+      const row = ev.detail as { id: string | number; patch?: Partial<Cliente> };
+      if (String(row.id) !== String(id)) return;   // 👈 forza string
+      if (row.patch) {
+        setCliente((prev) => (prev ? { ...prev, ...row.patch } : prev));
+      }
+    }
+    function onClienteReplace(ev: CustomEvent) {
+      const payload = ev.detail as { item: Cliente };
+      if (String(payload.item.id) !== String(id)) return;  // 👈 forza string
+      setCliente(payload.item);
+    }
 
 
-  // Funzioni di editing inline 
+    // progetti update/replace
+    function onProgettoUpdate(ev: CustomEvent) {
+      const row = ev.detail as { id: string; patch?: Partial<Progetto> };
+      setProgetti((prev) =>
+        prev.map((p) => (p.id === row.id ? { ...p, ...row.patch } : p))
+      );
+    }
+    function onProgettoReplace(ev: CustomEvent) {
+      const payload = ev.detail as { item: Progetto };
+      setProgetti((prev) =>
+        prev.map((p) => (p.id === payload.item.id ? payload.item : p))
+      );
+    }
+
+    window.addEventListener("clienti_credenziali:add", onAdd as EventListener);
+    window.addEventListener(
+      "clienti_credenziali:update",
+      onUpdate as EventListener
+    );
+    window.addEventListener(
+      "clienti_credenziali:remove",
+      onRemove as EventListener
+    );
+
+    window.addEventListener("clienti:update", onClienteUpdate as EventListener);
+    window.addEventListener(
+      "clienti:replace",
+      onClienteReplace as EventListener
+    );
+    window.addEventListener(
+      "progetti:update",
+      onProgettoUpdate as EventListener
+    );
+    window.addEventListener(
+      "progetti:replace",
+      onProgettoReplace as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "clienti_credenziali:add",
+        onAdd as EventListener
+      );
+      window.removeEventListener(
+        "clienti_credenziali:update",
+        onUpdate as EventListener
+      );
+      window.removeEventListener(
+        "clienti_credenziali:remove",
+        onRemove as EventListener
+      );
+
+      window.removeEventListener(
+        "clienti:update",
+        onClienteUpdate as EventListener
+      );
+      window.removeEventListener(
+        "clienti:replace",
+        onClienteReplace as EventListener
+      );
+      window.removeEventListener(
+        "progetti:update",
+        onProgettoUpdate as EventListener
+      );
+      window.removeEventListener(
+        "progetti:replace",
+        onProgettoReplace as EventListener
+      );
+    };
+  }, [id]);
+
+  /* -------------------------------
+     Helpers credenziali
+  --------------------------------*/
+  const resetForm = () =>
+    setForm({ nome: "", username: "", email: "", password: "", note: "" });
+
+  const byNome = (a: Credenziale, b: Credenziale) =>
+    (a.nome ?? "").localeCompare(b.nome ?? "", undefined, {
+      sensitivity: "base",
+    });
+  const applySort = (arr: Credenziale[]) => [...arr].sort(byNome);
+
   const startEdit = (row: Credenziale) => {
-    // apre la sezione credenziali se chiusa
     setOpenCredenziali(true);
-    // apre la riga di quella credenziale se chiusa
-    setOpenCredRowIds(prev => new Set(prev).add(row.id));
-    // entra in modalità editing
-    setEditingIds(prev => new Set(prev).add(row.id));
-    // snapshot per Annulla
-    setCredSnapshot(prev => ({ ...prev, [row.id]: { ...row } }));
+    setOpenCredRowIds((prev) => new Set(prev).add(row.id));
+    setEditingIds((prev) => new Set(prev).add(row.id));
+    setCredSnapshot((prev) => ({ ...prev, [row.id]: { ...row } }));
   };
 
   const cancelEdit = (idRow: number) => {
-    // ripristina i valori originali
     const snap = credSnapshot[idRow];
     if (snap) {
-      setCredenziali(prev => prev.map(c => (c.id === idRow ? { ...snap } : c)));
+      setCredenziali((prev) =>
+        prev.map((c) => (c.id === idRow ? { ...snap } : c))
+      );
     }
-    setEditingIds(prev => {
+    setEditingIds((prev) => {
       const next = new Set(prev);
       next.delete(idRow);
       return next;
     });
-    setCredSnapshot(prev => {
+    setCredSnapshot((prev) => {
       const { [idRow]: _, ...rest } = prev;
       return rest;
     });
   };
 
   const saveEdit = async (row: Credenziale) => {
-    await handleUpdate(row); // riusa la tua funzione
-    // riordina in base al (nuovo) nome
-    setCredenziali(prev => applySort(prev));
-    setEditingIds(prev => {
+    await handleUpdate(row);
+    setCredenziali((prev) => applySort(prev));
+    setEditingIds((prev) => {
       const next = new Set(prev);
       next.delete(row.id);
       return next;
     });
-    setCredSnapshot(prev => {
+    setCredSnapshot((prev) => {
       const { [row.id]: _, ...rest } = prev;
       return rest;
     });
   };
-
-  const byNome = (a: Credenziale, b: Credenziale) =>
-    (a.nome ?? "").localeCompare(b.nome ?? "", undefined, { sensitivity: "base" });
-
-  const applySort = (arr: Credenziale[]) => [...arr].sort(byNome);
-
-
-  // --- Cliente ---
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      if (!id) return;
-      const { data, error } = await supabase
-        .from("clienti")
-        .select("id, nome, email, telefono, note, avatar_url")
-        .eq("id", id)
-        .maybeSingle();
-
-      if (!alive) return;
-      if (!error && data) setCliente(data as ClienteLite);
-      setLoading(false);
-    })();
-    return () => { alive = false; };
-  }, [id]);
-
-  // --- Progetti collegati ---
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      if (!id) return;
-      const { data, error } = await supabase
-        .from("progetti")
-        .select(`
-          id, nome, slug, consegna,
-          stato:stati(id,nome,colore),
-          priorita:priorita(id,nome)
-        `)
-        .eq("cliente_id", id);
-
-      if (!alive) return;
-      if (!error && data) setProgetti(data as any[]);
-    })();
-    return () => { alive = false; };
-  }, [id]);
-
-
-
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      if (!id) return;
-      const { data, error } = await supabase
-        .from("clienti_credenziali")
-        .select("id, cliente_id, nome, username, email, password, note, created_at, modified_at")
-        .eq("cliente_id", id)
-        .is("deleted_at", null)
-        .order("nome", { ascending: true });
-
-      if (!alive) return;
-      if (!error && data) setCredenziali(data as Credenziale[]);
-    })();
-    return () => { alive = false; };
-  }, [id]);
-
-  const resetForm = () => setForm({ nome: "", username: "", email: "", password: "", note: "" });
 
   const handleAdd = async () => {
     if (!id || !form.nome?.trim()) return;
@@ -195,19 +291,19 @@ export default function DettaglioCliente() {
     const { data, error } = await supabase
       .from("clienti_credenziali")
       .insert(payload)
-      .select("id, cliente_id, nome, username, email, password, note, created_at, modified_at")
+      .select("*")
       .single();
-
     setSaving(false);
     if (error) {
       toast("Errore nell’aggiunta della credenziale", "error");
       return;
     }
     if (data) {
-      setCredenziali(prev => applySort([data as Credenziale, ...prev]));
+      setCredenziali((prev) => applySort([data as Credenziale, ...prev]));
       setAdding(false);
       resetForm();
-      toast("Credenziale aggiunta con successo", "success")
+      toast("Credenziale aggiunta con successo", "success");
+      dispatchResourceEvent("add", "clienti_credenziali", data);
     }
   };
 
@@ -217,30 +313,32 @@ export default function DettaglioCliente() {
       .from("clienti_credenziali")
       .update({ deleted_at: new Date().toISOString() })
       .eq("id", row.id);
-
     if (error) {
       toast("Errore durante l’eliminazione", "error");
       return;
     }
-    setCredenziali(prev => applySort(prev.filter(c => c.id !== row.id)));
+    setCredenziali((prev) => prev.filter((c) => c.id !== row.id));
     toast("Credenziale eliminata", "success");
+    dispatchResourceEvent("remove", "clienti_credenziali", row);
   };
-
 
   const handleUpdate = async (row: Credenziale) => {
     const { id: credId, ...rest } = row;
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("clienti_credenziali")
       .update({ ...rest, modified_at: new Date().toISOString() })
-      .eq("id", credId);
-
+      .eq("id", credId)
+      .select("*")
+      .single();
     if (error) {
       toast("Errore nel salvataggio", "error");
       return;
     }
-    toast("Modifica salvata", "success");;
+    toast("Modifica salvata", "success");
+    if (data) {
+      dispatchResourceEvent("update", "clienti_credenziali", data);
+    }
   };
-
 
   const copyToClipboard = async (text?: string | null) => {
     if (!text) return;
@@ -252,9 +350,11 @@ export default function DettaglioCliente() {
     }
   };
 
+  /* -------------------------------
+     Render
+  --------------------------------*/
   if (loading) return <div className="p-6 text-theme">Caricamento...</div>;
   if (!cliente) return <div className="p-6 text-theme">Cliente non trovato</div>;
-
 
   return (
     <div className="min-h-screen bg-theme text-theme">
@@ -274,8 +374,12 @@ export default function DettaglioCliente() {
         {/* Meta card */}
         <div className="rounded-xl border border-theme/20 card-theme p-5 space-y-4 text-[15px]">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <MetaField label="Email"><Chip>{cliente.email ?? "—"}</Chip></MetaField>
-            <MetaField label="Telefono"><Chip>{cliente.telefono ?? "—"}</Chip></MetaField>
+            <MetaField label="Email">
+              <Chip>{cliente.email ?? "—"}</Chip>
+            </MetaField>
+            <MetaField label="Telefono">
+              <Chip>{cliente.telefono ?? "—"}</Chip>
+            </MetaField>
           </div>
 
           {cliente.note && (
@@ -285,44 +389,45 @@ export default function DettaglioCliente() {
           )}
         </div>
 
-        {/* Progetti collegati (collassabile) */}
+        {/* Progetti collegati */}
         <div className="rounded-xl border border-theme/20 card-theme overflow-hidden">
           <button
             type="button"
-            onClick={() => setOpenProgetti(v => !v)}
-            className="w-full px-4 py-2 font-semibold bg-black/[.04] dark:bg.white/[.06] flex items-center justify-between gap-3 text-left hover-bg-theme"
-            aria-expanded={openProgetti}
-            aria-controls="sezione-progetti-collegati"
-            title={openProgetti ? "Chiudi progetti collegati" : "Apri progetti collegati"}
+            onClick={() => setOpenProgetti((v) => !v)}
+            className="w-full h-11 px-4 font-semibold bg-black/[.04] dark:bg-white/[.06] flex items-center justify-between gap-3 text-left hover-bg-theme"
           >
             <span className="inline-flex items-center gap-2">
               <FontAwesomeIcon icon={faFolder} /> Progetti collegati
             </span>
             <FontAwesomeIcon
               icon={faChevronDown}
-              className={`transition-transform duration-200 ${openProgetti ? "rotate-180" : ""}`}
+              className={`transition-transform duration-200 ${openProgetti ? "rotate-180" : ""
+                }`}
             />
           </button>
 
           {openProgetti && (
-            <div id="sezione-progetti-collegati">
+            <div>
               {progetti.length === 0 ? (
-                <div className="px-4 py-3 text-sm">Nessun progetto collegato.</div>
-              ) : (
-                <div>
-                  {progetti.map(p => (
-                    <div
-                      key={p.id}
-                      className="px-4 py-3 border-t border-theme/20 hover-bg-theme cursor-pointer"
-                      onClick={() => navigate(`/progetti/${p.slug ?? p.id}`)}
-                    >
-                      <div className="font-medium">{p.nome}</div>
-                      <div className="text-sm opacity-80">
-                        {p.consegna ? new Date(p.consegna as any).toLocaleDateString() : "—"} • {p.stato?.nome ?? "—"} • {p.priorita?.nome ?? "—"}
-                      </div>
-                    </div>
-                  ))}
+                <div className="px-4 py-3 text-sm">
+                  Nessun progetto collegato.
                 </div>
+              ) : (
+                progetti.map((p) => (
+                  <div
+                    key={p.id}
+                    className="px-4 py-3 border-t border-theme/20 hover-bg-theme cursor-pointer"
+                    onClick={() => navigate(`/progetti/${p.slug ?? p.id}`)}
+                  >
+                    <div className="font-medium">{p.nome}</div>
+                    <div className="text-sm opacity-80">
+                      {p.consegna
+                        ? new Date(p.consegna as any).toLocaleDateString()
+                        : "—"}{" "}
+                      • {p.stato?.nome ?? "—"} • {p.priorita?.nome ?? "—"}
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           )}
@@ -330,39 +435,47 @@ export default function DettaglioCliente() {
 
         {/* Credenziali (collassabile) */}
         <div className="rounded-xl border border-theme/20 card-theme overflow-hidden">
-          {/* Header sezione: titolo (toggle) + azioni a destra */}
-          <div className="px-4 py-2 bg-black/[.04] dark:bg-white/[.06] flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setOpenCredenziali(v => !v)}
-              className="font-semibold text-left inline-flex items-center gap-2 hover-bg-theme px-2 py-1 rounded-lg"
-              aria-expanded={openCredenziali}
-              aria-controls="sezione-credenziali"
-              title={openCredenziali ? "Chiudi credenziali" : "Apri credenziali"}
-            >
-              <FontAwesomeIcon icon={faKey} />
-              <span>Credenziali</span>
-              <FontAwesomeIcon
-                icon={faChevronDown}
-                className={`transition-transform duration-200 ${openCredenziali ? "rotate-180" : ""}`}
-              />
-            </button>
+          {/* Header toggle */}
+          <button
+            type="button"
+            onClick={() => setOpenCredenziali(v => !v)}
+            className="w-full h-11 px-4 font-semibold bg-black/[.04] dark:bg-white/[.06]
+               flex items-center justify-between gap-3 text-left hover-bg-theme"
+            aria-expanded={openCredenziali}
+            aria-controls="sezione-credenziali"
+            title={openCredenziali ? "Chiudi credenziali" : "Apri credenziali"}
+          >
+            <span className="inline-flex items-center gap-2">
+              <FontAwesomeIcon icon={faKey} /> Credenziali
+            </span>
+            <FontAwesomeIcon
+              icon={faChevronDown}
+              className={`transition-transform duration-200 ${openCredenziali ? "rotate-180" : ""}`}
+            />
+          </button>
 
-            {!adding && openCredenziali && (
-              <button
-                onClick={() => { setOpenCredenziali(true); setAdding(true); }}
-                className="px-3 py-2 rounded-xl bg-green-600 text-white hover:bg-green-500 text-[15px] inline-flex items-center gap-2"
-                title="Aggiungi credenziale"
-              >
-                <FontAwesomeIcon icon={faPlus} />
-                <span className="hidden sm:inline">Aggiungi</span>
-              </button>
-            )}
-          </div>
-
+          {/* Contenuto collapsabile */}
           {openCredenziali && (
             <div id="sezione-credenziali" className="p-4 space-y-4">
-              {/* Form aggiunta rapida con honeypot */}
+              {/* Bottone aggiungi */}
+              {!adding && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => {
+                      setOpenCredenziali(true);
+                      setAdding(true);
+                    }}
+                    className="px-3 py-2 rounded-xl bg-green-600 text-white hover:bg-green-500
+                       text-[15px] inline-flex items-center gap-2"
+                    title="Aggiungi credenziale"
+                  >
+                    <FontAwesomeIcon icon={faPlus} />
+                    <span className="hidden sm:inline">Aggiungi</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Form aggiunta rapida */}
               {adding && (
                 <form
                   autoComplete="off"
@@ -469,7 +582,7 @@ export default function DettaglioCliente() {
                 </form>
               )}
 
-              {/* Lista credenziali (righe collassabili) */}
+              {/* Lista credenziali */}
               {credenziali.length === 0 && !adding ? (
                 <div className="text-sm opacity-80">Nessuna credenziale salvata.</div>
               ) : (
@@ -478,7 +591,7 @@ export default function DettaglioCliente() {
                     const isOpen = openCredRowIds.has(row.id);
                     return (
                       <div key={row.id} className="rounded-xl border border-theme/20 card-theme overflow-hidden">
-                        {/* Header riga: click = toggle dettagli */}
+                        {/* Header riga */}
                         <div
                           role="button"
                           tabIndex={0}
@@ -549,7 +662,8 @@ export default function DettaglioCliente() {
                             )}
                           </div>
                         </div>
-                        {/* Dettagli riga (solo se aperta) */}
+
+                        {/* Dettagli riga */}
                         {isOpen && (
                           <div className="px-4 py-3 border-t border-theme/20 grid grid-cols-1 md:grid-cols-2 gap-3">
                             {/* mini honeypot */}
@@ -558,6 +672,7 @@ export default function DettaglioCliente() {
                             <input type="password" name={`hp_pass_${row.id}`} tabIndex={-1} autoComplete="current-password" aria-hidden="true"
                               style={{ position: "absolute", opacity: 0, height: 0, width: 0, pointerEvents: "none" }} />
 
+                            {/* Username */}
                             <div>
                               <label className="block text-xs mb-1 opacity-70">Username</label>
                               <div className="flex items-center gap-2">
@@ -580,6 +695,7 @@ export default function DettaglioCliente() {
                               </div>
                             </div>
 
+                            {/* Email */}
                             <div>
                               <label className="block text-xs mb-1 opacity-70">Email</label>
                               <div className="flex items-center gap-2">
@@ -603,6 +719,7 @@ export default function DettaglioCliente() {
                               </div>
                             </div>
 
+                            {/* Password */}
                             <div className="md:col-span-2">
                               <label className="block text-xs mb-1 opacity-70">Password</label>
                               <div className="flex items-center gap-2">
@@ -632,6 +749,7 @@ export default function DettaglioCliente() {
                               </div>
                             </div>
 
+                            {/* Note */}
                             <div className="md:col-span-2">
                               <label className="block text-xs mb-1 opacity-70">Note</label>
                               <textarea
@@ -658,6 +776,7 @@ export default function DettaglioCliente() {
             </div>
           )}
         </div>
+
 
       </div>
 

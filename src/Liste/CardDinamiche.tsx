@@ -19,11 +19,18 @@ export default function CardDinamiche<T extends { id: string | number }>({
 }) {
     const navigate = useNavigate();
     const configAny = resourceConfigs[tipo] as any;
-    if (!configAny) return <p className="text-red-600">Config non trovata per tipo: {tipo}</p>;
+    if (!configAny) return <p className="text-danger">Config non trovata per tipo: {tipo}</p>;
     const config = configAny as ResourceConfig<T>;
 
     const {
-        utenteId, items, loading, filtro, setFiltro, patchItem, removeItem, addItem,
+        utenteId,
+        items,
+        loading,
+        filtro,
+        setFiltro,
+        patchItem,
+        removeItem,
+        addItem,
     } = useResourceData(config, { modalitaCestino });
 
     const filteredItems = items.filter((item: any) => {
@@ -81,19 +88,24 @@ export default function CardDinamiche<T extends { id: string | number }>({
                 <p className="text-center text-theme text-lg">Caricamento...</p>
             ) : (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {filteredItems.map(item => (
-                        <div key={String(item.id)} className="card-theme p-4 flex flex-col justify-between">
+                    {filteredItems.map((item) => (
+                        <div
+                            key={String(item.id)}
+                            className="card-theme p-4 flex flex-col justify-between"
+                        >
                             <div className="flex-1 space-y-2">
                                 {/* colonne principali */}
-                                {config.colonne.map(col => (
-                                    <div key={String(col.chiave)} className="text-sm">
-                                        {col.render ? col.render(item, ctx) : (item as any)[col.chiave as keyof T]}
+                                {config.colonne.map((col) => (
+                                    <div key={String(col.chiave)} className="text-sm text-theme">
+                                        {col.render
+                                            ? col.render(item, ctx)
+                                            : (item as any)[col.chiave as keyof T]}
                                     </div>
                                 ))}
 
                                 {/* dettaglio coerente */}
                                 {config.renderDettaglio && (
-                                    <div className="mt-2 text-xs text-gray-600 dark:text-gray-300">
+                                    <div className="mt-2 text-xs text-theme opacity-80">
                                         {config.renderDettaglio(item, ctx)}
                                     </div>
                                 )}
@@ -108,14 +120,14 @@ export default function CardDinamiche<T extends { id: string | number }>({
                                     <>
                                         <button
                                             onClick={() => handleRestore(item.id)}
-                                            className="icon-color hover:text-green-600"
+                                            className="icon-color hover:icon-success"
                                             title="Ripristina"
                                         >
                                             <FontAwesomeIcon icon={faUndo} />
                                         </button>
                                         <button
                                             onClick={() => handleHardDelete(item.id)}
-                                            className="icon-color hover:text-red-600"
+                                            className="icon-color hover:icon-danger"
                                             title="Elimina definitivamente"
                                         >
                                             <FontAwesomeIcon icon={faTrash} />
@@ -127,9 +139,12 @@ export default function CardDinamiche<T extends { id: string | number }>({
                                         {config.renderModaleModifica && (
                                             <button
                                                 onClick={() =>
-                                                    config.renderModaleModifica?.(String(item.id), () => { })
+                                                    config.renderModaleModifica?.(
+                                                        String(item.id),
+                                                        () => { }
+                                                    )
                                                 }
-                                                className="icon-color hover:text-blue-600"
+                                                className="icon-color hover:icon-info"
                                                 title="Modifica"
                                             >
                                                 <FontAwesomeIcon icon={faPen} />

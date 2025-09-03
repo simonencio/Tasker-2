@@ -55,6 +55,7 @@ import { createRoot } from "react-dom/client";
 import TimelineDinamica from "./Liste/TimelineDinamica";
 
 import DettaglioCliente from "./Dettagli/DettaglioCliente.tsx";
+import GanttDinamico from "./Liste/GanttDinamico.tsx";
 
 
 type ModalType = "project" | "tasks" | "client" | "user" | "stato" | "priorita" | "ruolo" | "edit-project-template" | "edit-task-template" | "edit";
@@ -93,16 +94,17 @@ function ResourceRoute({ tipo, paramKey = "view" }: { tipo: ResourceKey; paramKe
 
     const view: Vista = (() => {
         const v = params.get(paramKey);
-        if (v === "list" || v === "cards" || v === "timeline") return v;
+        if (v === "list" || v === "cards" || v === "timeline" || v === "gantt") return v;
         return getPreferredView(tipo, "list");
     })();
 
-
     if (view === "cards") return <CardDinamiche tipo={tipo} paramKey={paramKey} />;
     if (view === "timeline") return <TimelineDinamica tipo={tipo} paramKey={paramKey} />;
+    if (view === "gantt") return <GanttDinamico tipo={tipo} paramKey={paramKey} />; // 👈 nuovo
 
     return <ListaDinamica tipo={tipo} paramKey={paramKey} />;
 }
+
 
 
 function AppContent() {

@@ -1,16 +1,12 @@
-// src/Liste/config/tasksConfig.tsx
+// src/Liste/config/tasksSubConfig.tsx
 import { faTasks } from "@fortawesome/free-solid-svg-icons";
 import { supabase } from "../../supporto/supabaseClient";
-import { fetchTasks, fetchTasksDeleted, cestinoActions } from "../../supporto/fetchData";
 import { softDeleteTask } from "../../supporto/softDeleteRecursive";
 import type { ResourceConfig, Task } from "../typesLista";
 import { fmt, is, badge } from "./common";
 import { azioni, dispatchResourceEvent } from "./azioniConfig";
-import { showToast } from "../../supporto/useToast"; // 👈 usa la funzione, non l’hook
+import { showToast } from "../../supporto/useToast";
 
-/* ============================================================
-   Timer setup helpers
-   ============================================================ */
 const TIMER_KEY = "kal_active_task_timer";
 
 function writeTimer(v: any | null) {
@@ -18,62 +14,94 @@ function writeTimer(v: any | null) {
     else localStorage.removeItem(TIMER_KEY);
 }
 
-export const tasksConfig: ResourceConfig<Task> = {
-    key: "tasks",
-    titolo: "Lista Task",
+// util interna per deduplicare utenti per id
+function uniqById<T extends { id?: string }>(arr: T[]): T[] {
+    const map = new Map<string, T>();
+    for (const x of arr) {
+        const id = x?.id as string | undefined;
+        if (!id) continue;
+        if (!map.has(id)) map.set(id, x);
+    }
+    return Array.from(map.values());
+}
+
+/**
+ * Config specifico per le SOTTO-TASK
+ * - stesso comportamento del tasksConfig
+ * - nel fetch filtra per parent_id = paramKey
+ */
+export const tasksSubConfig: ResourceConfig<Task> = {
+    key: "tasks_sub",
+    titolo: "Sotto-task",
     icona: faTasks,
-    coloreIcona: "text-green-500",
-    useHeaderFilters: true,
+    coloreIcona: "text-green-400",
+    useHeaderFilters: false,
 
     /* ================== FETCH ================== */
-    fetch: async ({ filtro, utenteId }) => {
-        const all = await fetchTasks({ ...filtro, soloMie: !!filtro.soloMieTasks }, utenteId ?? undefined);
-        let items = all || [];
+    fetch: async (opts) => {
+        const { paramKey } = opts as any;
+        if (!paramKey) return [];
 
-        // di default mostro solo root, MA se passo filtro.includeChildren = true le tengo tutte
-        if (!filtro?.includeChildren) {
-            items = items.filter((t: any) => !t.parent_id);
+        const { data, error } = await supabase
+            .from("tasks")
+            .select(`
+        id, nome, slug, note, consegna, tempo_stimato, fine_task,
+        stato:stato_id(id, nome, colore),
+        priorita:priorita_id(id, nome),
+        parent_id,
+        progetti_task(progetti(id, nome, slug)),
+        utenti_task(utenti(id, nome, cognome, avatar_url))
+      `)
+            .eq("parent_id", paramKey)
+            .is("deleted_at", null);
+
+        if (error) {
+            console.error("Errore fetch sottotask:", error);
+            return [];
         }
 
-        if (filtro?.soloMieTasks && utenteId) {
-            items = items.filter((t: any) => (t.assegnatari || []).some((u: any) => u.id === utenteId));
-        }
+        return (data || []).map((t: any) => {
+            const progetto = Array.isArray(t.progetti_task?.[0]?.progetti)
+                ? t.progetti_task?.[0]?.progetti[0]
+                : t.progetti_task?.[0]?.progetti ?? null;
 
-        return filtro.soloCompletate
-            ? items.filter((t: any) => !!t.fine_task || t.completata === true)
-            : items;
-    },
+            const assegnatariRaw = (t.utenti_task || [])
+                .map((r: any) => r?.utenti)
+                .filter(Boolean);
 
-
-    cestino: {
-        fetch: async ({ filtro }) => {
-            const data = await fetchTasksDeleted(filtro);
-            return data.filter((t: any) => !t.parent_id);
-        },
-        actions: cestinoActions.tasks,
+            return {
+                ...t,
+                progetto,
+                // dedup per evitare warning React "same key"
+                assegnatari: uniqById(assegnatariRaw),
+            };
+        });
     },
 
     /* ================== SETUP TIMER ================== */
     setup: ({ utenteId }) => {
-        let active: { taskId: string; taskName: string; progettoId?: string | null; startTime: Date } | null = null;
-
-        // ripristina eventuale timer salvato
-        const stored = (() => {
-            try {
-                const raw = localStorage.getItem(TIMER_KEY);
-                return raw ? JSON.parse(raw) : null;
-            } catch {
-                return null;
+        let active:
+            | {
+                taskId: string;
+                taskName: string;
+                progettoId?: string | null;
+                startTime: Date;
             }
-        })();
-        if (!active && stored) {
-            active = {
-                taskId: stored.taskId,
-                taskName: stored.taskName,
-                progettoId: stored.progettoId ?? null,
-                startTime: new Date(stored.startISO),
-            };
-        }
+            | null = null;
+
+        // ripristina eventuale timer
+        try {
+            const raw = localStorage.getItem(TIMER_KEY);
+            if (raw) {
+                const s = JSON.parse(raw);
+                active = {
+                    taskId: s.taskId,
+                    taskName: s.taskName,
+                    progettoId: s.progettoId ?? null,
+                    startTime: new Date(s.startISO),
+                };
+            }
+        } catch { }
 
         const notify = () => {
             window.dispatchEvent(new CustomEvent("tasks:timerChanged"));
@@ -81,21 +109,15 @@ export const tasksConfig: ResourceConfig<Task> = {
 
         const start = (task: Task) => {
             const progettoId = task.progetto?.id ?? null;
-
-            // 🚫 Task senza progetto
             if (!progettoId) {
                 showToast("Questa task non è collegata a nessun progetto", "error");
                 return;
             }
-
-            // 🚫 Utente non assegnato
             const assegnato = task.assegnatari?.some((u) => u.id === utenteId);
             if (!assegnato) {
                 showToast("Non sei assegnato a questa task", "error");
                 return;
             }
-
-            // ✅ Avvio timer
             active = {
                 taskId: task.id,
                 taskName: task.nome,
@@ -119,7 +141,6 @@ export const tasksConfig: ResourceConfig<Task> = {
                 notify();
                 return;
             }
-
             const progettoId = task?.progetto?.id ?? active.progettoId ?? null;
             if (!progettoId) {
                 showToast("Questa task non è collegata a nessun progetto", "error");
@@ -128,10 +149,10 @@ export const tasksConfig: ResourceConfig<Task> = {
                 notify();
                 return;
             }
-
             const endTime = new Date();
-            const durata = Math.floor((endTime.getTime() - active.startTime.getTime()) / 1000);
-
+            const durata = Math.floor(
+                (endTime.getTime() - active.startTime.getTime()) / 1000
+            );
             const { error } = await supabase.from("time_entries").insert({
                 utente_id: utenteId,
                 progetto_id: progettoId,
@@ -141,10 +162,8 @@ export const tasksConfig: ResourceConfig<Task> = {
                 data_fine: endTime.toISOString(),
                 durata,
             });
-
             if (error) showToast("Errore nel salvataggio", "error");
             else showToast("✅ Tempo salvato", "success");
-
             active = null;
             writeTimer(null);
             notify();
@@ -155,13 +174,18 @@ export const tasksConfig: ResourceConfig<Task> = {
         const stopListener = () => {
             void stop(undefined);
         };
-        window.addEventListener("tasks:timerStopRequest", stopListener as any);
+        window.addEventListener(
+            "tasks:timerStopRequest",
+            stopListener as unknown as EventListener
+        );
 
         return {
             extra: { start, stop, isRunning },
-            dispose: () => {
-                window.removeEventListener("tasks:timerStopRequest", stopListener as any);
-            },
+            dispose: () =>
+                window.removeEventListener(
+                    "tasks:timerStopRequest",
+                    stopListener as unknown as EventListener
+                ),
         };
     },
 
@@ -178,13 +202,28 @@ export const tasksConfig: ResourceConfig<Task> = {
                 </div>
             ),
         },
-        { chiave: "consegna", label: "Consegna", className: "w-40 hidden lg:block", render: (t) => fmt.date(t.consegna) },
-        { chiave: "stato", label: "Stato", className: "w-32 hidden lg:block", render: (t) => t.stato?.nome ?? "—" },
-        { chiave: "priorita", label: "Priorità", className: "w-32 hidden lg:block", render: (t) => t.priorita?.nome ?? "—" },
+        {
+            chiave: "consegna",
+            label: "Consegna",
+            className: "w-40 hidden lg:block",
+            render: (t) => fmt.date(t.consegna),
+        },
+        {
+            chiave: "stato",
+            label: "Stato",
+            className: "w-32 hidden lg:block",
+            render: (t) => t.stato?.nome ?? "—",
+        },
+        {
+            chiave: "priorita",
+            label: "Priorità",
+            className: "w-32 hidden lg:block",
+            render: (t) => t.priorita?.nome ?? "—",
+        },
     ],
 
     /* ================== AZIONI ================== */
-    azioni: (task, { navigate, extra, patchItem }) => {
+    azioni: (task, { extra, patchItem }) => {
         const running = extra?.isRunning?.(task.id);
 
         const toggleTimer = async () => {
@@ -200,64 +239,68 @@ export const tasksConfig: ResourceConfig<Task> = {
         const completaTask = async () => {
             if (task.fine_task) return;
             const nowIso = new Date().toISOString();
-            const { error } = await supabase.from("tasks").update({ fine_task: nowIso }).eq("id", task.id);
-            if (error) return alert("Errore nel completare la task: " + error.message);
-
+            const { error } = await supabase
+                .from("tasks")
+                .update({ fine_task: nowIso })
+                .eq("id", task.id);
+            if (error) {
+                showToast("Errore nel completare la task", "error");
+                return;
+            }
             patchItem?.(task.id, { fine_task: nowIso });
-            dispatchResourceEvent("update", "tasks", { id: task.id, patch: { fine_task: nowIso } });
+            dispatchResourceEvent("update", "tasks_sub", {
+                id: task.id,
+                patch: { fine_task: nowIso },
+            });
+            showToast("✅ Task completata", "success");
         };
 
         const eliminaTask = async () => {
-            if (!window.confirm("Eliminare questa task?")) return;
+            if (!window.confirm("Eliminare questa sotto-task?")) return;
             try {
                 await softDeleteTask(task.id);
-                dispatchResourceEvent("remove", "tasks", { id: task.id });
+                dispatchResourceEvent("remove", "tasks_sub", { id: task.id });
+                showToast("🗑️ Task spostata nel cestino", "info");
             } catch (err: any) {
-                alert("Errore eliminazione: " + err.message);
+                showToast(err?.message || "Errore eliminazione", "error");
             }
         };
 
         return (
             <>
-                {running ? azioni.stop(toggleTimer, "Ferma timer") : azioni.play(toggleTimer, "Avvia timer")}
-                {azioni.edit(() => (window as any).__openMiniEdit("tasks", task.id))}
-                {azioni.complete(completaTask, task.fine_task ? "Già completata" : "Segna come completata")}
-
-                {/* Mostra il dettaglio SOLO se non è sotto-task */}
-                {task.parent_id == null && (
-                    azioni.navigateTo(() => navigate(`/tasks/${task.slug}`), "Vai al dettaglio")
+                {running
+                    ? azioni.stop(toggleTimer, "Ferma timer")
+                    : azioni.play(toggleTimer, "Avvia timer")}
+                {azioni.edit(() => (window as any).__openMiniEdit?.("tasks", task.id))}
+                {azioni.complete(
+                    completaTask,
+                    task.fine_task ? "Già completata" : "Segna come completata"
                 )}
-
                 {azioni.trashSoft(eliminaTask)}
             </>
         );
-
     },
 
     /* ================== DETTAGLIO ================== */
     renderDettaglio: (task) => (
         <div className="space-y-2">
-            {task.progetto?.nome && (
-                <div>📁 Progetto: {task.progetto.nome}</div>
-            )}
-
             {task.tempo_stimato && (
                 <div>
-                    ⏱️ Tempo stimato: {typeof task.tempo_stimato === "string"
+                    ⏱️ Tempo stimato:{" "}
+                    {typeof task.tempo_stimato === "string"
                         ? task.tempo_stimato
                         : fmt.durata(task.tempo_stimato)}
                 </div>
             )}
-
             {task.assegnatari?.length ? (
                 <div>
-                    👥 Assegnata a: {task.assegnatari.map((u) => `${u.nome} ${u.cognome || ""}`).join(", ")}
+                    👥 Assegnata a:{" "}
+                    {task.assegnatari
+                        .map((u) => `${u.nome} ${u.cognome || ""}`.trim())
+                        .join(", ")}
                 </div>
             ) : null}
-
             {task.note && <div>🗒️ {task.note}</div>}
         </div>
     ),
-
-
 };

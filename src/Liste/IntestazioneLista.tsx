@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode, type JSX } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCheckCircle, faLink } from "@fortawesome/free-solid-svg-icons";
 
 import FiltriGenericiAvanzati, { type FiltroAvanzatoGenerico } from "../supporto/FiltriGenericiAvanzati";
 import { fetchUtenti, fetchClienti, fetchProgetti, fetchStati, fetchPriorita } from "../supporto/fetchData";
@@ -9,6 +8,7 @@ import { fetchUtenti, fetchClienti, fetchProgetti, fetchStati, fetchPriorita } f
 import type { ResourceKey } from "./resourceConfigs";
 import type { FiltroIntestazione, OpzioniGlobali } from "./typesLista";
 import { getPreferredView, setPreferredView, type Vista } from "./viewPrefs";
+import ToggleFiltri from "../supporto/ToggleFiltri";
 
 // helper
 function mapIdNome(arr: any[], fullName = false) {
@@ -62,12 +62,12 @@ function VistaSwitcher({ tipo, paramKey = "view" }: { tipo: ResourceKey; paramKe
             type="button"
             onClick={() => go(v)}
             className={
-                "px-2 py-1 rounded text-xs sm:text-sm border " +
+                "tooltip px-2 py-1 rounded text-xs sm:text-sm border border-theme cursor-pointer " +
                 (vista === v
                     ? "bg-blue-600 text-white border-blue-600"
-                    : "bg-transparent text-theme border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800")
+                    : "bg-transparent text-theme hover-bg-theme")
             }
-            title={`Vista ${label}`}
+            data-tooltip={`Vista ${label}`}
         >
             {label}
         </button>
@@ -77,9 +77,15 @@ function VistaSwitcher({ tipo, paramKey = "view" }: { tipo: ResourceKey; paramKe
         <div className="flex items-center gap-2">
             <Btn v="list" label="Lista" />
             <Btn v="cards" label="Schede" />
-            <Btn v="timeline" label="Timeline" />
+            {(tipo === "tasks" || tipo === "progetti") && (
+                <>
+                    <Btn v="timeline" label="Timeline" />
+                    <Btn v="gantt" label="Gantt" />
+                </>
+            )}
         </div>
     );
+
 }
 
 export default function IntestazioneLista({
@@ -93,6 +99,7 @@ export default function IntestazioneLista({
     valore,
     onChange,
     modalitaCestino = false,
+    minimal = false,   // 👈 nuova prop
 }: {
     titolo: string | JSX.Element;
     icona: any;
@@ -104,7 +111,11 @@ export default function IntestazioneLista({
     dati?: any[];
     valore?: FiltroIntestazione;
     onChange?: (filtro: FiltroIntestazione) => void;
+    minimal?: boolean;
 }) {
+
+
+
     const PREF_KEY = `filtro_${tipo}`;
 
     // Carico eventuale stato persistito
@@ -250,11 +261,44 @@ export default function IntestazioneLista({
         tipo,
         modalitaCestino,
     ]);
-
+    // 🔹 se minimal: solo titolo + toggle
+    if (minimal) {
+        return (
+            <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
+                <h1 className="text-2xl font-bold text-theme flex items-center">
+                    <FontAwesomeIcon
+                        icon={icona}
+                        className={`${coloreIcona || "icon-color"} mr-2`}
+                    />
+                    {titolo}
+                </h1>
+                <ToggleFiltri
+                    tipo={tipo}
+                    config={config}
+                    valori={{
+                        soloMieTasks,
+                        soloMieProgetti,
+                        soloCompletate,
+                        soloCompletati,
+                        soloNonCompletate,
+                        soloNonCompletati,
+                    }}
+                    setters={{
+                        setSoloMieTasks,
+                        setSoloMieProgetti,
+                        setSoloCompletate,
+                        setSoloCompletati,
+                        setSoloNonCompletate,
+                        setSoloNonCompletati,
+                    }}
+                />
+            </div>
+        );
+    }
     return (
         <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
             <h1 className="text-2xl font-bold text-theme flex items-center">
-                <FontAwesomeIcon icon={icona} className={`${coloreIcona || ""} mr-2`} />
+                <FontAwesomeIcon icon={icona} className={`${coloreIcona || "icon-color"} mr-2`} />
                 {titolo}
             </h1>
 
@@ -263,92 +307,26 @@ export default function IntestazioneLista({
 
                 {!modalitaCestino && (
                     <>
-                        {config.mostraToggleMie && (
-                            <div className="flex items-center gap-2">
-                                <FontAwesomeIcon icon={faLink} className="w-5 h-5 text-blue-600" />
-                                <span className="text-theme font-medium">{tipo === "progetti" ? "Miei" : "Mie"}</span>
-                                <div
-                                    onClick={() =>
-                                        tipo === "tasks"
-                                            ? setSoloMieTasks((v) => !v)
-                                            : tipo === "progetti"
-                                                ? setSoloMieProgetti((v) => !v)
-                                                : null
-                                    }
-                                    className={`toggle-theme ${(tipo === "tasks"
-                                        ? soloMieTasks
-                                        : tipo === "progetti"
-                                            ? soloMieProgetti
-                                            : false)
-                                        ? "active"
-                                        : ""
-                                        }`}
-                                >
-                                    <div
-                                        className={`toggle-thumb ${(tipo === "tasks"
-                                            ? soloMieTasks
-                                            : tipo === "progetti"
-                                                ? soloMieProgetti
-                                                : false)
-                                            ? "translate"
-                                            : ""
-                                            }`}
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        {config.mostraToggleCompletate && (
-                            <div className="flex items-center gap-2">
-                                <FontAwesomeIcon icon={faCheckCircle} className="w-5 h-5 text-green-600" />
-                                <span className="text-theme font-medium">Completate</span>
-                                <div
-                                    onClick={() => setSoloCompletate((v) => !v)}
-                                    className={`toggle-theme ${soloCompletate ? "active" : ""}`}
-                                >
-                                    <div className={`toggle-thumb ${soloCompletate ? "translate" : ""}`} />
-                                </div>
-                            </div>
-                        )}
-
-                        {config.mostraToggleNonCompletate && (
-                            <div className="flex items-center gap-2">
-                                <FontAwesomeIcon icon={faCheckCircle} className="w-5 h-5 text-red-600" />
-                                <span className="text-theme font-medium">Non completate</span>
-                                <div
-                                    onClick={() => setSoloNonCompletate((v) => !v)}
-                                    className={`toggle-theme ${soloNonCompletate ? "active" : ""}`}
-                                >
-                                    <div className={`toggle-thumb ${soloNonCompletate ? "translate" : ""}`} />
-                                </div>
-                            </div>
-                        )}
-
-                        {config.mostraToggleCompletati && (
-                            <div className="flex items-center gap-2">
-                                <FontAwesomeIcon icon={faCheckCircle} className="w-5 h-5 text-green-600" />
-                                <span className="text-theme font-medium">Completati</span>
-                                <div
-                                    onClick={() => setSoloCompletati((v) => !v)}
-                                    className={`toggle-theme ${soloCompletati ? "active" : ""}`}
-                                >
-                                    <div className={`toggle-thumb ${soloCompletati ? "translate" : ""}`} />
-                                </div>
-                            </div>
-                        )}
-
-                        {config.mostraToggleNonCompletati && (
-                            <div className="flex items-center gap-2">
-                                <FontAwesomeIcon icon={faCheckCircle} className="w-5 h-5 text-red-600" />
-                                <span className="text-theme font-medium">Non completati</span>
-                                <div
-                                    onClick={() => setSoloNonCompletati((v) => !v)}
-                                    className={`toggle-theme ${soloNonCompletati ? "active" : ""}`}
-                                >
-                                    <div className={`toggle-thumb ${soloNonCompletati ? "translate" : ""}`} />
-                                </div>
-                            </div>
-                        )}
+                        <ToggleFiltri
+                            tipo={tipo}
+                            config={config}
+                            valori={{
+                                soloMieTasks,
+                                soloMieProgetti,
+                                soloCompletate,
+                                soloCompletati,
+                                soloNonCompletate,
+                                soloNonCompletati,
+                            }}
+                            setters={{
+                                setSoloMieTasks,
+                                setSoloMieProgetti,
+                                setSoloCompletate,
+                                setSoloCompletati,
+                                setSoloNonCompletate,
+                                setSoloNonCompletati,
+                            }}
+                        />
 
                         {config.campi.length > 0 && (
                             <FiltriGenericiAvanzati<any>
@@ -366,7 +344,7 @@ export default function IntestazioneLista({
             </div>
 
             {loadingGlobali && !modalitaCestino && (
-                <div className="w-full text-sm text-gray-500 mt-1">Carico filtri…</div>
+                <div className="w-full text-sm text-theme mt-1">Carico filtri…</div>
             )}
         </div>
     );
