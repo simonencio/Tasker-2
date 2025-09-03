@@ -2,7 +2,7 @@
 import React, { useEffect, useState, type JSX } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import {
-    faUserPlus, faBuilding, faFlag, faSignal, faCalendarDays, faClock, faXmark,
+    faUserPlus, faBuilding, faFlag, faSignal, faCalendarDays, faClock, faXmark, faCopy
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { inviaNotifica } from "../Notifiche/notificheUtils";
@@ -39,6 +39,21 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
     const [errore, setErrore] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
+    const [templateList, setTemplateList] = useState<Array<{ id: string; nome: string }>>([]);
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+    const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+    const [templateName, setTemplateName] = useState("");
+
+
+
+    const reloadTemplateProgetti = async () => {
+        const { data } = await supabase
+            .from("templates_progetti")
+            .select("id,nome")
+            .order("nome", { ascending: true });
+        setTemplateList(data || []);
+    };
+
 
     useEffect(() => {
         const resize = () => setIsMobile(window.innerWidth <= 768);
@@ -86,6 +101,22 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
         };
     }, []);
 
+    // carica template progetti
+    useEffect(() => {
+        reloadTemplateProgetti();
+    }, []);
+
+    // realtime aggiornamenti templates_progetti
+    useEffect(() => {
+        const ch = supabase.channel("realtime_templates_progetti");
+        ch.on("postgres_changes", { event: "*", schema: "public", table: "templates_progetti" }, reloadTemplateProgetti)
+            .subscribe();
+        return () => { supabase.removeChannel(ch); };
+    }, []);
+
+
+
+
     const reset = () => {
         setNome(""); setNote(""); setClienteId(null);
         setUtentiSelezionati([]); setStatoId("");
@@ -100,6 +131,7 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
         try {
             if (!nome.trim()) throw new Error("Il nome del progetto è obbligatorio.");
 
+            // tempo stimato per IL PROGETTO
             const tempo_stimato = ore || minuti ? `${ore} hours ${minuti} minutes` : null;
             const userResp = await supabase.auth.getUser();
 
@@ -123,7 +155,7 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
 
             const progettoId = created.id;
 
-            // 2) Inserisci membri in utenti_progetti
+            // 2) Inserisci membri in utenti_progetti + notifica
             for (const u of utentiSelezionati) {
                 await supabase.from("utenti_progetti").insert({ progetto_id: progettoId, utente_id: u.id });
                 await inviaNotifica(
@@ -151,6 +183,45 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
             // 4) Dispatch finale
             dispatchResourceEvent("add", "progetti", { item: nuovo });
 
+            // 5) (OPZIONALE) Salva come MODELLO di progetto
+            if (saveAsTemplate) {
+                // tempo stimato per IL MODELLO (ricalcolato qui per evitare l’errore)
+                const tempoTemplate = ore || minuti ? `${ore} hours ${minuti} minutes` : null;
+
+                try {
+                    const { data: tpl, error: e1 } = await supabase
+                        .from("templates_progetti")
+                        .insert({
+                            nome: (templateName?.trim() || nome.trim()),
+                            descrizione: note || null,
+                            default_cliente_id: clienteId,
+                            default_stato_id: statoId ? +statoId : null,
+                            default_priorita_id: prioritaId ? +prioritaId : null,
+                            consegna_offset_days: consegna
+                                ? Math.round((new Date(consegna).getTime() - Date.now()) / 86400000)
+                                : null,
+                            default_tempo_stimato: tempoTemplate,
+                        })
+                        .select("id")
+                        .single();
+
+                    if (!e1 && tpl?.id && utentiSelezionati.length) {
+                        await supabase
+                            .from("templates_progetti_utenti")
+                            .insert(utentiSelezionati.map(u => ({ template_id: tpl.id, utente_id: u.id })));
+                    }
+
+                    await reloadTemplateProgetti();               // aggiorna la lista subito
+                    if (!e1 && tpl?.id) setSelectedTemplateId(tpl.id); // seleziona il nuovo in UI
+                    
+                } catch (tplErr: any) {
+                    // Non bloccare la creazione del progetto se fallisce il salvataggio del modello
+                    console.warn("Salvataggio modello progetto fallito:", tplErr?.message || tplErr);
+                }
+
+            }
+
+
             setSuccess(true);
             reset();
             setTimeout(() => setSuccess(false), 3000);
@@ -161,6 +232,7 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
             setLoading(false);
         }
     };
+
 
 
     const baseInputClass = "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-theme text-theme";
@@ -177,8 +249,7 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
                         }}
                         className={`cursor-pointer px-2 py-1 rounded border ${clienteId === c.id
                             ? "selected-panel font-semibold"
-                            : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
-                            }`}
+                            : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"}`}
                     >
                         {c.nome}
                     </div>
@@ -192,8 +263,7 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
                     return (
                         <div
                             key={u.id}
-                            onClick={() => setUtentiSelezionati(prev =>
-                                selected ? prev.filter(s => s.id !== u.id) : [...prev, u]
+                            onClick={() => setUtentiSelezionati(prev => selected ? prev.filter(s => s.id !== u.id) : [...prev, u]
                             )}
                             className={`cursor-pointer px-2 py-1 rounded border ${selected ? "selected-panel font-semibold" : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"}`}
                         >
@@ -214,8 +284,7 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
                         }}
                         className={`cursor-pointer px-2 py-1 rounded border ${statoId === String(s.id)
                             ? "selected-panel font-semibold"
-                            : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
-                            }`}
+                            : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"}`}
                     >
                         {s.nome}
                     </div>
@@ -233,8 +302,7 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
                         }}
                         className={`cursor-pointer px-2 py-1 rounded border ${prioritaId === String(p.id)
                             ? "selected-panel font-semibold"
-                            : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
-                            }`}
+                            : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"}`}
                     >
                         {p.nome}
                     </div>
@@ -253,7 +321,54 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
                     {[0, 15, 30, 45].map(m => <option key={m} value={m}>{m}min</option>)}
                 </select>
             </div>
-        )
+        ),
+        modello: (
+            <div className="space-y-1 max-h-60">
+                {templateList.map((tpl) => (
+                    <div
+                        key={tpl.id}
+                        onClick={async () => {
+                            setSelectedTemplateId(tpl.id);
+                            setPopupOpen(null);
+                            // Fetch dettagli modello e applica ai campi
+                            const { data } = await supabase
+                                .from("templates_progetti")
+                                .select("*, templates_progetti_utenti(utente_id)")
+                                .eq("id", tpl.id)
+                                .maybeSingle();
+
+                            if (!data) return;
+                            setNome(data.nome || "");
+                            setNote(data.descrizione || "");
+                            setClienteId(data.default_cliente_id || null);
+                            setStatoId(data.default_stato_id ? String(data.default_stato_id) : "");
+                            setPrioritaId(data.default_priorita_id ? String(data.default_priorita_id) : "");
+
+                            if (data.consegna_offset_days != null) {
+                                const d = new Date();
+                                d.setDate(d.getDate() + data.consegna_offset_days);
+                                setConsegna(d.toISOString().slice(0, 10));
+                            }
+                            if (data.default_tempo_stimato) {
+                                const m = data.default_tempo_stimato.match(/(\d+)\s*hours?\s*(\d+)\s*minutes?/i);
+                                setOre(m ? +m[1] : 0);
+                                setMinuti(m ? +m[2] : 0);
+                            }
+                            if (Array.isArray(data.templates_progetti_utenti)) {
+                                const ids = data.templates_progetti_utenti.map((r: any) => r.utente_id);
+                                setUtentiSelezionati(utenti.filter(u => ids.includes(u.id)));
+                            }
+                        }}
+                        className={`cursor-pointer px-2 py-1 rounded border ${selectedTemplateId === tpl.id
+                            ? "selected-panel font-semibold"
+                            : "hover:bg-gray-100 dark:hover:bg-gray-600 border-transparent"
+                            }`}
+                    >
+                        {tpl.nome}
+                    </div>
+                ))}
+            </div>
+        ),
     };
 
     const popupButtons = [
@@ -263,6 +378,9 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
         { icon: faSignal, popup: "priorita", color: "text-yellow-400", active: "text-yellow-600" },
         { icon: faCalendarDays, popup: "consegna", color: "text-blue-400", active: "text-blue-600" },
         { icon: faClock, popup: "tempo", color: "text-purple-400", active: "text-purple-600" },
+
+
+        { icon: faCopy, popup: "modello", color: "text-indigo-400", active: "text-indigo-600" },
     ] as const;
 
     const computedLeft = offsetIndex
@@ -343,6 +461,26 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
                         {success && <div className="text-green-600">✅ Progetto creato</div>}
                     </div>
                 )}
+
+                {saveAsTemplate && (
+                    <input
+                        className={baseInputClass}
+                        placeholder="Nome modello"
+                        value={templateName}
+                        onChange={e => setTemplateName(e.target.value)}
+                    />
+                )}
+
+                <div className="flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        id="saveAsTpl"
+                        checked={saveAsTemplate}
+                        onChange={e => setSaveAsTemplate(e.target.checked)}
+                    />
+                    <label htmlFor="saveAsTpl">Salva questa configurazione come modello</label>
+                </div>
+
 
                 <div>
                     <button

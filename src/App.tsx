@@ -17,6 +17,7 @@ import ConfirmEmailWelcome from "./Pagine/ConfirmEmailWelcome";
 import LoginForm from "./Pagine/LoginForm";
 import Home from "./Pagine/Home";
 import Profilo from "./Profilo/Profilo";
+import ModelliPage from "./Dettagli/DettaglioModello.tsx"
 // ⬇️ aggiungi
 import { ToastBridge } from "./Liste/config/common";
 import { TimerOverlay } from "./Liste/config/TimerOverlay";
@@ -56,7 +57,7 @@ import TimelineDinamica from "./Liste/TimelineDinamica";
 import DettaglioCliente from "./Dettagli/DettaglioCliente.tsx";
 
 
-type ModalType = "project" | "tasks" | "client" | "user" | "stato" | "priorita" | "ruolo";
+type ModalType = "project" | "tasks" | "client" | "user" | "stato" | "priorita" | "ruolo" | "edit-project-template" | "edit-task-template" | "edit";
 
 /** Redirect legacy /tasks/:id -> /tasks/:slug */
 function RedirectTaskById() {
@@ -295,6 +296,7 @@ function AppContent() {
                                 />
 
                                 <Route path="/profilo" element={<Profilo />} />
+                                <Route path="/modelli" element={<ModelliPage />} />
 
                                 {/* Progetti */}
                                 <Route path="/progetti/:slug" element={<DettaglioProgetto />} />

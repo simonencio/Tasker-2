@@ -349,6 +349,7 @@ export default function Header({
                             {loggedIn ? (
                                 <>
                                     <button onClick={() => { navigate("/profilo"); setOpen(false); }} className="dropdown-button">Gestione account</button>
+                                    <button onClick={() => { navigate("/modelli"); setOpen(false); }} className="dropdown-button">Modelli</button>
                                     <button onClick={handleLogout} className="dropdown-button">Logout</button>
                                 </>
                             ) : (
