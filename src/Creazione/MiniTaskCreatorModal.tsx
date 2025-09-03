@@ -243,19 +243,20 @@ export default function MiniTaskCreatorModal({ onClose, offsetIndex = 0 }: Props
             }
 
             // 4) Refetch coerente con la lista (JOIN completi)
-            let nuovo: any = createdTask;
+            // 👇 Non facciamo più add manuale (arriva già dal realtime),
+            //    ma se troviamo il record con i join lo mandiamo come "replace".
             try {
                 const { data: auth } = await supabase.auth.getUser();
                 const utenteId = auth?.user?.id ?? null;
                 const all = await fetchTasks({}, utenteId ?? undefined);
                 const found = (all || []).find((x: any) => String(x.id) === String(taskId));
-                if (found) nuovo = found;
+                if (found) {
+                    dispatchResourceEvent("replace", "tasks", { item: found });
+                }
             } catch (err) {
-                console.warn("Refetch task fallito, uso record base:", err);
+                console.warn("Refetch task fallito:", err);
             }
 
-            // 5) Dispatch con record completo
-            dispatchResourceEvent("add", "tasks", { item: nuovo });
 
             // 6) (OPZIONALE) Salva come modello
             if (saveAsTaskTemplate) {

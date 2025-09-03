@@ -1,3 +1,4 @@
+// src/Dettagli/DettaglioProgetto.tsx
 import { useParams } from "react-router-dom";
 import { useEffect, useState, useMemo, useCallback } from "react";
 
@@ -48,29 +49,30 @@ export default function DettaglioProgetto() {
         isUtenteAdmin().then((res) => setIsAdmin(res));
     }, []);
 
-    // Carica progetto da slug
-    useEffect(() => {
-        const fetchProgetto = async () => {
-            if (!slug) return;
-            const { data } = await supabase
-                .from("progetti")
-                .select(
-                    `
-          id, nome, slug, note, consegna, tempo_stimato,
-          cliente:clienti(id, nome),
-          stato:stati(id, nome, colore),
-          priorita(id, nome),
-          fine_progetto
-        `
-                )
-                .eq("slug", slug)
-                .single<Progetto>();
+    // Carica progetto (riutilizzabile dopo salvataggio)
+    const fetchProgetto = useCallback(async () => {
+        if (!slug) return;
+        const { data } = await supabase
+            .from("progetti")
+            .select(
+                `
+                id, nome, slug, note, consegna, tempo_stimato,
+                cliente:clienti(id, nome),
+                stato:stati(id, nome, colore),
+                priorita(id, nome),
+                fine_progetto
+            `
+            )
+            .eq("slug", slug)
+            .single<Progetto>();
 
-            if (data) setProgetto({ ...data, membri: [] });
-            setLoading(false);
-        };
-        fetchProgetto();
+        if (data) setProgetto({ ...data, membri: [] });
+        setLoading(false);
     }, [slug]);
+
+    useEffect(() => {
+        fetchProgetto();
+    }, [fetchProgetto]);
 
     // Carica membri del progetto
     useEffect(() => {
@@ -209,7 +211,12 @@ export default function DettaglioProgetto() {
             </div>
 
             {modaleAperta && progettoId && (
-                <GenericEditorModal table="progetti" id={progettoId} onClose={() => setModaleAperta(false)} />
+                <GenericEditorModal
+                    table="progetti"
+                    id={progettoId}
+                    onClose={() => setModaleAperta(false)}
+                    onSaved={fetchProgetto} // 👈 aggiorna i dati subito dopo salvataggio
+                />
             )}
         </div>
     );

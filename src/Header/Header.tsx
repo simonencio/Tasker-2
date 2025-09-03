@@ -204,9 +204,9 @@ export default function Header({
                     .single();
 
                 if (data) {
-                    mostraNotificaBrowser("🔔 Notifica Kalimero", {
+                    mostraNotificaBrowser("Tasker 🔔", {
                         body: data.messaggio,
-                        icon: "/kalimero_logo.png",
+                        icon: "/altro-3.png",
                     });
                 }
             }).subscribe();

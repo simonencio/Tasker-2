@@ -52,7 +52,7 @@ import { getPreferredView, type Vista } from "./Liste/viewPrefs";
 import MiniProjectCreatorModal from "./Creazione/MiniProjectCreatorModal";
 import GenericEditorModal from "./Modifica/GenericEditorModal";
 import { createRoot } from "react-dom/client";
-import TimelineDinamica from "./Liste/TimelineDinamica";
+// import TimelineDinamica from "./Liste/TimelineDinamica";
 
 import DettaglioCliente from "./Dettagli/DettaglioCliente.tsx";
 import GanttDinamico from "./Liste/GanttDinamico.tsx";
@@ -94,12 +94,12 @@ function ResourceRoute({ tipo, paramKey = "view" }: { tipo: ResourceKey; paramKe
 
     const view: Vista = (() => {
         const v = params.get(paramKey);
-        if (v === "list" || v === "cards" || v === "timeline" || v === "gantt") return v;
+        if (v === "list" || v === "cards" || v === "gantt") return v;
         return getPreferredView(tipo, "list");
     })();
 
     if (view === "cards") return <CardDinamiche tipo={tipo} paramKey={paramKey} />;
-    if (view === "timeline") return <TimelineDinamica tipo={tipo} paramKey={paramKey} />;
+    // if (view === "timeline") return <TimelineDinamica tipo={tipo} paramKey={paramKey} />;
     if (view === "gantt") return <GanttDinamico tipo={tipo} paramKey={paramKey} />; // 👈 nuovo
 
     return <ListaDinamica tipo={tipo} paramKey={paramKey} />;
@@ -185,24 +185,46 @@ function AppContent() {
 
     // esponi apertura "mini create" a risorse
     useEffect(() => {
-        (window as any).__openMiniCreate = (kind: "stato" | "priorita" | "ruolo") => {
-            if (kind === "stato") openModal("stato");
-            else if (kind === "priorita") openModal("priorita");
-            else if (kind === "ruolo") openModal("ruolo");
-            (window as any).__openMiniTask = () => openModal("tasks");
-            (window as any).__openMiniProject = () => openModal("project");
-            (window as any).__toggleNotifiche = () => toggleNotifiche();
-        };
-        return () => {
-            try {
-                delete (window as any).__openMiniCreate;
-                delete (window as any).__openMiniTask;
-                delete (window as any).__openMiniProject;
-                delete (window as any).__toggleNotifiche;
-            } catch { }
+        (window as any).__openMiniCreate = (kind: string) => {
+            switch (kind) {
+                case "stati":
+                    openModal("stato");
+                    break;
+                case "priorita":
+                    openModal("priorita");
+                    break;
+                case "ruoli":
+                    openModal("ruolo");
+                    break;
+                case "tasks":
+                    openModal("tasks");
+                    break;
+                case "progetti":
+                    openModal("project");
+                    break;
+                case "clienti":
+                    openModal("client");
+                    break;
+                case "utenti":
+                    openModal("user");
+                    break;
+                default:
+                    console.warn("Nessuna modal per", kind);
+            }
         };
 
-    }, []);
+        (window as any).__openMiniTask = () => openModal("tasks");
+        (window as any).__openMiniProject = () => openModal("project");
+        (window as any).__toggleNotifiche = () => toggleNotifiche();
+
+        return () => {
+            delete (window as any).__openMiniCreate;
+            delete (window as any).__openMiniTask;
+            delete (window as any).__openMiniProject;
+            delete (window as any).__toggleNotifiche;
+        };
+    }, [openModal, toggleNotifiche]);
+
     // gestore globale per aprire la modale di modifica
     useEffect(() => {
         (window as any).__openMiniEdit = (table: string, id: string) => {

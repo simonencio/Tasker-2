@@ -4,6 +4,9 @@ import { softDelete } from "../../supporto/softDelete";
 import type { ResourceConfig, Priorita } from "../typesLista";
 import { azioni, dispatchResourceEvent } from "./azioniConfig";
 
+// import del modal di creazione
+import MiniPrioritaCreatorModal from "../../Creazione/MiniPrioritaCreatorModal";
+
 export const prioritaConfig: ResourceConfig<Priorita> = {
     key: "priorita",
     titolo: "Lista Priorità",
@@ -14,6 +17,8 @@ export const prioritaConfig: ResourceConfig<Priorita> = {
         fetch: async () => await fetchPrioritaDeleted(),
         actions: cestinoActions.priorita,
     },
+    creator: (onClose) => <MiniPrioritaCreatorModal onClose={onClose} />,
+
     colonne: [
         { chiave: "nome", label: "Nome", className: "flex-1 font-medium truncate" },
         {

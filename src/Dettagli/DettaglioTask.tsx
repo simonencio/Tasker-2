@@ -1,6 +1,6 @@
 // src/Dettagli/DettaglioTask.tsx
 import { useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -44,11 +44,9 @@ function formatDurata(value?: number | string | null): string {
         if (m > 0) return `${m}m`;
         return `${s}s`;
     }
-    // se è string (interval) lasciamo "—" per coerenza con attuale UI
     return "—";
 }
 
-// Deduplica per evitare key duplicate nei render
 function uniqById<T extends { id?: string }>(arr: T[]): T[] {
     const map = new Map<string, T>();
     for (const x of arr) {
@@ -84,19 +82,19 @@ export default function DettaglioTask() {
     }, []);
 
     /* ------------------------ Fetch task ------------------------ */
-    const fetchTask = async () => {
+    const fetchTask = useCallback(async () => {
         if (!slug) return;
 
         const { data, error } = await supabase
             .from("tasks")
             .select(`
-        id, nome, slug, note, consegna, tempo_stimato, fine_task,
-        stato:stato_id(id, nome, colore),
-        priorita:priorita_id(id, nome),
-        parent_id,
-        progetti_task(progetti(id, nome, slug)),
-        utenti_task(utenti(id, nome, cognome, avatar_url))
-      `)
+                id, nome, slug, note, consegna, tempo_stimato, fine_task,
+                stato:stato_id(id, nome, colore),
+                priorita:priorita_id(id, nome),
+                parent_id,
+                progetti_task(progetti(id, nome, slug)),
+                utenti_task(utenti(id, nome, cognome, avatar_url))
+            `)
             .eq("slug", slug)
             .single();
 
@@ -125,7 +123,6 @@ export default function DettaglioTask() {
             priorita: Array.isArray(data.priorita) ? data.priorita[0] : data.priorita,
             progetto,
             parent_id: data.parent_id,
-            // dedup per evitare warning "same key" in AvatarChip
             assegnatari: uniqById(assegnatariRaw),
         };
 
@@ -142,32 +139,26 @@ export default function DettaglioTask() {
                 uniqById((membri || []).map((r: any) => r.utenti).filter(Boolean))
             );
         }
-    };
 
-    useEffect(() => {
-        fetchTask();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [slug]);
-
-    /* ------------------------ Durata ------------------------ */
-    useEffect(() => {
-        const fetchDurate = async () => {
-            if (!task?.id) return;
-            const { data } = await supabase
+        if (data.id) {
+            const { data: durate } = await supabase
                 .from("time_entries")
                 .select("durata")
-                .eq("task_id", task.id);
+                .eq("task_id", data.id);
 
-            const totale = (data || []).reduce(
+            const totale = (durate || []).reduce(
                 (acc, r) => acc + (r.durata || 0),
                 0
             );
             setTotaleTaskSec(totale);
-        };
-        fetchDurate();
-    }, [task?.id]);
+        }
+    }, [slug]);
 
-    /* ------------------------ Timer (task principale) ------------------------ */
+    useEffect(() => {
+        fetchTask();
+    }, [fetchTask]);
+
+    /* ------------------------ Timer ------------------------ */
     const handleStartTimer = (t: Task) => {
         if (activeTimer) {
             handleStopTimer(t, activeTimer);
@@ -210,7 +201,9 @@ export default function DettaglioTask() {
             error ? "Errore nel salvataggio" : "Tempo salvato",
             error ? Toast.TYPE_ERROR : Toast.TYPE_DONE
         );
+
         setActiveTimer(null);
+        fetchTask(); // 👈 aggiorna subito il dettaglio dopo stop timer
     };
 
     /* ------------------------ Render ------------------------ */
@@ -326,13 +319,13 @@ export default function DettaglioTask() {
                     </div>
                 </div>
 
-                {/* Lista dinamica sotto-task (usa tasksSubConfig + paramKey) */}
+                {/* Lista dinamica sotto-task */}
                 <div className="mt-8">
                     <ListaDinamica
                         tipo="tasks_sub"
                         minimalHeader
                         configOverride={tasksSubConfig}
-                        paramKey={task.id} // fondamentale: passato al fetch del config
+                        paramKey={task.id}
                     />
                 </div>
             </div>
