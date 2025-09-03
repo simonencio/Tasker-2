@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPen, faUndo, faTrash } from "@fortawesome/free-solid-svg-icons";
-import { listenResourceEvents } from "./config/azioniConfig";
+import { azioni, listenResourceEvents } from "./config/azioniConfig";
 
 import IntestazioneLista from "./IntestazioneLista";
 import { resourceConfigs, type ResourceKey } from "./resourceConfigs";
@@ -313,37 +311,19 @@ export default function ListaDinamica<T extends { id: string | number }>({
                                     >
                                         {modalitaCestino && config.cestino ? (
                                             <>
-                                                <button
-                                                    onClick={() => handleRestore(item.id)}
-                                                    className="clickable icon-action tooltip"
-                                                    data-tooltip="Ripristina"
-                                                >
-                                                    <FontAwesomeIcon icon={faUndo} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleHardDelete(item.id)}
-                                                    className="clickable icon-action tooltip"
-                                                    data-tooltip="Elimina definitivamente"
-                                                >
-                                                    <FontAwesomeIcon icon={faTrash} />
-                                                </button>
+                                                {azioni.restore(() => handleRestore(item.id))}
+                                                {azioni.trashHard(() => handleHardDelete(item.id))}
                                             </>
                                         ) : (
                                             <>
                                                 {config.azioni?.(item, ctx)}
                                                 {config.renderModaleModifica && (
-                                                    <button
-                                                        onClick={() =>
-                                                            config.renderModaleModifica?.(
-                                                                String(item.id),
-                                                                () => { }
-                                                            )
-                                                        }
-                                                        className="clickable icon-action tooltip"
-                                                        data-tooltip="Modifica"
-                                                    >
-                                                        <FontAwesomeIcon icon={faPen} />
-                                                    </button>
+                                                    azioni.edit(() =>
+                                                        config.renderModaleModifica?.(
+                                                            String(item.id),
+                                                            () => { }
+                                                        )
+                                                    )
                                                 )}
                                             </>
                                         )}

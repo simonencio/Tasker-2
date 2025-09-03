@@ -58,22 +58,26 @@ export default function MiniPrioritaCreatorModal({ onClose, offsetIndex = 0 }: P
             return;
         }
 
-        // 👇 aggiorna subito tutte le viste senza refresh
+        // Refetch coerente (per avere join completi se ci sono)
+        let nuovo: any = data;
         try {
             const rc: any = (resourceConfigs as any)["priorita"];
             const userResp = await supabase.auth.getUser();
             const utenteId = userResp?.data?.user?.id ?? null;
 
-            let nuovo: any = data;
             if (rc?.fetch) {
                 const all = await rc.fetch({ filtro: {}, utenteId });
                 nuovo = (all || []).find((x: any) => String(x.id) === String(data.id)) ?? data;
             }
-
-            dispatchResourceEvent("add", "priorita", { item: nuovo });
-        } catch {
-            dispatchResourceEvent("add", "priorita", { item: data });
+        } catch (err) {
+            console.warn("Refetch priorità fallito, uso record base:", err);
         }
+
+        // ✅ Dispatch finale → SOLO replace, niente add
+        if (nuovo && nuovo.id) {
+            dispatchResourceEvent("replace", "priorita", { item: nuovo });
+        }
+
 
 
         setSuccess(true);

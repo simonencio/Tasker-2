@@ -14,7 +14,6 @@ import {
     type DragEndEvent,
 } from "@dnd-kit/core";
 import {
-    arrayMove,
     SortableContext,
     verticalListSortingStrategy,
     useSortable,
@@ -27,7 +26,6 @@ import type { ResourceConfig } from "./typesLista";
 import { useResourceData } from "./useResourceData";
 
 /* ------------------------------------------------------------------ */
-/* Tipi */
 type GanttItem = {
     id: string;
     name: string;
@@ -37,12 +35,14 @@ type GanttItem = {
     coloreClass: string;
     isCompletato: boolean;
     assegnatari?: { id: string; nome: string; avatar_url?: string | null }[];
+    hasRealDates: boolean;
+    children?: GanttItem[];
+    parentId?: string | null;
     __raw: any;
 };
 
 type ViewMode = "day" | "week" | "month";
 
-/* ------------------------------------------------------------------ */
 const ROW_HEIGHT = 56;
 const MIN_DAY_WIDTH = 70;
 
@@ -56,17 +56,18 @@ const TASK_COLORS = [
 ];
 
 /* ------------------------------------------------------------------ */
-/* Riga ordinabile */
 function SortableRow({
     item,
     left,
     width,
     onSelect,
+    level = 0,
 }: {
     item: GanttItem;
     left: string;
     width: string;
     onSelect: (item: GanttItem) => void;
+    level?: number;
 }) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id });
     const style = { transform: CSS.Transform.toString(transform), transition };
@@ -81,15 +82,22 @@ function SortableRow({
         >
             <div
                 className={`absolute top-2 left-0 h-9 rounded-md cursor-pointer transition-transform duration-150 hover:scale-105 shadow-sm flex items-center px-2 text-xs font-medium text-white overflow-hidden ${item.coloreClass}`}
-                style={{ left, width, opacity: item.isCompletato ? 0.65 : 1 }}
-                title={`${item.name}: ${moment(item.start).format("DD/MM/YYYY")} → ${moment(item.end).format("DD/MM/YYYY")}`}
+                style={{
+                    left,
+                    width,
+                    opacity: item.isCompletato ? 0.65 : 1,
+                    border: item.hasRealDates ? "2px solid white" : undefined,
+                }}
+                title={`${item.name}: ${moment(item.start).format("DD/MM/YYYY")} → ${moment(item.end).format(
+                    "DD/MM/YYYY"
+                )}`}
                 onClick={() => onSelect(item)}
             >
-                <span className="truncate">{item.name}</span>
+                <span className="truncate">{`${"— ".repeat(level)}${item.name}`}</span>
                 <div className="flex ml-auto -space-x-2">
-                    {item.assegnatari?.slice(0, 3).map((u) => (
+                    {item.assegnatari?.slice(0, 3).map((u, idx) => (
                         <img
-                            key={u.id}
+                            key={`${item.id}-${u.id}-${idx}`}
                             src={u.avatar_url || "/default-avatar.png"}
                             className="w-5 h-5 rounded-full border border-white"
                             title={u.nome}
@@ -102,7 +110,6 @@ function SortableRow({
 }
 
 /* ------------------------------------------------------------------ */
-/* Componente principale */
 export default function GanttDinamico<T extends { id: string | number }>({
     tipo,
     modalitaCestino = false,
@@ -117,102 +124,104 @@ export default function GanttDinamico<T extends { id: string | number }>({
     if (!cfgAny) return <p className="text-red-600">Config non trovata per tipo: {tipo}</p>;
     const cfg = cfgAny as ResourceConfig<T>;
 
-    const { items, loading, filtro, setFiltro } = useResourceData(cfg, { modalitaCestino });
+    const { items, loading } = useResourceData(cfg, { modalitaCestino });
 
-    /* stato */
     const [viewMode, setViewMode] = useState<ViewMode>("week");
-    const storageKey = `gantt-order-${tipo}`;
-    const [orderedIds, setOrderedIds] = useState<string[]>([]);
-
-    /* sensors dichiarati qui, non in JSX! */
     const sensors = useSensors(useSensor(PointerSensor));
 
-    /* effetto iniziale per ordine salvato */
-    useEffect(() => {
-        const saved = localStorage.getItem(storageKey);
-        if (saved) setOrderedIds(JSON.parse(saved));
-    }, [storageKey]);
+    /* utility: calcola start/end coerenti */
+    function calcolaDate(item: any): { start: Date; end: Date; hasReal: boolean } {
+        if (item.inizio_task && item.fine_task) {
+            return { start: new Date(item.inizio_task), end: new Date(item.fine_task), hasReal: true };
+        } else if (item.consegna) {
+            return {
+                start: new Date(item.created_at || new Date().toISOString()),
+                end: new Date(item.consegna),
+                hasReal: false,
+            };
+        } else {
+            const start = new Date(item.created_at || new Date().toISOString());
+            return { start, end: moment(start).add(7, "days").toDate(), hasReal: false };
+        }
+    }
 
-    /* filtro lato client */
-    const filteredItems = useMemo(() => {
-        return items.filter((it: any) => {
-            if (filtro.soloCompletate) return !!it.fine_task;
-            if (filtro.soloNonCompletate) return !it.fine_task;
-            if (filtro.soloCompletati) return !!it.fine_progetto;
-            if (filtro.soloNonCompletati) return !it.fine_progetto;
-            return true;
+    /* costruisce la gerarchia */
+    function buildHierarchy(list: any[]): GanttItem[] {
+        const map = new Map<string, GanttItem>();
+        const roots: GanttItem[] = [];
+
+        list.forEach((item: any, idx: number) => {
+            const { start, end, hasReal } = calcolaDate(item);
+            const coloreClass = TASK_COLORS[idx % TASK_COLORS.length];
+            const gi: GanttItem = {
+                id: String(item.id),
+                name: item.nome,
+                start,
+                end,
+                isTask: tipo === "tasks",
+                isCompletato: tipo === "tasks" ? !!item.fine_task : !!item.fine_progetto,
+                coloreClass,
+                hasRealDates: hasReal,
+                assegnatari: item.assegnatari
+                    ? item.assegnatari.map((ut: any) => ({
+                        id: ut.id,
+                        nome: [ut.nome, ut.cognome].filter(Boolean).join(" "),
+                        avatar_url: ut.avatar_url,
+                    }))
+                    : [],
+                parentId: item.parent_id,
+                children: [],
+                __raw: item,
+            };
+            map.set(gi.id, gi);
         });
-    }, [items, filtro]);
+
+        map.forEach((gi) => {
+            if (gi.parentId && map.has(gi.parentId)) {
+                map.get(gi.parentId)!.children!.push(gi);
+            } else {
+                roots.push(gi);
+            }
+        });
+
+        return roots;
+    }
 
     /* prepara dati gantt */
     const ganttItems: GanttItem[] = useMemo(() => {
-        return filteredItems.map((item: any, idx: number) => {
-            const startISO = item.inizio_gantt || item.created_at || new Date().toISOString();
-            const endISO =
-                item.fine_gantt ||
-                item.fine_task ||
-                item.fine_progetto ||
-                item.consegna ||
-                moment(startISO).add(7, "days").toISOString();
+        return buildHierarchy(items);
+    }, [items, tipo]);
 
-            const isTask = tipo === "tasks" || item.fine_task !== undefined;
-            const isCompletato = isTask ? !!item.fine_task : !!item.fine_progetto;
-            const coloreClass = TASK_COLORS[idx % TASK_COLORS.length];
+    /* flatten per rendering */
+    const flattenItems = (items: GanttItem[], level = 0): (GanttItem & { level: number })[] =>
+        items.flatMap((it) => [{ ...it, level }, ...flattenItems(it.children || [], level + 1)]);
+    const flatItems = flattenItems(ganttItems);
 
-            return {
-                id: String(item.id),
-                name: item.nome,
-                start: new Date(startISO),
-                end: new Date(endISO),
-                isTask,
-                isCompletato,
-                coloreClass,
-                assegnatari: item.utenti_task
-                    ? item.utenti_task.map((ut: any) => ({
-                        id: ut.utente?.id,
-                        nome: [ut.utente?.nome, ut.utente?.cognome].filter(Boolean).join(" "),
-                        avatar_url: ut.utente?.avatar_url,
-                    }))
-                    : [],
-                __raw: item,
-            };
-        });
-    }, [filteredItems, tipo]);
-
-    /* ordering */
-    const orderedItems = useMemo(() => {
-        if (orderedIds.length === 0) return ganttItems;
-        const map = new Map(ganttItems.map((g) => [g.id, g]));
-        return orderedIds.map((id) => map.get(id)).filter(Boolean) as GanttItem[];
-    }, [ganttItems, orderedIds]);
+    useEffect(() => {
+        console.log("Items dal DB:", items);
+        console.log("Gantt gerarchico:", ganttItems);
+        console.log("Flat items:", flatItems);
+    }, [items, ganttItems, flatItems]);
 
     const handleDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
-        if (active.id !== over?.id) {
-            const oldIndex = orderedItems.findIndex((i) => i.id === active.id);
-            const newIndex = orderedItems.findIndex((i) => i.id === over?.id);
-            const newOrder = arrayMove(orderedItems, oldIndex, newIndex);
-            setOrderedIds(newOrder.map((i) => i.id));
-            localStorage.setItem(storageKey, JSON.stringify(newOrder.map((i) => i.id)));
-        }
+        // per ora non facciamo ordinamento
+        console.log("DragEnd:", event);
     };
 
-    /* range */
     const minDate = useMemo(() => {
-        return ganttItems.length
-            ? moment.min(ganttItems.map((g) => moment(g.start))).toDate()
+        return flatItems.length
+            ? moment.min(flatItems.map((g) => moment(g.start))).toDate()
             : new Date();
-    }, [ganttItems]);
+    }, [flatItems]);
 
     const maxDate = useMemo(() => {
-        return ganttItems.length
-            ? moment.max(ganttItems.map((g) => moment(g.end))).toDate()
+        return flatItems.length
+            ? moment.max(flatItems.map((g) => moment(g.end))).toDate()
             : moment().add(1, "month").toDate();
-    }, [ganttItems]);
+    }, [flatItems]);
 
     const totalDays = moment(maxDate).diff(moment(minDate), "days") + 1;
 
-    /* ticks timeline */
     const timelineTicks = useMemo(() => {
         const ticks: Date[] = [];
         let cur = moment(minDate).startOf(viewMode);
@@ -237,7 +246,6 @@ export default function GanttDinamico<T extends { id: string | number }>({
         return ticks;
     }, [minDate, maxDate, viewMode]);
 
-    /* calcolo posizione barre */
     const getBarStyle = useCallback(
         (item: GanttItem) => {
             const startOffset = moment(item.start).diff(moment(minDate), "days");
@@ -261,13 +269,12 @@ export default function GanttDinamico<T extends { id: string | number }>({
                 titolo={cfg.titolo}
                 icona={cfg.icona}
                 coloreIcona={cfg.coloreIcona}
-                onChange={setFiltro}
+                onChange={() => { }}
                 dati={cfg.useHeaderFilters ? items : undefined}
                 paramKey={paramKey}
                 modalitaCestino={modalitaCestino}
             />
 
-            {/* controlli zoom */}
             <div className="flex justify-center gap-2 mb-4">
                 {(["day", "week", "month"] as ViewMode[]).map((m) => (
                     <button
@@ -290,7 +297,7 @@ export default function GanttDinamico<T extends { id: string | number }>({
                     {/* lista sinistra */}
                     <div className="w-80 border-r border-theme overflow-y-auto hide-scrollbar">
                         <div className="font-semibold text-sm px-4 py-2 border-b border-theme">Attività</div>
-                        {orderedItems.map((item) => (
+                        {flatItems.map((item) => (
                             <div
                                 key={item.id}
                                 className="flex items-center gap-3 px-4 py-3 cursor-pointer hover-bg-theme"
@@ -302,6 +309,7 @@ export default function GanttDinamico<T extends { id: string | number }>({
                                 />
                                 <div className="flex-1 truncate">
                                     <div className="font-medium text-sm flex items-center gap-2">
+                                        {"— ".repeat(item.level)}
                                         {item.name}
                                         {item.isCompletato && (
                                             <FontAwesomeIcon icon={faCheckCircle} className="icon-success text-xs" />
@@ -317,7 +325,6 @@ export default function GanttDinamico<T extends { id: string | number }>({
 
                     {/* timeline */}
                     <div className="flex-1 relative overflow-x-auto ">
-                        {/* header timeline */}
                         <div
                             className="sticky top-0 z-10 border-b border-theme bg-theme"
                             style={{
@@ -329,83 +336,33 @@ export default function GanttDinamico<T extends { id: string | number }>({
                                             : `${timelineTicks.length * (MIN_DAY_WIDTH * 30)}px`,
                             }}
                         >
-                            {/* riga superiore */}
+                            {/* intestazioni timeline */}
                             <div className="flex border-b border-theme">
-                                {timelineTicks.map((d, i) => {
-                                    const label =
-                                        viewMode === "day" || viewMode === "week"
-                                            ? moment(d).format("MMM YYYY")
-                                            : moment(d).format("YYYY");
-
-                                    const sameAsPrev =
-                                        i > 0 &&
-                                        label ===
-                                        (viewMode === "day" || viewMode === "week"
-                                            ? moment(timelineTicks[i - 1]).format("MMM YYYY")
-                                            : moment(timelineTicks[i - 1]).format("YYYY"));
-
-                                    if (sameAsPrev) return null;
-
-                                    let span = 1;
-                                    for (let j = i + 1; j < timelineTicks.length; j++) {
-                                        const nextLabel =
-                                            viewMode === "day" || viewMode === "week"
-                                                ? moment(timelineTicks[j]).format("MMM YYYY")
-                                                : moment(timelineTicks[j]).format("YYYY");
-                                        if (nextLabel === label) span++;
-                                        else break;
-                                    }
-
-                                    return (
-                                        <div
-                                            key={i}
-                                            className="text-xs font-semibold text-center border-r border-theme flex-shrink-0"
-                                            style={{
-                                                width:
-                                                    viewMode === "day"
-                                                        ? `${MIN_DAY_WIDTH * span}px`
-                                                        : viewMode === "week"
-                                                            ? `${(MIN_DAY_WIDTH * 7) * span}px`
-                                                            : `${(MIN_DAY_WIDTH * 30) * span}px`,
-                                            }}
-                                        >
-                                            {label}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            {/* riga inferiore */}
-                            <div className="flex">
-                                {timelineTicks.map((d, i) => {
-                                    const isWeekend = viewMode === "day" && (moment(d).day() === 0 || moment(d).day() === 6);
-                                    return (
-                                        <div
-                                            key={i}
-                                            className={`text-xs text-center border-r border-theme flex-shrink-0 ${isWeekend ? "bg-weekend" : ""}`}
-                                            style={{
-                                                width:
-                                                    viewMode === "day"
-                                                        ? `${MIN_DAY_WIDTH}px`
-                                                        : viewMode === "week"
-                                                            ? `${MIN_DAY_WIDTH * 7}px`
-                                                            : `${MIN_DAY_WIDTH * 30}px`,
-                                            }}
-                                        >
-                                            {viewMode === "day"
-                                                ? moment(d).format("DD")
-                                                : viewMode === "week"
-                                                    ? `${moment(d).format("DD/MM")} – ${moment(d).add(6, "days").format("DD/MM")}`
-                                                    : moment(d).format("MMM")}
-                                        </div>
-                                    );
-                                })}
+                                {timelineTicks.map((d, i) => (
+                                    <div
+                                        key={i}
+                                        className="text-xs font-semibold text-center border-r border-theme flex-shrink-0"
+                                        style={{
+                                            width:
+                                                viewMode === "day"
+                                                    ? `${MIN_DAY_WIDTH}px`
+                                                    : viewMode === "week"
+                                                        ? `${MIN_DAY_WIDTH * 7}px`
+                                                        : `${MIN_DAY_WIDTH * 30}px`,
+                                        }}
+                                    >
+                                        {viewMode === "day"
+                                            ? moment(d).format("DD/MM")
+                                            : viewMode === "week"
+                                                ? `Sett. ${moment(d).week()}`
+                                                : moment(d).format("MMM YYYY")}
+                                    </div>
+                                ))}
                             </div>
                         </div>
 
-                        {/* righe items */}
                         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                            <SortableContext items={orderedItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+                            <SortableContext items={flatItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
                                 <div
                                     className="relative"
                                     style={{
@@ -437,9 +394,18 @@ export default function GanttDinamico<T extends { id: string | number }>({
                                         </div>
                                     </div>
 
-                                    {orderedItems.map((item) => {
+                                    {flatItems.map((item) => {
                                         const { left, width } = getBarStyle(item);
-                                        return <SortableRow key={item.id} item={item} left={left} width={width} onSelect={handleSelect} />;
+                                        return (
+                                            <SortableRow
+                                                key={item.id}
+                                                item={item}
+                                                left={left}
+                                                width={width}
+                                                level={item.level}
+                                                onSelect={handleSelect}
+                                            />
+                                        );
                                     })}
                                 </div>
                             </SortableContext>

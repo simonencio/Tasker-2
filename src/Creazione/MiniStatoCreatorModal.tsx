@@ -58,22 +58,26 @@ export default function MiniStatoCreatorModal({ onClose, offsetIndex = 0 }: Prop
             return;
         }
 
-        // 👇 aggiorna tutte le viste col nuovo record
+        // Refetch coerente (per avere join completi se ci sono)
+        let nuovo: any = data;
         try {
             const rc: any = (resourceConfigs as any)["stati"];
             const userResp = await supabase.auth.getUser();
             const utenteId = userResp?.data?.user?.id ?? null;
 
-            let nuovo: any = data;
             if (rc?.fetch) {
                 const all = await rc.fetch({ filtro: {}, utenteId });
                 nuovo = (all || []).find((x: any) => String(x.id) === String(data.id)) ?? data;
             }
-
-            dispatchResourceEvent("add", "stati", { item: nuovo });
-        } catch {
-            dispatchResourceEvent("add", "stati", { item: data });
+        } catch (err) {
+            console.warn("Refetch stato fallito, uso record base:", err);
         }
+
+        // ✅ Dispatch finale → SOLO replace, niente add
+        if (nuovo && nuovo.id) {
+            dispatchResourceEvent("replace", "stati", { item: nuovo });
+        }
+
 
 
         setSuccess(true);

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode, type JSX } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPlus } from "@fortawesome/free-solid-svg-icons";
 
 import FiltriGenericiAvanzati, { type FiltroAvanzatoGenerico } from "../supporto/FiltriGenericiAvanzati";
 import { fetchUtenti, fetchClienti, fetchProgetti, fetchStati, fetchPriorita } from "../supporto/fetchData";
 
-import type { ResourceKey } from "./resourceConfigs";
+import { resourceConfigs, type ResourceKey } from "./resourceConfigs";
 import type { FiltroIntestazione, OpzioniGlobali } from "./typesLista";
 import { getPreferredView, setPreferredView, type Vista } from "./viewPrefs";
 import ToggleFiltri from "../supporto/ToggleFiltri";
@@ -25,7 +26,7 @@ function VistaSwitcher({ tipo, paramKey = "view" }: { tipo: ResourceKey; paramKe
 
     const readView = (): Vista => {
         const v = searchParams.get(paramKey);
-        if (v === "cards" || v === "timeline" || v === "list") return v;
+        if (v === "cards" || v === "list" || v === "gantt") return v;
         return getPreferredView(tipo, "list");
     };
 
@@ -79,13 +80,11 @@ function VistaSwitcher({ tipo, paramKey = "view" }: { tipo: ResourceKey; paramKe
             <Btn v="cards" label="Schede" />
             {(tipo === "tasks" || tipo === "progetti") && (
                 <>
-                    <Btn v="timeline" label="Timeline" />
                     <Btn v="gantt" label="Gantt" />
                 </>
             )}
         </div>
     );
-
 }
 
 export default function IntestazioneLista({
@@ -99,7 +98,7 @@ export default function IntestazioneLista({
     valore,
     onChange,
     modalitaCestino = false,
-    minimal = false,   // 👈 nuova prop
+    minimal = false,
 }: {
     titolo: string | JSX.Element;
     icona: any;
@@ -113,9 +112,6 @@ export default function IntestazioneLista({
     onChange?: (filtro: FiltroIntestazione) => void;
     minimal?: boolean;
 }) {
-
-
-
     const PREF_KEY = `filtro_${tipo}`;
 
     // Carico eventuale stato persistito
@@ -261,15 +257,16 @@ export default function IntestazioneLista({
         tipo,
         modalitaCestino,
     ]);
+
+    const [] = useState(false);
+    const cfg = resourceConfigs[tipo];
+
     // 🔹 se minimal: solo titolo + toggle
     if (minimal) {
         return (
             <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
                 <h1 className="text-2xl font-bold text-theme flex items-center">
-                    <FontAwesomeIcon
-                        icon={icona}
-                        className={`${coloreIcona || "icon-color"} mr-2`}
-                    />
+                    <FontAwesomeIcon icon={icona} className={`${coloreIcona || "icon-color"} mr-2`} />
                     {titolo}
                 </h1>
                 <ToggleFiltri
@@ -295,6 +292,7 @@ export default function IntestazioneLista({
             </div>
         );
     }
+
     return (
         <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
             <h1 className="text-2xl font-bold text-theme flex items-center">
@@ -341,6 +339,20 @@ export default function IntestazioneLista({
                 )}
 
                 {azioniExtra}
+
+                {/* 👇 Bottone Crea visibile sempre se la risorsa ha creator */}
+                {!modalitaCestino && cfg?.creator && (
+                    <button
+                        type="button"
+                        onClick={() => (window as any).__openMiniCreate(tipo)}
+                        className="clickable px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
+                    >
+                        <FontAwesomeIcon icon={faPlus} className="mr-1" />
+                        Crea
+                    </button>
+                )}
+
+
             </div>
 
             {loadingGlobali && !modalitaCestino && (

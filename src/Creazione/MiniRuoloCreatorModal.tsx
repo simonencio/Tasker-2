@@ -48,22 +48,26 @@ export default function MiniRuoloCreatorModal({ onClose, offsetIndex = 0 }: Prop
             return;
         }
 
-        // 👇 notifica tutte le viste (lista, card, timeline) senza refresh
+        // Refetch coerente (per avere join completi se ci sono)
+        let nuovo: any = data;
         try {
             const rc: any = (resourceConfigs as any)["ruoli"];
             const userResp = await supabase.auth.getUser();
             const utenteId = userResp?.data?.user?.id ?? null;
 
-            let nuovo: any = data;
             if (rc?.fetch) {
                 const all = await rc.fetch({ filtro: {}, utenteId });
                 nuovo = (all || []).find((x: any) => String(x.id) === String(data.id)) ?? data;
             }
-
-            dispatchResourceEvent("add", "ruoli", { item: nuovo });
-        } catch {
-            dispatchResourceEvent("add", "ruoli", { item: data });
+        } catch (err) {
+            console.warn("Refetch ruolo fallito, uso record base:", err);
         }
+
+        // ✅ Dispatch finale → SOLO replace, niente add
+        if (nuovo && nuovo.id) {
+            dispatchResourceEvent("replace", "ruoli", { item: nuovo });
+        }
+
 
 
         setSuccess(true);

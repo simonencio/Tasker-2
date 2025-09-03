@@ -4,6 +4,9 @@ import { softDelete } from "../../supporto/softDelete";
 import type { ResourceConfig, Ruolo } from "../typesLista";
 import { azioni, dispatchResourceEvent } from "./azioniConfig";
 
+// import del modal di creazione
+import MiniRuoloCreatorModal from "../../Creazione/MiniRuoloCreatorModal";
+
 export const ruoliConfig: ResourceConfig<Ruolo> = {
     key: "ruoli",
     titolo: "Lista Ruoli",
@@ -14,7 +17,11 @@ export const ruoliConfig: ResourceConfig<Ruolo> = {
         fetch: async () => await fetchRuoliDeleted(),
         actions: cestinoActions.ruoli,
     },
-    colonne: [{ chiave: "nome", label: "Nome", className: "flex-1 font-medium truncate" }],
+    creator: (onClose) => <MiniRuoloCreatorModal onClose={onClose} />,
+
+    colonne: [
+        { chiave: "nome", label: "Nome", className: "flex-1 font-medium truncate" },
+    ],
     azioni: (ruolo) => (
         <>
             {azioni.edit(() => (window as any).__openMiniEdit("ruoli", ruolo.id))}

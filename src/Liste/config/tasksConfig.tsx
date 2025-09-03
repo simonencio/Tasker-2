@@ -27,7 +27,11 @@ export const tasksConfig: ResourceConfig<Task> = {
 
     /* ================== FETCH ================== */
     fetch: async ({ filtro, utenteId }) => {
-        const all = await fetchTasks({ ...filtro, soloMie: !!filtro.soloMieTasks }, utenteId ?? undefined);
+        // Passa utenteId SOLO se è richiesto soloMieTasks
+        const all = await fetchTasks(
+            { ...filtro, soloMie: !!filtro.soloMieTasks },
+            filtro?.soloMieTasks && utenteId ? utenteId : undefined
+        );
         let items = all || [];
 
         // di default mostro solo root, MA se passo filtro.includeChildren = true le tengo tutte
@@ -35,14 +39,18 @@ export const tasksConfig: ResourceConfig<Task> = {
             items = items.filter((t: any) => !t.parent_id);
         }
 
+        // ulteriore protezione lato client
         if (filtro?.soloMieTasks && utenteId) {
-            items = items.filter((t: any) => (t.assegnatari || []).some((u: any) => u.id === utenteId));
+            items = items.filter((t: any) =>
+                (t.assegnatari || []).some((u: any) => u.id === utenteId)
+            );
         }
 
         return filtro.soloCompletate
             ? items.filter((t: any) => !!t.fine_task || t.completata === true)
             : items;
     },
+
 
 
     cestino: {
