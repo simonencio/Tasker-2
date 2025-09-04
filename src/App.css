@@ -1359,3 +1359,17 @@ html.dark .bg-weekend {
   background-color: rgba(255, 100, 100, 0.12);
 }
 
+/* ✅ Nascondi SOLO la scrollbar verticale */
+.hide-scrollbar-y {
+  -ms-overflow-style: none;     /* IE/Edge */
+  scrollbar-width: none;        /* Firefox -> la metteremo su un wrapper solo verticale */
+}
+.hide-scrollbar-y::-webkit-scrollbar:vertical {
+  width: 0 !important;          /* Chrome/Safari/Edge (Blink/WebKit) */
+  display: none !important;
+}
+/* (opzionale) Nascondi SOLO la scrollbar orizzontale */
+.hide-scrollbar-x::-webkit-scrollbar:horizontal {
+  height: 0 !important;
+  display: none !important;
+}

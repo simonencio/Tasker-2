@@ -1,4 +1,4 @@
-// src/Dettagli/DettaglioTask.tsx
+// 📄 src/Dettagli/DettaglioTask.tsx
 import { useParams } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../supporto/supabaseClient";
@@ -20,7 +20,7 @@ import {
     Section,
     MetaField,
 } from "../supporto/ui";
-import type { Task, Utente } from "../supporto/tipi";
+import type { Task, Utente, Commento } from "../supporto/tipi";
 
 import GenericEditorModal from "../Modifica/GenericEditorModal";
 import ChatCommentiModal from "../GestioneTask/ChatCommentiModal";
@@ -73,6 +73,8 @@ export default function DettaglioTask() {
     const [activeTimer, setActiveTimer] =
         useState<{ taskId: string; startTime: Date } | null>(null);
 
+    const [commenti, setCommenti] = useState<Commento[]>([]);
+
     /* ------------------------ Sessione ------------------------ */
     useEffect(() => {
         (async () => {
@@ -88,13 +90,13 @@ export default function DettaglioTask() {
         const { data, error } = await supabase
             .from("tasks")
             .select(`
-                id, nome, slug, note, consegna, tempo_stimato, fine_task,
-                stato:stato_id(id, nome, colore),
-                priorita:priorita_id(id, nome),
-                parent_id,
-                progetti_task(progetti(id, nome, slug)),
-                utenti_task(utenti(id, nome, cognome, avatar_url))
-            `)
+        id, nome, slug, note, consegna, tempo_stimato, fine_task,
+        stato:stato_id(id, nome, colore),
+        priorita:priorita_id(id, nome),
+        parent_id,
+        progetti_task(progetti(id, nome, slug)),
+        utenti_task(utenti(id, nome, cognome, avatar_url))
+      `)
             .eq("slug", slug)
             .single();
 
@@ -158,6 +160,57 @@ export default function DettaglioTask() {
         fetchTask();
     }, [fetchTask]);
 
+    /* ------------------------ Commenti ------------------------ */
+    const fetchCommenti = useCallback(async () => {
+        if (!task?.id) return;
+        const { data, error } = await supabase
+            .from("commenti")
+            .select(`
+        id, descrizione, created_at, modified_at, parent_id,
+        utente:utente_id ( id, nome, cognome, avatar_url ),
+        destinatari:commenti_destinatari( utente_id )
+      `)
+            .eq("task_id", task.id)
+            .is("deleted_at", null)
+            .order("created_at", { ascending: true });
+
+        if (!error && data) setCommenti(data as any);
+    }, [task?.id]);
+
+    useEffect(() => {
+        fetchCommenti();
+    }, [fetchCommenti]);
+
+    // realtime
+    useEffect(() => {
+        if (!task?.id) return;
+        const ch = supabase
+            .channel(`commenti:task:${task.id}`)
+            .on(
+                "postgres_changes",
+                { event: "INSERT", schema: "public", table: "commenti", filter: `task_id=eq.${task.id}` },
+                (payload) => {
+                    const nuovo = payload.new as any;
+                    setCommenti((prev) =>
+                        prev.some((c) => c.id === nuovo.id) ? prev : [...prev, nuovo]
+                    );
+                }
+            )
+            .on(
+                "postgres_changes",
+                { event: "DELETE", schema: "public", table: "commenti", filter: `task_id=eq.${task.id}` },
+                (payload) => {
+                    const delId = (payload.old as any).id;
+                    setCommenti((prev) => prev.filter((c) => c.id !== delId));
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(ch);
+        };
+    }, [task?.id]);
+
     /* ------------------------ Timer ------------------------ */
     const handleStartTimer = (t: Task) => {
         if (activeTimer) {
@@ -203,7 +256,7 @@ export default function DettaglioTask() {
         );
 
         setActiveTimer(null);
-        fetchTask(); // 👈 aggiorna subito il dettaglio dopo stop timer
+        fetchTask();
     };
 
     /* ------------------------ Render ------------------------ */
@@ -234,7 +287,7 @@ export default function DettaglioTask() {
                     </div>
                 </h1>
 
-                {/* Metacard task */}
+                {/* Metacard */}
                 <div className="rounded-xl border border-theme/20 card-theme p-5 text-[15px] space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <MetaField label="Progetto">
@@ -302,7 +355,9 @@ export default function DettaglioTask() {
                             <FontAwesomeIcon
                                 icon={activeTimer?.taskId === task.id ? faStop : faPlay}
                             />
-                            {activeTimer?.taskId === task.id ? "Ferma Timer" : "Avvia Timer"}
+                            {activeTimer?.taskId === task.id
+                                ? "Ferma Timer"
+                                : "Avvia Timer"}
                         </button>
                         <button
                             onClick={() => setCommentiAperti(true)}
@@ -319,7 +374,7 @@ export default function DettaglioTask() {
                     </div>
                 </div>
 
-                {/* Lista dinamica sotto-task */}
+                {/* Sotto-task */}
                 <div className="mt-8">
                     <ListaDinamica
                         tipo="tasks_sub"
@@ -340,14 +395,30 @@ export default function DettaglioTask() {
                 />
             )}
 
-            {commentiAperti && (
+            {commentiAperti && utenteId && (
                 <ChatCommentiModal
-                    commenti={[]} // caricati dalla modale
-                    utenteId={utenteId || ""}
+                    commenti={commenti}
+                    utenteId={utenteId}
                     taskId={task.id}
                     utentiProgetto={utentiProgetto}
                     onClose={() => setCommentiAperti(false)}
-                    onNuovoCommento={() => { }}
+                    onNuovoCommento={(c) =>
+                        setCommenti((prev) =>
+                            prev.some((x) => x.id === c.id)
+                                ? prev
+                                : [
+                                    ...prev,
+                                    {
+                                        ...c,
+                                        id: c.id || crypto.randomUUID(),
+                                        task_id: task.id,
+                                        utente_id: utenteId,
+                                        created_at: c.created_at || new Date().toISOString(),
+                                        modified_at: new Date().toISOString(),
+                                    } as Commento,
+                                ]
+                        )
+                    }
                 />
             )}
         </div>
