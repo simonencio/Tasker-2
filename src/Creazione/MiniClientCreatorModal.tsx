@@ -74,22 +74,26 @@ export default function MiniClientCreatorModal({ onClose, offsetIndex = 0 }: Pro
             return;
         }
 
-        // 👇 qui notifichiamo tutte le viste (Lista, Card, Timeline) senza refresh
+        // Refetch coerente (per avere join completi se ci sono)
+        let nuovo: any = data;
         try {
             const rc: any = (resourceConfigs as any)["clienti"];
             const userResp = await supabase.auth.getUser();
             const utenteId = userResp?.data?.user?.id ?? null;
 
-            let nuovo: any = data;
             if (rc?.fetch) {
                 const all = await rc.fetch({ filtro: {}, utenteId });
                 nuovo = (all || []).find((x: any) => String(x.id) === String(data.id)) ?? data;
             }
-
-            dispatchResourceEvent("add", "clienti", { item: nuovo });
-        } catch {
-            dispatchResourceEvent("add", "clienti", { item: data });
+        } catch (err) {
+            console.warn("Refetch cliente fallito, uso record base:", err);
         }
+
+        // ✅ Dispatch finale → SOLO replace, niente add
+        if (nuovo && nuovo.id) {
+            dispatchResourceEvent("replace", "clienti", { item: nuovo });
+        }
+
 
 
 

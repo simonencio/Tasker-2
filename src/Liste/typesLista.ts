@@ -73,10 +73,12 @@ export type ResourceConfig<T extends { id: string | number }> = {
     };
     cestino?: CestinoConfig<T>;
     filtroIniziale?: Partial<FiltroIntestazione>;
+    creator?: (onClose: () => void) => JSX.Element
     // 👇 per compatibilità con CardDinamiche e BachecaDinamica
     card?: (item: T, ctx: ResourceRenderCtx<T>) => JSX.Element;
     groupBy?: Record<string, GroupByDef>;
 };
+
 
 
 /** Tipi per bacheca/kanban */

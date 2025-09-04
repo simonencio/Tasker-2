@@ -181,7 +181,11 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
             }
 
             // 4) Dispatch finale
-            dispatchResourceEvent("add", "progetti", { item: nuovo });
+            // Non facciamo più "add", ci pensa il realtime.
+            // Se ho fatto il refetch con join completo, aggiorno la riga esistente.
+            if (nuovo && nuovo.id) {
+                dispatchResourceEvent("replace", "progetti", { item: nuovo });
+            }
 
             // 5) (OPZIONALE) Salva come MODELLO di progetto
             if (saveAsTemplate) {
@@ -213,7 +217,7 @@ export default function MiniProjectCreatorModal({ onClose, offsetIndex = 0 }: Pr
 
                     await reloadTemplateProgetti();               // aggiorna la lista subito
                     if (!e1 && tpl?.id) setSelectedTemplateId(tpl.id); // seleziona il nuovo in UI
-                    
+
                 } catch (tplErr: any) {
                     // Non bloccare la creazione del progetto se fallisce il salvataggio del modello
                     console.warn("Salvataggio modello progetto fallito:", tplErr?.message || tplErr);

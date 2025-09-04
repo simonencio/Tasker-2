@@ -454,10 +454,10 @@ export function useChatCommenti({
             // menzionati: solo loro
             const menzionatiOnly = Array.from(new Set(menzionatiValidi))
                 //.filter((id) => id && id !== utenteId);
-                 .filter((id) => !!id); // permetti auto-mention
+                .filter((id) => !!id); // permetti auto-mention
 
             // generali: tutti i destinatari esclusi i menzionati
-            const generali = destinatariNotifica.filter((id) => !menzionatiOnly.includes(id) && id !== utenteId);  
+            const generali = destinatariNotifica.filter((id) => !menzionatiOnly.includes(id) && id !== utenteId);
 
             if (menzionatiOnly.length > 0) {
                 await inviaNotifica(

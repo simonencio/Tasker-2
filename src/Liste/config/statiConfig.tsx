@@ -4,6 +4,9 @@ import { softDelete } from "../../supporto/softDelete";
 import type { ResourceConfig, Stato } from "../typesLista";
 import { azioni, dispatchResourceEvent } from "./azioniConfig";
 
+// import del modal di creazione
+import MiniStatoCreatorModal from "../../Creazione/MiniStatoCreatorModal";
+
 export const statiConfig: ResourceConfig<Stato> = {
     key: "stati",
     titolo: "Lista Stati",
@@ -14,6 +17,8 @@ export const statiConfig: ResourceConfig<Stato> = {
         fetch: async () => await fetchStatiDeleted(),
         actions: cestinoActions.stati,
     },
+    creator: (onClose) => <MiniStatoCreatorModal onClose={onClose} />,
+
     colonne: [
         { chiave: "nome", label: "Nome", className: "flex-1 font-medium truncate" },
         {

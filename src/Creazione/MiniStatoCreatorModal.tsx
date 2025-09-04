@@ -1,3 +1,4 @@
+// src/MiniModali/MiniStatoCreatorModal.tsx
 import React, { useState, useEffect } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -58,30 +59,31 @@ export default function MiniStatoCreatorModal({ onClose, offsetIndex = 0 }: Prop
             return;
         }
 
-        // 👇 aggiorna tutte le viste col nuovo record
+        // Refetch coerente (per avere join completi se ci sono)
+        let nuovo: any = data;
         try {
             const rc: any = (resourceConfigs as any)["stati"];
             const userResp = await supabase.auth.getUser();
             const utenteId = userResp?.data?.user?.id ?? null;
 
-            let nuovo: any = data;
             if (rc?.fetch) {
                 const all = await rc.fetch({ filtro: {}, utenteId });
                 nuovo = (all || []).find((x: any) => String(x.id) === String(data.id)) ?? data;
             }
-
-            dispatchResourceEvent("add", "stati", { item: nuovo });
-        } catch {
-            dispatchResourceEvent("add", "stati", { item: data });
+        } catch (err) {
+            console.warn("Refetch stato fallito, uso record base:", err);
         }
 
+        // ✅ Dispatch finale → SOLO replace, niente add
+        if (nuovo && nuovo.id) {
+            dispatchResourceEvent("replace", "stati", { item: nuovo });
+        }
 
         setSuccess(true);
         reset();
         setLoading(false);
         setTimeout(() => setSuccess(false), 3000);
     };
-
 
     const baseInputClass =
         "w-full border rounded px-3 py-2 focus:outline-none focus:ring focus:ring-offset-1 bg-theme text-theme";
@@ -92,10 +94,17 @@ export default function MiniStatoCreatorModal({ onClose, offsetIndex = 0 }: Prop
 
     return (
         <div
-            className="fixed bottom-6 z-50 rounded-xl shadow-xl p-5 bg-white dark:bg-gray-800 modal-container"
+            className="fixed bottom-6 z-50 rounded-xl shadow-xl p-5 modal-container"
             style={
                 isMobile
-                    ? { left: 0, right: 0, margin: "auto", width: "calc(100% - 32px)", maxWidth: "400px", zIndex: 100 + offsetIndex }
+                    ? {
+                        left: 0,
+                        right: 0,
+                        margin: "auto",
+                        width: "calc(100% - 32px)",
+                        maxWidth: "400px",
+                        zIndex: 100 + offsetIndex,
+                    }
                     : { left: computedLeft, width: "400px", zIndex: 100 + offsetIndex }
             }
         >
@@ -139,7 +148,11 @@ export default function MiniStatoCreatorModal({ onClose, offsetIndex = 0 }: Prop
                     </div>
                 )}
 
-                <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-60">
+                <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-60"
+                >
                     {loading ? "Salvataggio..." : "Crea Stato"}
                 </button>
             </form>

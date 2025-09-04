@@ -97,22 +97,25 @@ export default function MiniUserCreatorModal({ onClose, offsetIndex = 0 }: Props
                 .eq("id", json.user.id)
                 .single();
 
-            // 3) Aggiorna subito tutte le viste utenti
+            // 3) Refetch coerente (per avere join completi se ci sono)
             if (nuovoUtente) {
+                let nuovo: any = nuovoUtente;
                 try {
                     const rc: any = (resourceConfigs as any)["utenti"];
                     const userResp = await supabase.auth.getUser();
                     const utenteId = userResp?.data?.user?.id ?? null;
 
-                    let nuovo: any = nuovoUtente;
                     if (rc?.fetch) {
                         const all = await rc.fetch({ filtro: {}, utenteId });
                         nuovo = (all || []).find((x: any) => String(x.id) === String(nuovoUtente.id)) ?? nuovoUtente;
                     }
+                } catch (err) {
+                    console.warn("Refetch utente fallito, uso record base:", err);
+                }
 
-                    dispatchResourceEvent("add", "utenti", { item: nuovo });
-                } catch {
-                    dispatchResourceEvent("add", "utenti", { item: nuovoUtente });
+                // ✅ Dispatch finale → SOLO replace, niente add
+                if (nuovo && nuovo.id) {
+                    dispatchResourceEvent("replace", "utenti", { item: nuovo });
                 }
             }
 

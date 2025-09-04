@@ -1,6 +1,6 @@
-// src/Dettagli/DettaglioTask.tsx
+// 📄 src/Dettagli/DettaglioTask.tsx
 import { useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../supporto/supabaseClient";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -20,7 +20,7 @@ import {
     Section,
     MetaField,
 } from "../supporto/ui";
-import type { Task, Utente } from "../supporto/tipi";
+import type { Task, Utente, Commento } from "../supporto/tipi";
 
 import GenericEditorModal from "../Modifica/GenericEditorModal";
 import ChatCommentiModal from "../GestioneTask/ChatCommentiModal";
@@ -44,11 +44,9 @@ function formatDurata(value?: number | string | null): string {
         if (m > 0) return `${m}m`;
         return `${s}s`;
     }
-    // se è string (interval) lasciamo "—" per coerenza con attuale UI
     return "—";
 }
 
-// Deduplica per evitare key duplicate nei render
 function uniqById<T extends { id?: string }>(arr: T[]): T[] {
     const map = new Map<string, T>();
     for (const x of arr) {
@@ -75,6 +73,8 @@ export default function DettaglioTask() {
     const [activeTimer, setActiveTimer] =
         useState<{ taskId: string; startTime: Date } | null>(null);
 
+    const [commenti, setCommenti] = useState<Commento[]>([]);
+
     /* ------------------------ Sessione ------------------------ */
     useEffect(() => {
         (async () => {
@@ -84,7 +84,7 @@ export default function DettaglioTask() {
     }, []);
 
     /* ------------------------ Fetch task ------------------------ */
-    const fetchTask = async () => {
+    const fetchTask = useCallback(async () => {
         if (!slug) return;
 
         const { data, error } = await supabase
@@ -125,7 +125,6 @@ export default function DettaglioTask() {
             priorita: Array.isArray(data.priorita) ? data.priorita[0] : data.priorita,
             progetto,
             parent_id: data.parent_id,
-            // dedup per evitare warning "same key" in AvatarChip
             assegnatari: uniqById(assegnatariRaw),
         };
 
@@ -142,32 +141,77 @@ export default function DettaglioTask() {
                 uniqById((membri || []).map((r: any) => r.utenti).filter(Boolean))
             );
         }
-    };
 
-    useEffect(() => {
-        fetchTask();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [slug]);
-
-    /* ------------------------ Durata ------------------------ */
-    useEffect(() => {
-        const fetchDurate = async () => {
-            if (!task?.id) return;
-            const { data } = await supabase
+        if (data.id) {
+            const { data: durate } = await supabase
                 .from("time_entries")
                 .select("durata")
-                .eq("task_id", task.id);
+                .eq("task_id", data.id);
 
-            const totale = (data || []).reduce(
+            const totale = (durate || []).reduce(
                 (acc, r) => acc + (r.durata || 0),
                 0
             );
             setTotaleTaskSec(totale);
-        };
-        fetchDurate();
+        }
+    }, [slug]);
+
+    useEffect(() => {
+        fetchTask();
+    }, [fetchTask]);
+
+    /* ------------------------ Commenti ------------------------ */
+    const fetchCommenti = useCallback(async () => {
+        if (!task?.id) return;
+        const { data, error } = await supabase
+            .from("commenti")
+            .select(`
+        id, descrizione, created_at, modified_at, parent_id,
+        utente:utente_id ( id, nome, cognome, avatar_url ),
+        destinatari:commenti_destinatari( utente_id )
+      `)
+            .eq("task_id", task.id)
+            .is("deleted_at", null)
+            .order("created_at", { ascending: true });
+
+        if (!error && data) setCommenti(data as any);
     }, [task?.id]);
 
-    /* ------------------------ Timer (task principale) ------------------------ */
+    useEffect(() => {
+        fetchCommenti();
+    }, [fetchCommenti]);
+
+    // realtime
+    useEffect(() => {
+        if (!task?.id) return;
+        const ch = supabase
+            .channel(`commenti:task:${task.id}`)
+            .on(
+                "postgres_changes",
+                { event: "INSERT", schema: "public", table: "commenti", filter: `task_id=eq.${task.id}` },
+                (payload) => {
+                    const nuovo = payload.new as any;
+                    setCommenti((prev) =>
+                        prev.some((c) => c.id === nuovo.id) ? prev : [...prev, nuovo]
+                    );
+                }
+            )
+            .on(
+                "postgres_changes",
+                { event: "DELETE", schema: "public", table: "commenti", filter: `task_id=eq.${task.id}` },
+                (payload) => {
+                    const delId = (payload.old as any).id;
+                    setCommenti((prev) => prev.filter((c) => c.id !== delId));
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(ch);
+        };
+    }, [task?.id]);
+
+    /* ------------------------ Timer ------------------------ */
     const handleStartTimer = (t: Task) => {
         if (activeTimer) {
             handleStopTimer(t, activeTimer);
@@ -210,7 +254,9 @@ export default function DettaglioTask() {
             error ? "Errore nel salvataggio" : "Tempo salvato",
             error ? Toast.TYPE_ERROR : Toast.TYPE_DONE
         );
+
         setActiveTimer(null);
+        fetchTask();
     };
 
     /* ------------------------ Render ------------------------ */
@@ -241,7 +287,7 @@ export default function DettaglioTask() {
                     </div>
                 </h1>
 
-                {/* Metacard task */}
+                {/* Metacard */}
                 <div className="rounded-xl border border-theme/20 card-theme p-5 text-[15px] space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <MetaField label="Progetto">
@@ -309,7 +355,9 @@ export default function DettaglioTask() {
                             <FontAwesomeIcon
                                 icon={activeTimer?.taskId === task.id ? faStop : faPlay}
                             />
-                            {activeTimer?.taskId === task.id ? "Ferma Timer" : "Avvia Timer"}
+                            {activeTimer?.taskId === task.id
+                                ? "Ferma Timer"
+                                : "Avvia Timer"}
                         </button>
                         <button
                             onClick={() => setCommentiAperti(true)}
@@ -326,13 +374,13 @@ export default function DettaglioTask() {
                     </div>
                 </div>
 
-                {/* Lista dinamica sotto-task (usa tasksSubConfig + paramKey) */}
+                {/* Sotto-task */}
                 <div className="mt-8">
                     <ListaDinamica
                         tipo="tasks_sub"
                         minimalHeader
                         configOverride={tasksSubConfig}
-                        paramKey={task.id} // fondamentale: passato al fetch del config
+                        paramKey={task.id}
                     />
                 </div>
             </div>
@@ -347,14 +395,30 @@ export default function DettaglioTask() {
                 />
             )}
 
-            {commentiAperti && (
+            {commentiAperti && utenteId && (
                 <ChatCommentiModal
-                    commenti={[]} // caricati dalla modale
-                    utenteId={utenteId || ""}
+                    commenti={commenti}
+                    utenteId={utenteId}
                     taskId={task.id}
                     utentiProgetto={utentiProgetto}
                     onClose={() => setCommentiAperti(false)}
-                    onNuovoCommento={() => { }}
+                    onNuovoCommento={(c) =>
+                        setCommenti((prev) =>
+                            prev.some((x) => x.id === c.id)
+                                ? prev
+                                : [
+                                    ...prev,
+                                    {
+                                        ...c,
+                                        id: c.id || crypto.randomUUID(),
+                                        task_id: task.id,
+                                        utente_id: utenteId,
+                                        created_at: c.created_at || new Date().toISOString(),
+                                        modified_at: new Date().toISOString(),
+                                    } as Commento,
+                                ]
+                        )
+                    }
                 />
             )}
         </div>

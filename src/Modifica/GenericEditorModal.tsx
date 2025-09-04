@@ -203,6 +203,7 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose, onSaved }) =>
             }
 
             // 3) caso speciale tasks: pivot progetto
+            // 3) caso speciale tasks: pivot progetto
             if (table === "tasks") {
                 const newProjId = form.progetto_id;
                 const { data: oldLink } = await supabase
@@ -216,8 +217,15 @@ const GenericEditorModal: React.FC<Props> = ({ table, id, onClose, onSaved }) =>
                     if (newProjId) {
                         await supabase.from("progetti_task").insert({ progetti_id: newProjId, task_id: id });
                     }
+
+                    // 👇 se la task è stata spostata via da questo progetto,
+                    // emetti un evento remove per farla sparire subito dal dettaglio progetto
+                    if (oldLink?.progetti_id) {
+                        dispatchResourceEvent("remove", "tasks", { id });
+                    }
                 }
             }
+
 
             // 4) hook custom post-save
             if (config.hooks?.afterSave) {

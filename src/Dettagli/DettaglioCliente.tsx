@@ -1,5 +1,5 @@
 // src/Dettagli/DettaglioCliente.tsx
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -118,6 +118,29 @@ export default function DettaglioCliente() {
       alive = false;
     };
   }, [id, slug]);
+  const fetchCliente = useCallback(async () => {
+    const data = await fetchClienteDettaglioBySlugOrId({
+      id: id ?? null,
+      slug: slug ?? null,
+    });
+    if (data) {
+      setCliente({
+        id: data.id,
+        nome: data.nome,
+        email: data.email,
+        telefono: data.telefono,
+        avatar_url: data.avatar_url,
+        note: data.note,
+      });
+      setProgetti(data.progetti as Progetto[]);
+      setCredenziali(data.credenziali as Credenziale[]);
+    }
+    setLoading(false);
+  }, [id, slug]);
+
+  useEffect(() => {
+    fetchCliente();
+  }, [fetchCliente]);
 
   /* -------------------------------
      Listener eventi locali
@@ -781,7 +804,12 @@ export default function DettaglioCliente() {
       </div>
 
       {modaleAperta && cliente.id && (
-        <GenericEditorModal table="clienti" id={cliente.id} onClose={() => setModaleAperta(false)} />
+        <GenericEditorModal
+          table="clienti"
+          id={cliente.id}
+          onClose={() => setModaleAperta(false)}
+          onSaved={fetchCliente}
+        />
       )}
     </div>
   );

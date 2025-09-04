@@ -1,33 +1,49 @@
-// src/Liste/GanttDinamico.tsx
-import { useMemo, useState, useCallback, useEffect } from "react";
+// 📅 src/Liste/GanttDinamico.tsx
+import { useMemo, useState, useCallback, useEffect, useRef, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faFolder, faTasks, faCheckCircle } from "@fortawesome/free-solid-svg-icons";
+import {
+    faFolder,
+    faTasks,
+    faCheckCircle,
+    faChevronLeft,
+    faChevronRight,
+    faCalendarDay,
+    faChevronDown,
+    faChevronRight as faChevronRightSmall,
+    faUser,
+    faSitemap,
+} from "@fortawesome/free-solid-svg-icons";
 
 import {
     DndContext,
     closestCenter,
+    PointerSensor,
     useSensor,
     useSensors,
-    PointerSensor,
     type DragEndEvent,
 } from "@dnd-kit/core";
 import {
-    arrayMove,
     SortableContext,
     verticalListSortingStrategy,
     useSortable,
+    arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { restrictToVerticalAxis, restrictToParentElement } from "@dnd-kit/modifiers";
 
 import IntestazioneLista from "./IntestazioneLista";
 import { resourceConfigs, type ResourceKey } from "./resourceConfigs";
 import type { ResourceConfig } from "./typesLista";
 import { useResourceData } from "./useResourceData";
+import { supabase } from "../supporto/supabaseClient";
 
 /* ------------------------------------------------------------------ */
-/* Tipi */
+/** Tipi compatti lato UI */
+type SimpleUser = { id: string; nome: string; avatar_url?: string | null };
+type SimpleProject = { id: string; nome: string; slug?: string };
+
 type GanttItem = {
     id: string;
     name: string;
@@ -36,15 +52,29 @@ type GanttItem = {
     isTask: boolean;
     coloreClass: string;
     isCompletato: boolean;
-    assegnatari?: { id: string; nome: string; avatar_url?: string | null }[];
+    assegnatari: SimpleUser[];
+    progetti: SimpleProject[];
+    hasRealDates: boolean;
+    children?: GanttItem[];
+    parentId?: string | null;
+    level: number;
+    childCount: number;
     __raw: any;
 };
 
-type ViewMode = "day" | "week" | "month";
-
-/* ------------------------------------------------------------------ */
-const ROW_HEIGHT = 56;
-const MIN_DAY_WIDTH = 70;
+/* ----------------------- Costanti UI/Densità (più grandi) --------- */
+const ROW_HEIGHT = 68;           // +12px vs 56
+const SIDEBAR_PCT = 0.28;        // un filo più ampia per testo leggibile
+const INDENT_PER_LEVEL = 14;     // indent più evidente
+const HEADER_BAR_H = 40;         // altezza header giorni (prima 30/32)
+const HEADER_TITLE_H = 44;       // altezza riga titolo mese (prima 32)
+const BAR_HEIGHT_CLASS = "h-9";  // barre timeline più alte (prima h-7)
+const BAR_TEXT_CLASS = "text-[13px] md:text-sm font-semibold"; // testo dentro barre
+const ROW_TEXT_MAIN = "text-[14px] md:text-[15px] font-semibold";
+const ROW_TEXT_META = "text-[12px] md:text-[13px]";
+const DAY_LABEL_TEXT = "text-[12px] md:text-sm font-semibold";
+const DAY_BADGE_TEXT = "text-[11px] md:text-[12px]";
+const AVATAR_SIZE = "w-5 h-5";   // prima 4x4
 
 const TASK_COLORS = [
     "gantt-bar-blue",
@@ -55,54 +85,208 @@ const TASK_COLORS = [
     "gantt-bar-teal",
 ];
 
-/* ------------------------------------------------------------------ */
-/* Riga ordinabile */
-function SortableRow({
+/* ---------------------- UI helpers ---------------------- */
+function AvatarStack({ users }: { users: SimpleUser[] }) {
+    if (!users?.length) return null;
+    const show = users.slice(0, 3);
+    return (
+        <div className="inline-flex items-center -space-x-1.5">
+            {show.map((u) => (
+                <img
+                    key={u.id}
+                    src={u.avatar_url || "/default-avatar.png"}
+                    className={`${AVATAR_SIZE} rounded-full border border-white`}
+                    title={u.nome}
+                    alt={u.nome}
+                    loading="lazy"
+                />
+            ))}
+            {users.length > 3 && (
+                <span className="ml-1 text-[11px] md:text-[12px] font-medium opacity-80">
+                    +{users.length - 3}
+                </span>
+            )}
+        </div>
+    );
+}
+
+function ProjBadge({ p }: { p: SimpleProject }) {
+    return (
+        <span
+            className={`inline-flex items-center rounded px-1.5 py-[2px] ${DAY_BADGE_TEXT} border border-theme/50 bg-white/60`}
+            title={`Progetto: ${p.nome}`}
+        >
+            {p.nome}
+        </span>
+    );
+}
+
+function Chevron({ open }: { open: boolean }) {
+    return (
+        <FontAwesomeIcon
+            icon={open ? faChevronDown : faChevronRightSmall}
+            className="text-sm opacity-70"
+        />
+    );
+}
+
+/* ---------------------------------- */
+/** TIMELINE row (DnD) */
+const TimelineSortableRow = memo(function TimelineSortableRow({
     item,
-    left,
-    width,
+    startCol,
+    endCol,
     onSelect,
+    gridTemplateColumns,
+    zebra,
 }: {
     item: GanttItem;
-    left: string;
-    width: string;
+    startCol: number;
+    endCol: number;
     onSelect: (item: GanttItem) => void;
+    gridTemplateColumns: string;
+    zebra: boolean;
 }) {
-    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id });
-    const style = { transform: CSS.Transform.toString(transform), transition };
+    const { attributes, listeners, setNodeRef, transform, transition } =
+        useSortable({ id: item.id });
+    const styleDnD = { transform: CSS.Transform.toString(transform), transition };
+    const innerIndentPx = Math.min(item.level * INDENT_PER_LEVEL, 56);
 
     return (
         <div
             ref={setNodeRef}
-            style={{ ...style, height: ROW_HEIGHT }}
-            className="relative border-b border-theme"
+            style={{ ...styleDnD, height: ROW_HEIGHT }}
+            className={`relative border-b border-theme cursor-grab active:cursor-grabbing select-none ${zebra ? "bg-black/[0.02] dark:bg-white/[0.04]" : ""
+                }`}
             {...attributes}
             {...listeners}
+            onDoubleClick={() => onSelect(item)}
+            title="Trascina su/giù per riordinare"
         >
-            <div
-                className={`absolute top-2 left-0 h-9 rounded-md cursor-pointer transition-transform duration-150 hover:scale-105 shadow-sm flex items-center px-2 text-xs font-medium text-white overflow-hidden ${item.coloreClass}`}
-                style={{ left, width, opacity: item.isCompletato ? 0.65 : 1 }}
-                title={`${item.name}: ${moment(item.start).format("DD/MM/YYYY")} → ${moment(item.end).format("DD/MM/YYYY")}`}
-                onClick={() => onSelect(item)}
-            >
-                <span className="truncate">{item.name}</span>
-                <div className="flex ml-auto -space-x-2">
-                    {item.assegnatari?.slice(0, 3).map((u) => (
-                        <img
-                            key={u.id}
-                            src={u.avatar_url || "/default-avatar.png"}
-                            className="w-5 h-5 rounded-full border border-white"
-                            title={u.nome}
+            <div className="grid h-full items-center" style={{ gridTemplateColumns }}>
+                <div
+                    className={`${BAR_HEIGHT_CLASS} rounded-md transition-transform duration-150 hover:scale-[1.01] shadow-sm flex items-center gap-2 px-2 md:px-3 ${BAR_TEXT_CLASS} text-white overflow-hidden ${item.coloreClass}`}
+                    style={{
+                        gridColumn: `${startCol} / ${endCol}`,
+                        opacity: item.isCompletato ? 0.68 : 1,
+                        border: item.hasRealDates ? "2px solid white" : undefined,
+                        cursor: "pointer",
+                        paddingLeft: 8 + innerIndentPx,
+                    }}
+                    onClick={() => onSelect(item)}
+                    title={`${item.name}: ${moment(item.start).format("DD/MM/YYYY")} → ${moment(item.end).format("DD/MM/YYYY")}`}
+                >
+                    <span className="truncate">{item.name}</span>
+                    {item.isTask && <AvatarStack users={item.assegnatari} />}
+                    {item.childCount > 0 && (
+                        <span className="ml-1 inline-flex items-center gap-1 text-[11px] md:text-[12px] opacity-95">
+                            <FontAwesomeIcon icon={faSitemap} className="text-[12px]" />
+                            {item.childCount}
+                        </span>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+});
+
+/* ---------------------------------- */
+/** SIDEBAR row (più grande/leggibile) */
+function ActivityRow({
+    item,
+    isCollapsed,
+    onToggle,
+    onOpen,
+    zebra,
+    userId,
+}: {
+    item: GanttItem;
+    isCollapsed: boolean;
+    onToggle: (id: string) => void;
+    onOpen: (item: GanttItem) => void;
+    zebra: boolean;
+    userId: string | null;
+}) {
+    const hasChildren = item.isTask
+        ? (item.children?.length ?? 0) > 0 || item.childCount > 0
+        : item.childCount > 0;
+
+    const indent = item.level * INDENT_PER_LEVEL;
+
+    const isMine = !!userId && item.assegnatari.some((u) => u.id === userId);
+
+    return (
+        <div
+            className={`group cursor-pointer border-b border-theme px-3 md:px-4 py-3 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors ${zebra ? "bg-black/[0.02] dark:bg-white/[0.04]" : ""
+                }`}
+            style={{ height: ROW_HEIGHT }}
+            onClick={() => onOpen(item)}
+        >
+            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 md:gap-4 min-w-0">
+                {/* CONTROLLI */}
+                <div className="flex items-center gap-2 md:gap-3">
+                    <div className="shrink-0" style={{ width: indent }} onClick={(e) => e.stopPropagation()} />
+                    {hasChildren ? (
+                        <button
+                            className="shrink-0 rounded hover:bg-black/5 px-1.5"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onToggle(item.id);
+                            }}
+                            title={isCollapsed ? "Espandi figli" : "Comprimi figli"}
+                        >
+                            <Chevron open={!isCollapsed} />
+                        </button>
+                    ) : (
+                        <span className="shrink-0 w-4" />
+                    )}
+                    <FontAwesomeIcon
+                        icon={item.isTask ? faTasks : faFolder}
+                        className={`${item.isTask ? "text-blue-500" : "text-purple-500"} text-base md:text-lg`}
+                    />
+                </div>
+
+                {/* CONTENUTO */}
+                <div className="min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <span className={`truncate ${ROW_TEXT_MAIN}`}>{item.name}</span>
+                        {item.childCount > 0 && (
+                            <span className="inline-flex items-center gap-1 text-[12px] md:text-[13px] opacity-90">
+                                <FontAwesomeIcon icon={faSitemap} />
+                                {item.childCount}
+                            </span>
+                        )}
+                        {item.isCompletato && (
+                            <FontAwesomeIcon
+                                icon={faCheckCircle}
+                                className="text-[14px] md:text-[16px] text-emerald-600"
+                                title="Completato"
+                            />
+                        )}
+                    </div>
+                    <div className={`mt-1 ${ROW_TEXT_META} text-gray-600 dark:text-gray-300 flex items-center gap-2`}>
+                        {moment(item.start).format("DD/MM")} → {moment(item.end).format("DD/MM")}
+                        {item.isTask && item.progetti?.[0] && <ProjBadge p={item.progetti[0]} />}
+                    </div>
+                </div>
+
+                {/* META DESTRA */}
+                <div className="flex items-center gap-2 md:gap-3">
+                    <AvatarStack users={item.assegnatari} />
+                    {isMine && (
+                        <FontAwesomeIcon
+                            icon={faUser}
+                            className="text-[12px] md:text-[13px] opacity-70"
+                            title="Assegnata a te"
                         />
-                    ))}
+                    )}
                 </div>
             </div>
         </div>
     );
 }
 
-/* ------------------------------------------------------------------ */
-/* Componente principale */
+/* ---------------------------------- */
 export default function GanttDinamico<T extends { id: string | number }>({
     tipo,
     modalitaCestino = false,
@@ -117,333 +301,573 @@ export default function GanttDinamico<T extends { id: string | number }>({
     if (!cfgAny) return <p className="text-red-600">Config non trovata per tipo: {tipo}</p>;
     const cfg = cfgAny as ResourceConfig<T>;
 
-    const { items, loading, filtro, setFiltro } = useResourceData(cfg, { modalitaCestino });
+    const { items, loading } = useResourceData(cfg, { modalitaCestino });
 
-    /* stato */
-    const [viewMode, setViewMode] = useState<ViewMode>("week");
-    const storageKey = `gantt-order-${tipo}`;
-    const [orderedIds, setOrderedIds] = useState<string[]>([]);
+    /* --- Stato barra titolo / mese --- */
+    const [selectedMonth, setSelectedMonth] = useState<Date>(moment().startOf("month").toDate());
+    const monthStart = useMemo(() => moment(selectedMonth).startOf("month"), [selectedMonth]);
+    const monthEnd = useMemo(() => moment(selectedMonth).endOf("month"), [selectedMonth]);
 
-    /* sensors dichiarati qui, non in JSX! */
-    const sensors = useSensors(useSensor(PointerSensor));
+    // Vista metà mese: 0 = 1–15, 1 = 16–fine
+    const [halfIdx, setHalfIdx] = useState<0 | 1>(0);
 
-    /* effetto iniziale per ordine salvato */
+    /* --- Collassamento gerarchia --- */
+    const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+    /* --- Utente corrente --- */
+    const [userId, setUserId] = useState<string | null>(null);
     useEffect(() => {
-        const saved = localStorage.getItem(storageKey);
-        if (saved) setOrderedIds(JSON.parse(saved));
-    }, [storageKey]);
-
-    /* filtro lato client */
-    const filteredItems = useMemo(() => {
-        return items.filter((it: any) => {
-            if (filtro.soloCompletate) return !!it.fine_task;
-            if (filtro.soloNonCompletate) return !it.fine_task;
-            if (filtro.soloCompletati) return !!it.fine_progetto;
-            if (filtro.soloNonCompletati) return !it.fine_progetto;
-            return true;
-        });
-    }, [items, filtro]);
-
-    /* prepara dati gantt */
-    const ganttItems: GanttItem[] = useMemo(() => {
-        return filteredItems.map((item: any, idx: number) => {
-            const startISO = item.inizio_gantt || item.created_at || new Date().toISOString();
-            const endISO =
-                item.fine_gantt ||
-                item.fine_task ||
-                item.fine_progetto ||
-                item.consegna ||
-                moment(startISO).add(7, "days").toISOString();
-
-            const isTask = tipo === "tasks" || item.fine_task !== undefined;
-            const isCompletato = isTask ? !!item.fine_task : !!item.fine_progetto;
-            const coloreClass = TASK_COLORS[idx % TASK_COLORS.length];
-
-            return {
-                id: String(item.id),
-                name: item.nome,
-                start: new Date(startISO),
-                end: new Date(endISO),
-                isTask,
-                isCompletato,
-                coloreClass,
-                assegnatari: item.utenti_task
-                    ? item.utenti_task.map((ut: any) => ({
-                        id: ut.utente?.id,
-                        nome: [ut.utente?.nome, ut.utente?.cognome].filter(Boolean).join(" "),
-                        avatar_url: ut.utente?.avatar_url,
-                    }))
-                    : [],
-                __raw: item,
-            };
-        });
-    }, [filteredItems, tipo]);
-
-    /* ordering */
-    const orderedItems = useMemo(() => {
-        if (orderedIds.length === 0) return ganttItems;
-        const map = new Map(ganttItems.map((g) => [g.id, g]));
-        return orderedIds.map((id) => map.get(id)).filter(Boolean) as GanttItem[];
-    }, [ganttItems, orderedIds]);
-
-    const handleDragEnd = (event: DragEndEvent) => {
-        const { active, over } = event;
-        if (active.id !== over?.id) {
-            const oldIndex = orderedItems.findIndex((i) => i.id === active.id);
-            const newIndex = orderedItems.findIndex((i) => i.id === over?.id);
-            const newOrder = arrayMove(orderedItems, oldIndex, newIndex);
-            setOrderedIds(newOrder.map((i) => i.id));
-            localStorage.setItem(storageKey, JSON.stringify(newOrder.map((i) => i.id)));
-        }
-    };
-
-    /* range */
-    const minDate = useMemo(() => {
-        return ganttItems.length
-            ? moment.min(ganttItems.map((g) => moment(g.start))).toDate()
-            : new Date();
-    }, [ganttItems]);
-
-    const maxDate = useMemo(() => {
-        return ganttItems.length
-            ? moment.max(ganttItems.map((g) => moment(g.end))).toDate()
-            : moment().add(1, "month").toDate();
-    }, [ganttItems]);
-
-    const totalDays = moment(maxDate).diff(moment(minDate), "days") + 1;
-
-    /* ticks timeline */
-    const timelineTicks = useMemo(() => {
-        const ticks: Date[] = [];
-        let cur = moment(minDate).startOf(viewMode);
-        const end = moment(maxDate).endOf(viewMode);
-
-        if (viewMode === "day") {
-            while (cur.isSameOrBefore(end)) {
-                ticks.push(cur.toDate());
-                cur.add(1, "day");
+        let ok = true;
+        (async () => {
+            try {
+                const { data } = await supabase.auth.getUser();
+                if (ok) setUserId(data.user?.id ?? null);
+            } catch {
+                if (ok) setUserId(null);
             }
-        } else if (viewMode === "week") {
-            while (cur.isSameOrBefore(end)) {
-                ticks.push(cur.toDate());
-                cur.add(1, "week");
-            }
-        } else {
-            while (cur.isSameOrBefore(end)) {
-                ticks.push(cur.toDate());
-                cur.add(1, "month");
-            }
-        }
-        return ticks;
-    }, [minDate, maxDate, viewMode]);
+        })();
+        return () => {
+            ok = false;
+        };
+    }, []);
 
-    /* calcolo posizione barre */
-    const getBarStyle = useCallback(
-        (item: GanttItem) => {
-            const startOffset = moment(item.start).diff(moment(minDate), "days");
-            const endOffset = moment(item.end).diff(moment(minDate), "days") + 1;
-            const left = (startOffset / totalDays) * 100;
-            const width = ((endOffset - startOffset) / totalDays) * 100;
-            return { left: `${left}%`, width: `${width}%` };
-        },
-        [minDate, totalDays]
+    /* --- DnD --- */
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+    /* --- Overrides date --- */
+    const [overrides] = useState<Record<string, { start: Date; end: Date; hasRealDates?: boolean }>>(
+        {}
     );
 
+    /* --- Mapping helper: utenti/task/progetti --- */
+    const toUsersForTask = (raw: any): SimpleUser[] => {
+        const fromUT =
+            raw?.utenti_task?.map((ut: any) => ut.utente) ||
+            raw?.utenti ||
+            raw?.assegnatari ||
+            [];
+        return (fromUT || []).map((u: any) => ({
+            id: u.id,
+            nome: [u.nome, u.cognome].filter(Boolean).join(" "),
+            avatar_url: u.avatar_url,
+        }));
+    };
+
+    const toUsersForProject = (raw: any): SimpleUser[] => {
+        const fromUP = raw?.utenti_progetti?.map((up: any) => up.utente) || raw?.utenti || [];
+        return (fromUP || []).map((u: any) => ({
+            id: u.id,
+            nome: [u.nome, u.cognome].filter(Boolean).join(" "),
+            avatar_url: u.avatar_url,
+        }));
+    };
+
+    const toProjects = (raw: any): SimpleProject[] => {
+        if (Array.isArray(raw?.progetti))
+            return raw.progetti.map((p: any) => ({ id: p.id, nome: p.nome, slug: p.slug }));
+        if (raw?.progetto)
+            return [{ id: raw.progetto.id, nome: raw.progetto.nome, slug: raw.progetto.slug }];
+        if (Array.isArray(raw?.progetti_task)) {
+            return raw.progetti_task
+                .map((pt: any) => pt.progetto || pt.progetti || pt.project)
+                .filter(Boolean)
+                .map((p: any) => ({ id: p.id, nome: p.nome, slug: p.slug }));
+        }
+        return [];
+    };
+
+    /* --- Calcolo date --- */
+    const calcolaDate = useCallback(
+        (item: any, isTask: boolean): { start: Date; end: Date; hasReal: boolean } => {
+            if (isTask) {
+                if (item.inizio_task && item.fine_task) {
+                    return { start: new Date(item.inizio_task), end: new Date(item.fine_task), hasReal: true };
+                }
+                if (item.consegna) {
+                    return {
+                        start: new Date(item.created_at || new Date().toISOString()),
+                        end: new Date(item.consegna),
+                        hasReal: false,
+                    };
+                }
+                const start = new Date(item.created_at || new Date().toISOString());
+                return { start, end: moment(start).add(3, "days").toDate(), hasReal: false };
+            } else {
+                if (item.inizio_progetto && item.fine_progetto) {
+                    return { start: new Date(item.inizio_progetto), end: new Date(item.fine_progetto), hasReal: true };
+                }
+                if (item.consegna) {
+                    return {
+                        start: new Date(item.created_at || new Date().toISOString()),
+                        end: new Date(item.consegna),
+                        hasReal: false,
+                    };
+                }
+                const start = new Date(item.created_at || new Date().toISOString());
+                return { start, end: moment(start).add(7, "days").toDate(), hasReal: false };
+            }
+        },
+        []
+    );
+
+    /* --- Costruzione items Gantt --- */
+    const ganttItems: GanttItem[] = useMemo(() => {
+        const map = new Map<string, GanttItem>();
+        const roots: GanttItem[] = [];
+
+        items.forEach((raw: any, idx: number) => {
+            const isTask = tipo === "tasks";
+            const base = calcolaDate(raw, isTask);
+            const ov = overrides[raw.id];
+            const start = ov?.start ?? base.start;
+            const end = ov?.end ?? base.end;
+            const hasReal = ov?.hasRealDates ?? base.hasReal;
+            const coloreClass = TASK_COLORS[idx % TASK_COLORS.length];
+
+            const taskChildrenCount = (raw.children?.length ?? 0) + (raw.subtasks?.length ?? 0);
+            const projTaskCount =
+                (Array.isArray(raw.progetti_task) ? raw.progetti_task.length : 0) ||
+                (Array.isArray(raw.tasks) ? raw.tasks.length : 0);
+
+            const gi: GanttItem = {
+                id: String(raw.id),
+                name: raw.nome,
+                start,
+                end,
+                isTask,
+                isCompletato: isTask ? !!raw.fine_task : !!raw.fine_progetto,
+                coloreClass,
+                hasRealDates: hasReal,
+                assegnatari: isTask ? toUsersForTask(raw) : toUsersForProject(raw),
+                progetti: isTask ? toProjects(raw) : [],
+                parentId: isTask ? raw.parent_id ?? null : null,
+                children: [],
+                level: 0,
+                childCount: isTask ? taskChildrenCount : projTaskCount,
+                __raw: raw,
+            };
+            map.set(gi.id, gi);
+        });
+
+        // collega gerarchia SOLO per tasks via parent_id
+        map.forEach((gi) => {
+            if (gi.isTask && gi.parentId && map.has(gi.parentId)) {
+                map.get(gi.parentId)!.children!.push(gi);
+            }
+        });
+
+        const setLevel = (node: GanttItem, lvl: number) => {
+            node.level = lvl;
+            node.children?.forEach((c) => setLevel(c, lvl + 1));
+        };
+
+        map.forEach((gi) => {
+            if (!gi.isTask) {
+                roots.push(gi);
+            } else {
+                if (!gi.parentId || !map.has(gi.parentId)) {
+                    roots.push(gi);
+                    setLevel(gi, 0);
+                }
+            }
+        });
+
+        roots.forEach((r) => setLevel(r, r.level || 0));
+        return roots;
+    }, [items, tipo, overrides, calcolaDate]);
+
+    /* --- Flatten --- */
+    const flattenItems = useCallback(
+        (arr: GanttItem[]): GanttItem[] => arr.flatMap((it) => [it, ...flattenItems(it.children || [])]),
+        []
+    );
+    const flatItems = useMemo(() => flattenItems(ganttItems), [ganttItems, flattenItems]);
+
+    /* --- Filtro mese intero (base) --- */
+    const monthItems = useMemo(() => {
+        const start = monthStart.toDate();
+        const end = monthEnd.toDate();
+        return flatItems.filter((it) => it.end >= start && it.start <= end);
+    }, [flatItems, monthStart, monthEnd]);
+
+    /* ------------------ Mezza mese: giorni visibili ------------------ */
+    const allDays = useMemo(() => {
+        const arr: Date[] = [];
+        let cur = monthStart.clone();
+        while (cur.isSameOrBefore(monthEnd, "day")) {
+            arr.push(cur.toDate());
+            cur.add(1, "day");
+        }
+        return arr;
+    }, [monthStart, monthEnd]);
+
+    const firstHalfStartIdx = 0;
+    const firstHalfEndIdx = Math.min(14, allDays.length - 1);
+    const secondHalfStartIdx = Math.min(15, allDays.length - 1);
+    const secondHalfEndIdx = allDays.length - 1;
+
+    const halfStartIdx = halfIdx === 0 ? firstHalfStartIdx : secondHalfStartIdx;
+    const halfEndIdx = halfIdx === 0 ? firstHalfEndIdx : secondHalfEndIdx;
+
+    const visibleDays = useMemo(
+        () => allDays.slice(halfStartIdx, halfEndIdx + 1),
+        [allDays, halfStartIdx, halfEndIdx]
+    );
+
+    const isWeekend = (d: Date) => {
+        const wd = moment(d).day();
+        return wd === 0 || wd === 6;
+    };
+
+    const dayWeights = useMemo(() => visibleDays.map(() => 1), [visibleDays]);
+
+    const gridTemplateColumns = useMemo(
+        () => dayWeights.map((w) => `${w}fr`).join(" "),
+        [dayWeights]
+    );
+
+    const visibleStart = visibleDays[0];
+    const visibleEnd = visibleDays[visibleDays.length - 1];
+
+    const dateToIndex = useCallback(
+        (date: Date) => {
+            if (moment(date).isBefore(visibleStart, "day")) return 0;
+            if (moment(date).isAfter(visibleEnd, "day")) return visibleDays.length - 1;
+            return moment(date).startOf("day").diff(moment(visibleStart).startOf("day"), "days");
+        },
+        [visibleStart, visibleEnd, visibleDays.length]
+    );
+
+    const getGridCols = useCallback(
+        (item: GanttItem) => {
+            const sIdx = dateToIndex(item.start);
+            const eIdx = Math.max(sIdx, dateToIndex(item.end));
+            const startCol = Math.max(1, Math.min(sIdx + 1, visibleDays.length + 1));
+            const endCol = Math.max(startCol + 1, Math.min(eIdx + 2, visibleDays.length + 1));
+            return { startCol, endCol };
+        },
+        [dateToIndex, visibleDays.length]
+    );
+
+    const todayIdx = useMemo(() => {
+        const today = moment().startOf("day");
+        if (!today.isBetween(visibleStart, visibleEnd, "day", "[]")) return null;
+        return today.diff(moment(visibleStart), "days");
+    }, [visibleStart, visibleEnd]);
+
+    // Items limitati alla metà visibile
+    const windowItems = useMemo(
+        () => monthItems.filter((it) => it.end >= visibleStart && it.start <= visibleEnd),
+        [monthItems, visibleStart, visibleEnd]
+    );
+    const windowItemsById = useMemo(
+        () => new Map(windowItems.map((m) => [m.id, m])),
+        [windowItems]
+    );
+
+    /* --- Ordinamento persistente --- */
+    const [orderedItems, setOrderedItems] = useState<string[]>([]);
+    const lastSavedOrderRef = useRef<string>("");
+    const [userKeyReady, setUserKeyReady] = useState(false);
+    const orderKey = useMemo(() => `ganttOrder:${tipo}:${userId ?? "anon"}`, [tipo, userId]);
+
+    const arraysEqual = (a: string[], b: string[]) =>
+        a.length === b.length && a.every((v, i) => v === b[i]);
+
+    const allFlatIds = useMemo(() => windowItems.map((i) => i.id), [windowItems]);
+
+    useEffect(() => {
+        let desired = allFlatIds;
+        try {
+            const raw = localStorage.getItem(orderKey);
+            if (raw) {
+                const saved: string[] = JSON.parse(raw);
+                const filtered = saved.filter((id) => allFlatIds.includes(id));
+                const missing = allFlatIds.filter((id) => !filtered.includes(id));
+                desired = [...filtered, ...missing];
+            }
+        } catch {
+            desired = allFlatIds;
+        }
+        setOrderedItems((prev) => (arraysEqual(prev, desired) ? prev : desired));
+        setUserKeyReady(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [orderKey, allFlatIds.join("|")]);
+
+    useEffect(() => {
+        if (!userKeyReady) return;
+        const json = JSON.stringify(orderedItems);
+        if (json !== lastSavedOrderRef.current) {
+            try {
+                localStorage.setItem(orderKey, json);
+            } catch { }
+            lastSavedOrderRef.current = json;
+        }
+    }, [orderedItems, orderKey, userKeyReady]);
+
+    /* --- Visibili + collassati sulla window --- */
+    const windowSet = useMemo(() => new Set(windowItems.map((m) => m.id)), [windowItems]);
+
+    const visibleOrderedIds = useMemo(() => {
+        const inOrder = orderedItems.filter((id) => windowSet.has(id));
+        const missing = windowItems.map((m) => m.id).filter((id) => !inOrder.includes(id));
+        const base = [...inOrder, ...missing];
+
+        const hidden = new Set<string>();
+        base.forEach((id) => {
+            const it = windowItemsById.get(id);
+            if (!it) return;
+            if (it.isTask) {
+                let p = it.parentId ? windowItemsById.get(it.parentId) : null;
+                while (p) {
+                    if (collapsed.has(p.id)) {
+                        hidden.add(id);
+                        break;
+                    }
+                    p = p.parentId ? windowItemsById.get(p.parentId) : null;
+                }
+            }
+        });
+
+        return base.filter((id) => !hidden.has(id));
+    }, [orderedItems, windowItems, windowItemsById, collapsed, windowSet]);
+
+    /* --- Navigazione metà/mesi --- */
+    const gotoPrevHalf = () => {
+        if (halfIdx === 1) setHalfIdx(0);
+        else {
+            setSelectedMonth(moment(selectedMonth).subtract(1, "month").toDate());
+            setHalfIdx(1);
+        }
+    };
+    const gotoNextHalf = () => {
+        if (halfIdx === 0) setHalfIdx(1);
+        else {
+            setSelectedMonth(moment(selectedMonth).add(1, "month").toDate());
+            setHalfIdx(0);
+        }
+    };
+    const gotoToday = () => {
+        const m = moment().startOf("month").toDate();
+        setSelectedMonth(m);
+        const day = moment().date();
+        setHalfIdx(day <= 15 ? 0 : 1);
+    };
+
+    /* --- Selezione riga --- */
     const handleSelect = (item: GanttItem) => {
-        navigate(item.isTask ? `/tasks/${item.__raw.slug ?? item.id}` : `/progetti/${item.__raw.slug ?? item.id}`);
+        navigate(
+            item.isTask
+                ? `/tasks/${item.__raw.slug ?? item.id}`
+                : `/progetti/${item.__raw.slug ?? item.id}`
+        );
+    };
+
+    /* --- DnD end --- */
+    const onTimelineDragEnd = useCallback(({ active, over }: DragEndEvent) => {
+        if (!over) return;
+        if (active.id === over.id) return;
+        setOrderedItems((prev) => {
+            const oldIndex = prev.indexOf(active.id as string);
+            const newIndex = prev.indexOf(over.id as string);
+            if (oldIndex === -1 || newIndex === -1) return prev;
+            const next = arrayMove(prev, oldIndex, newIndex);
+            return prev.length === next.length && prev.every((v, i) => v === next[i]) ? prev : next;
+        });
+    }, []);
+
+    const toggleCollapse = (id: string) => {
+        setCollapsed((prev) => {
+            const n = new Set(prev);
+            if (n.has(id)) n.delete(id);
+            else n.add(id);
+            return n;
+        });
     };
 
     /* ------------------------------------------------------------------ */
     return (
-        <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-            <IntestazioneLista
-                tipo={tipo}
-                titolo={cfg.titolo}
-                icona={cfg.icona}
-                coloreIcona={cfg.coloreIcona}
-                onChange={setFiltro}
-                dati={cfg.useHeaderFilters ? items : undefined}
-                paramKey={paramKey}
-                modalitaCestino={modalitaCestino}
-            />
+        // ROOT – nessuna scrollbar locale
+        <div className="w-full min-h-screen flex flex-col overflow-x-hidden">
+            <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+                <IntestazioneLista
+                    tipo={tipo}
+                    titolo={(resourceConfigs as any)[tipo]?.titolo}
+                    icona={(resourceConfigs as any)[tipo]?.icona}
+                    coloreIcona={(resourceConfigs as any)[tipo]?.coloreIcona}
+                    onChange={() => { }}
+                    dati={(resourceConfigs as any)[tipo]?.useHeaderFilters ? items : undefined}
+                    paramKey={paramKey}
+                    modalitaCestino={modalitaCestino}
+                />
 
-            {/* controlli zoom */}
-            <div className="flex justify-center gap-2 mb-4">
-                {(["day", "week", "month"] as ViewMode[]).map((m) => (
-                    <button
-                        key={m}
-                        onClick={() => setViewMode(m)}
-                        className={`px-3 py-1.5 text-sm rounded-lg border border-theme transition ${viewMode === m
-                            ? "bg-blue-600 text-white border-blue-600 shadow"
-                            : "bg-theme text-theme hover-bg-theme"
-                            }`}
-                    >
-                        {m.toUpperCase()}
-                    </button>
-                ))}
+                {/* Toolbar */}
+                <div className="mt-4 mb-5 flex w-full justify-center">
+                    <div className="inline-flex items-center gap-3 rounded-xl border border-theme bg-theme/70 backdrop-blur px-3 md:px-4 py-2.5 shadow-sm">
+                        <button
+                            onClick={gotoPrevHalf}
+                            className="inline-flex items-center gap-2 rounded-lg border border-theme/60 bg-white/70 px-3 md:px-4 py-2 text-sm md:text-base hover:bg-white"
+                            title="Metà precedente"
+                        >
+                            <FontAwesomeIcon icon={faChevronLeft} />
+                            <span className="hidden sm:inline">Prec. metà</span>
+                        </button>
+
+                        <div className="rounded-lg bg-white/80 px-4 md:px-5 py-2 text-sm md:text-base font-bold tracking-wide">
+                            {moment(selectedMonth).format("MMMM YYYY")} • {halfIdx === 0 ? "1–15" : `16–${moment(selectedMonth).daysInMonth()}`}
+                        </div>
+
+                        <button
+                            onClick={gotoNextHalf}
+                            className="inline-flex items-center gap-2 rounded-lg border border-theme/60 bg-white/70 px-3 md:px-4 py-2 text-sm md:text-base hover:bg-white"
+                            title="Metà successiva"
+                        >
+                            <span className="hidden sm:inline">Succ. metà</span>
+                            <FontAwesomeIcon icon={faChevronRight} />
+                        </button>
+
+                        <div className="mx-1 hidden h-6 w-px bg-theme/60 sm:block" />
+                        <button
+                            onClick={gotoToday}
+                            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 md:px-4 py-2 text-sm md:text-base font-medium text-white hover:bg-blue-700"
+                            title="Vai a oggi"
+                        >
+                            <FontAwesomeIcon icon={faCalendarDay} />
+                            <span className="hidden sm:inline">Oggi</span>
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {loading ? (
-                <p className="text-center text-theme py-8">Caricamento…</p>
+                <p className="py-10 text-center text-lg text-theme">Caricamento…</p>
             ) : (
-                <div className="card-theme flex hide-scrollbar" style={{ height: 650 }}>
-                    {/* lista sinistra */}
-                    <div className="w-80 border-r border-theme overflow-y-auto hide-scrollbar">
-                        <div className="font-semibold text-sm px-4 py-2 border-b border-theme">Attività</div>
-                        {orderedItems.map((item) => (
-                            <div
-                                key={item.id}
-                                className="flex items-center gap-3 px-4 py-3 cursor-pointer hover-bg-theme"
-                                onClick={() => handleSelect(item)}
-                            >
-                                <FontAwesomeIcon
-                                    icon={item.isTask ? faTasks : faFolder}
-                                    className={item.isTask ? "text-blue-500" : "text-purple-500"}
-                                />
-                                <div className="flex-1 truncate">
-                                    <div className="font-medium text-sm flex items-center gap-2">
-                                        {item.name}
-                                        {item.isCompletato && (
-                                            <FontAwesomeIcon icon={faCheckCircle} className="icon-success text-xs" />
-                                        )}
+                <div className="w-full flex justify-center">
+                    <div className="card-theme w-full lg:w-5/6 flex flex-col overflow-hidden">
+                        {/* HEADER STICKY */}
+                        <div className="sticky top-0 z-10 bg-theme/95 backdrop-blur border-b border-theme">
+                            <div className="flex w-full">
+                                <div
+                                    className="border-r border-theme px-4 py-2 text-sm md:text-base font-semibold"
+                                    style={{ width: `${Math.round(SIDEBAR_PCT * 100)}%` }}
+                                >
+                                    Attività
+                                </div>
+                                <div className="flex-1">
+                                    <div className="w-full border-b border-theme flex" style={{ height: HEADER_TITLE_H }}>
+                                        <div className="w-full flex items-center justify-center px-4 text-sm md:text-base font-bold tracking-wide">
+                                            {moment(selectedMonth).format("MMMM YYYY")} • {halfIdx === 0 ? "1–15" : `16–${moment(selectedMonth).daysInMonth()}`}
+                                        </div>
                                     </div>
-                                    <div className="text-xs text-gray-500">
-                                        {moment(item.start).format("DD/MM")} → {moment(item.end).format("DD/MM")}
+                                    <div
+                                        className="grid"
+                                        style={{
+                                            height: HEADER_BAR_H,
+                                            gridTemplateColumns: gridTemplateColumns,
+                                        }}
+                                    >
+                                        {visibleDays.map((d, i) => {
+                                            const weekend = isWeekend(d);
+                                            const isToday = todayIdx === i;
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    className={`flex items-center justify-center border-r border-theme ${DAY_LABEL_TEXT} ${weekend ? "bg-gray-100 text-gray-700" : "text-gray-900"
+                                                        } ${isToday ? "bg-yellow-100 text-gray-900 font-extrabold" : ""}`}
+                                                    title={moment(d).format("dddd DD MMMM YYYY")}
+                                                >
+                                                    <span className="tracking-tight uppercase">
+                                                        {moment(d).format("dd")} {moment(d).format("DD")}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* timeline */}
-                    <div className="flex-1 relative overflow-x-auto ">
-                        {/* header timeline */}
-                        <div
-                            className="sticky top-0 z-10 border-b border-theme bg-theme"
-                            style={{
-                                minWidth:
-                                    viewMode === "day"
-                                        ? `${timelineTicks.length * MIN_DAY_WIDTH}px`
-                                        : viewMode === "week"
-                                            ? `${timelineTicks.length * (MIN_DAY_WIDTH * 7)}px`
-                                            : `${timelineTicks.length * (MIN_DAY_WIDTH * 30)}px`,
-                            }}
-                        >
-                            {/* riga superiore */}
-                            <div className="flex border-b border-theme">
-                                {timelineTicks.map((d, i) => {
-                                    const label =
-                                        viewMode === "day" || viewMode === "week"
-                                            ? moment(d).format("MMM YYYY")
-                                            : moment(d).format("YYYY");
-
-                                    const sameAsPrev =
-                                        i > 0 &&
-                                        label ===
-                                        (viewMode === "day" || viewMode === "week"
-                                            ? moment(timelineTicks[i - 1]).format("MMM YYYY")
-                                            : moment(timelineTicks[i - 1]).format("YYYY"));
-
-                                    if (sameAsPrev) return null;
-
-                                    let span = 1;
-                                    for (let j = i + 1; j < timelineTicks.length; j++) {
-                                        const nextLabel =
-                                            viewMode === "day" || viewMode === "week"
-                                                ? moment(timelineTicks[j]).format("MMM YYYY")
-                                                : moment(timelineTicks[j]).format("YYYY");
-                                        if (nextLabel === label) span++;
-                                        else break;
-                                    }
-
-                                    return (
-                                        <div
-                                            key={i}
-                                            className="text-xs font-semibold text-center border-r border-theme flex-shrink-0"
-                                            style={{
-                                                width:
-                                                    viewMode === "day"
-                                                        ? `${MIN_DAY_WIDTH * span}px`
-                                                        : viewMode === "week"
-                                                            ? `${(MIN_DAY_WIDTH * 7) * span}px`
-                                                            : `${(MIN_DAY_WIDTH * 30) * span}px`,
-                                            }}
-                                        >
-                                            {label}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            {/* riga inferiore */}
-                            <div className="flex">
-                                {timelineTicks.map((d, i) => {
-                                    const isWeekend = viewMode === "day" && (moment(d).day() === 0 || moment(d).day() === 6);
-                                    return (
-                                        <div
-                                            key={i}
-                                            className={`text-xs text-center border-r border-theme flex-shrink-0 ${isWeekend ? "bg-weekend" : ""}`}
-                                            style={{
-                                                width:
-                                                    viewMode === "day"
-                                                        ? `${MIN_DAY_WIDTH}px`
-                                                        : viewMode === "week"
-                                                            ? `${MIN_DAY_WIDTH * 7}px`
-                                                            : `${MIN_DAY_WIDTH * 30}px`,
-                                            }}
-                                        >
-                                            {viewMode === "day"
-                                                ? moment(d).format("DD")
-                                                : viewMode === "week"
-                                                    ? `${moment(d).format("DD/MM")} – ${moment(d).add(6, "days").format("DD/MM")}`
-                                                    : moment(d).format("MMM")}
-                                        </div>
-                                    );
-                                })}
                             </div>
                         </div>
 
-                        {/* righe items */}
-                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                            <SortableContext items={orderedItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+                        {/* CORPO */}
+                        <div className="overflow-visible pb-16">
+
+                            <div className="flex w-full">
+                                {/* SIDEBAR ATTIVITÀ */}
                                 <div
-                                    className="relative"
-                                    style={{
-                                        minWidth:
-                                            viewMode === "day"
-                                                ? `${timelineTicks.length * MIN_DAY_WIDTH}px`
-                                                : viewMode === "week"
-                                                    ? `${timelineTicks.length * (MIN_DAY_WIDTH * 7)}px`
-                                                    : `${timelineTicks.length * (MIN_DAY_WIDTH * 30)}px`,
-                                    }}
+                                    className="border-r border-theme overflow-hidden"
+                                    style={{ width: `${Math.round(SIDEBAR_PCT * 100)}%` }}
                                 >
-                                    {/* griglia */}
-                                    <div className="absolute inset-0 pointer-events-none">
-                                        <div className="flex h-full">
-                                            {timelineTicks.map((_, i) => (
-                                                <div
-                                                    key={i}
-                                                    className="border-r border-theme flex-shrink-0"
-                                                    style={{
-                                                        width:
-                                                            viewMode === "day"
-                                                                ? `${MIN_DAY_WIDTH}px`
-                                                                : viewMode === "week"
-                                                                    ? `${MIN_DAY_WIDTH * 7}px`
-                                                                    : `${MIN_DAY_WIDTH * 30}px`,
-                                                    }}
-                                                />
-                                            ))}
+                                    {visibleOrderedIds.map((id, idx) => {
+                                        const item = windowItemsById.get(id);
+                                        if (!item) return null;
+                                        const zebra = idx % 2 === 1;
+                                        const isCollapsed = collapsed.has(item.id);
+                                        return (
+                                            <ActivityRow
+                                                key={item.id}
+                                                item={item}
+                                                isCollapsed={isCollapsed}
+                                                onToggle={toggleCollapse}
+                                                onOpen={handleSelect}
+                                                zebra={zebra}
+                                                userId={userId}
+                                            />
+                                        );
+                                    })}
+                                </div>
+
+                                {/* TIMELINE */}
+                                <div className="relative flex-1 overflow-hidden">
+                                    {/* background griglia giorni */}
+                                    <div className="pointer-events-none absolute inset-0">
+                                        <div className="grid h-full" style={{ gridTemplateColumns }}>
+                                            {visibleDays.map((d, i) => {
+                                                const weekend = isWeekend(d);
+                                                const isToday = todayIdx === i;
+                                                return (
+                                                    <div
+                                                        key={i}
+                                                        className={`border-r border-theme ${isToday ? "bg-yellow-50" : weekend ? "bg-gray-50" : ""
+                                                            }`}
+                                                    />
+                                                );
+                                            })}
                                         </div>
                                     </div>
 
-                                    {orderedItems.map((item) => {
-                                        const { left, width } = getBarStyle(item);
-                                        return <SortableRow key={item.id} item={item} left={left} width={width} onSelect={handleSelect} />;
-                                    })}
+                                    {/* righe + dnd */}
+                                    <DndContext
+                                        sensors={sensors}
+                                        collisionDetection={closestCenter}
+                                        autoScroll={false}
+                                        modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+                                        onDragEnd={onTimelineDragEnd}
+                                    >
+                                        <SortableContext items={visibleOrderedIds} strategy={verticalListSortingStrategy}>
+                                            <div className="relative">
+                                                {visibleOrderedIds.map((id, idx) => {
+                                                    const item = windowItemsById.get(id);
+                                                    if (!item) return null;
+                                                    const { startCol, endCol } = getGridCols(item);
+                                                    const zebra = idx % 2 === 1;
+                                                    return (
+                                                        <TimelineSortableRow
+                                                            key={item.id}
+                                                            item={item}
+                                                            startCol={startCol}
+                                                            endCol={endCol}
+                                                            onSelect={handleSelect}
+                                                            gridTemplateColumns={gridTemplateColumns}
+                                                            zebra={zebra}
+                                                        />
+                                                    );
+                                                })}
+                                            </div>
+                                        </SortableContext>
+                                    </DndContext>
                                 </div>
-                            </SortableContext>
-                        </DndContext>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             )}
