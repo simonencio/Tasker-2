@@ -57,6 +57,8 @@ import { createRoot } from "react-dom/client";
 import DettaglioCliente from "./Dettagli/DettaglioCliente.tsx";
 import GanttDinamico from "./Liste/GanttDinamico.tsx";
 
+import "./supporto/timerGlobal";
+
 
 type ModalType = "project" | "tasks" | "client" | "user" | "stato" | "priorita" | "ruolo" | "edit-project-template" | "edit-task-template" | "edit";
 

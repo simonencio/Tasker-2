@@ -114,7 +114,9 @@ export const azioni = {
 
     play: (onClick: () => Promise<void> | void, title = "Avvia timer"): JSX.Element => (
         <button
-            onClick={async () => await onClick()}
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={async (e) => { e.preventDefault(); e.stopPropagation(); await onClick(); }}
             className="clickable icon-action tooltip"
             data-tooltip={title}
         >
@@ -124,13 +126,16 @@ export const azioni = {
 
     stop: (onClick: () => Promise<void> | void, title = "Ferma timer"): JSX.Element => (
         <button
-            onClick={async () => await onClick()}
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={async (e) => { e.preventDefault(); e.stopPropagation(); await onClick(); }}
             className="clickable icon-action tooltip"
             data-tooltip={title}
         >
             <FontAwesomeIcon icon={faStop} className="clickable icon-stop" />
         </button>
     ),
+
 };
 
 /**

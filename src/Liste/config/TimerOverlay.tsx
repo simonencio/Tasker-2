@@ -51,7 +51,7 @@ export const TimerOverlay = () => {
 
     return (
         <div
-            className="fixed bottom-6 right-6 z-[9998] rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 flex items-center gap-3"
+            className="fixed bottom-6 right-6 z-[9998] rounded-2xl shadow-xl border border-theme bg-theme-80 text-theme px-4 py-3 flex items-center gap-3"
             role="status"
         >
             <div className="w-2 h-2 rounded-full animate-pulse bg-emerald-500" />
@@ -70,5 +70,6 @@ export const TimerOverlay = () => {
                 Stop
             </button>
         </div>
+
     );
 };
