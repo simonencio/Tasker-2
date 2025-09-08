@@ -18,7 +18,7 @@ import QuickActionsWidget from "../Componenti/QuickActionWidget";
 import MetricheWidget from "../Componenti/MetricheWidget";
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faTimes, faPlus } from '@fortawesome/free-solid-svg-icons';
 
 interface WidgetItem { id: string; type: string; }
 
@@ -226,7 +226,7 @@ export default function Home() {
         </h1>
       </div>
 
-      
+
 
       {/* Drag & Drop in griglia */}
       <DndContext
@@ -265,14 +265,14 @@ export default function Home() {
                   {widget.type === 'Progetti' && (
                     <WidgetModello
                       resource="progetti"
-                       widgetKey={widget.id}
+                      widgetKey={widget.id}
                       onSpanChange={(s) => setWidgetSpan(widget.id, s)}
                     />
                   )}
                   {widget.type === 'Task' && (
                     <WidgetModello
                       resource="tasks"
-                       widgetKey={widget.id}
+                      widgetKey={widget.id}
                       onSpanChange={(s) => setWidgetSpan(widget.id, s)}
                     />
                   )}
@@ -319,7 +319,7 @@ export default function Home() {
           className="bg-blue-600 hover:bg-blue-700 text-white rounded-full w-14 h-14 flex items-center justify-center text-2xl leading-none shadow-lg"
           onClick={() => setShowPicker(prev => !prev)}
         >
-
+          <FontAwesomeIcon icon={faPlus} />
         </button>
 
         {showPicker && (
@@ -418,10 +418,10 @@ function SortableWidget({ id, className, children }: {
     zIndex: isDragging ? 50 : 'auto',
     opacity: isDragging ? 0 : 1,
     boxSizing: 'border-box',
-    contain: 'paint',               // niente 'size' (non collassa l'altezza)
-    isolation: 'isolate',           // opzionale: nuovo stacking context, niente impatto su misura
-    willChange: 'transform',        // stabilizza i repaint
-    // Durante il drag: dimensioni fisse  posizionamento assoluto
+    // 🔄 prima avevi: contain: 'paint'
+    contain: isDragging ? 'paint' : 'none',   // ✅ abilita solo durante il drag
+    isolation: 'isolate',
+    willChange: 'transform',
     ...(isDragging && originalSize ? {
       width: originalSize.w,
       height: originalSize.h,
@@ -434,7 +434,6 @@ function SortableWidget({ id, className, children }: {
       flexGrow: 0
     } : {})
   };
-
   return (
     <div
       ref={combinedRef}

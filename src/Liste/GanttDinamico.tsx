@@ -113,7 +113,7 @@ function AvatarStack({ users }: { users: SimpleUser[] }) {
 function ProjBadge({ p }: { p: SimpleProject }) {
     return (
         <span
-            className={`inline-flex items-center rounded px-1.5 py-[2px] ${DAY_BADGE_TEXT} border border-theme/50 bg-white/60`}
+            className={`inline-flex items-center rounded px-1.5 py-[2px] ${DAY_BADGE_TEXT} border border-theme/50 badge-translucent`}
             title={`Progetto: ${p.nome}`}
         >
             {p.nome}
@@ -169,7 +169,12 @@ const TimelineSortableRow = memo(function TimelineSortableRow({
                     style={{
                         gridColumn: `${startCol} / ${endCol}`,
                         opacity: item.isCompletato ? 0.68 : 1,
-                        border: item.hasRealDates ? "2px solid white" : undefined,
+                        border: item.hasRealDates
+                            ? (document.documentElement.classList.contains('dark')
+                                ? "2px solid rgba(255,255,255,.7)"
+                                : "2px solid white")
+                            : undefined,
+
                         cursor: "pointer",
                         paddingLeft: 8 + innerIndentPx,
                     }}
@@ -703,30 +708,31 @@ export default function GanttDinamico<T extends { id: string | number }>({
 
                 {/* Toolbar */}
                 <div className="mt-4 mb-5 flex w-full justify-center">
-                    <div className="inline-flex items-center gap-3 rounded-xl border border-theme bg-theme/70 backdrop-blur px-3 md:px-4 py-2.5 shadow-sm">
+                    <div className="inline-flex items-center gap-3 rounded-xl border border-theme bg-theme-70 backdrop-blur px-3 md:px-4 py-2.5 shadow-sm">
                         <button
                             onClick={gotoPrevHalf}
-                            className="inline-flex items-center gap-2 rounded-lg border border-theme/60 bg-white/70 px-3 md:px-4 py-2 text-sm md:text-base hover:bg-white"
-                            title="Metà precedente"
+                            className="inline-flex items-center gap-2 rounded-lg border border-theme bg-theme-70 px-3 md:px-4 py-2 text-sm md:text-base text-theme hover-bg-theme"
+                            title="Vai alla metà precedente"
                         >
                             <FontAwesomeIcon icon={faChevronLeft} />
                             <span className="hidden sm:inline">Prec. metà</span>
                         </button>
 
-                        <div className="rounded-lg bg-white/80 px-4 md:px-5 py-2 text-sm md:text-base font-bold tracking-wide">
+                        <div className="rounded-lg bg-theme-80 px-4 md:px-5 py-2 text-sm md:text-base font-bold tracking-wide">
                             {moment(selectedMonth).format("MMMM YYYY")} • {halfIdx === 0 ? "1–15" : `16–${moment(selectedMonth).daysInMonth()}`}
                         </div>
 
                         <button
                             onClick={gotoNextHalf}
-                            className="inline-flex items-center gap-2 rounded-lg border border-theme/60 bg-white/70 px-3 md:px-4 py-2 text-sm md:text-base hover:bg-white"
-                            title="Metà successiva"
+                            className="inline-flex items-center gap-2 rounded-lg border border-theme bg-theme-70 px-3 md:px-4 py-2 text-sm md:text-base text-theme hover-bg-theme"
+                            title="Vai alla metà successiva"
                         >
                             <span className="hidden sm:inline">Succ. metà</span>
                             <FontAwesomeIcon icon={faChevronRight} />
                         </button>
 
-                        <div className="mx-1 hidden h-6 w-px bg-theme/60 sm:block" />
+                        <div className="mx-1 hidden h-6 w-px bg-white/20 dark:bg-white/10 sm:block" />
+
                         <button
                             onClick={gotoToday}
                             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 md:px-4 py-2 text-sm md:text-base font-medium text-white hover:bg-blue-700"
@@ -745,7 +751,7 @@ export default function GanttDinamico<T extends { id: string | number }>({
                 <div className="w-full flex justify-center">
                     <div className="card-theme w-full lg:w-5/6 flex flex-col overflow-hidden">
                         {/* HEADER STICKY */}
-                        <div className="sticky top-0 z-10 bg-theme/95 backdrop-blur border-b border-theme">
+                        <div className="sticky top-0 z-10 bg-theme-80 backdrop-blur border-b border-theme">
                             <div className="flex w-full">
                                 <div
                                     className="border-r border-theme px-4 py-2 text-sm md:text-base font-semibold"
@@ -772,8 +778,8 @@ export default function GanttDinamico<T extends { id: string | number }>({
                                             return (
                                                 <div
                                                     key={i}
-                                                    className={`flex items-center justify-center border-r border-theme ${DAY_LABEL_TEXT} ${weekend ? "bg-gray-100 text-gray-700" : "text-gray-900"
-                                                        } ${isToday ? "bg-yellow-100 text-gray-900 font-extrabold" : ""}`}
+                                                    className={`flex items-center justify-center border-r border-theme ${DAY_LABEL_TEXT} ${weekend ? "bg-gantt-weekend text-theme" : "text-theme"
+                                                        } ${isToday ? "bg-gantt-today text-gantt-today font-extrabold" : ""}`}
                                                     title={moment(d).format("dddd DD MMMM YYYY")}
                                                 >
                                                     <span className="tracking-tight uppercase">
@@ -826,8 +832,8 @@ export default function GanttDinamico<T extends { id: string | number }>({
                                                 return (
                                                     <div
                                                         key={i}
-                                                        className={`border-r border-theme ${isToday ? "bg-yellow-50" : weekend ? "bg-gray-50" : ""
-                                                            }`}
+                                                        className={`border-r border-theme ${isToday ? "bg-gantt-today" : weekend ? "bg-gantt-weekend" : ""}`}
+
                                                     />
                                                 );
                                             })}

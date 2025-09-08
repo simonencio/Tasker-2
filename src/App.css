@@ -1370,7 +1370,7 @@ html.dark .scroll-y::-webkit-scrollbar-thumb {
   display: none;              /* Chrome/Safari */
 }
 
-=======
+
 /* ✅ Nascondi SOLO la scrollbar verticale */
 .hide-scrollbar-y {
   -ms-overflow-style: none;     /* IE/Edge */
@@ -1385,3 +1385,25 @@ html.dark .scroll-y::-webkit-scrollbar-thumb {
   height: 0 !important;
   display: none !important;
 }
+
+
+
+/* —— Helpers traslucidi coerenti col tema —— */
+.bg-theme-80 { background-color: color-mix(in srgb, var(--color-background-light) 80%, transparent); }
+html.dark .bg-theme-80 { background-color: color-mix(in srgb, var(--color-background-dark) 80%, transparent); }
+
+.bg-theme-70 { background-color: color-mix(in srgb, var(--color-background-light) 70%, transparent); }
+html.dark .bg-theme-70 { background-color: color-mix(in srgb, var(--color-background-dark) 70%, transparent); }
+
+/* Celle Gantt */
+.bg-gantt-weekend { background-color: rgba(0,0,0,.05); }
+html.dark .bg-gantt-weekend { background-color: rgba(255,255,255,.06); }
+
+.bg-gantt-today { background-color: #FEF3C7; }              /* yellow-100 */
+html.dark .bg-gantt-today { background-color: rgba(146,64,14,.30); } /* amber-800/30 */
+.text-gantt-today { color: #111827; }                        /* gray-900 */
+html.dark .text-gantt-today { color: #FDE68A; }              /* amber-200 */
+
+/* Badge progetto traslucido */
+.badge-translucent { background-color: rgba(255,255,255,.60); }
+html.dark .badge-translucent { background-color: rgba(255,255,255,.10); color: var(--color-text-dark); }

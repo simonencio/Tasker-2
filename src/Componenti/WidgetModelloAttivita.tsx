@@ -2,7 +2,7 @@
 // Restano: + per scegliere dall'elenco (filtrato per utente), 'x' per rimuovere.
 // Lo span verso il parent è sempre 1.
 
-import { useEffect, useMemo, useState, useId } from "react";
+import { useEffect, useMemo, useState, useId, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus, faTimes } from "@fortawesome/free-solid-svg-icons";
@@ -41,6 +41,11 @@ export default function WidgetModello({ resource, widgetKey, onSpanChange }: Pro
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [pickerOpen, setPickerOpen] = useState(false);
 
+    const [timerTick, setTimerTick] = useState(0);
+
+    // ...stato esistente
+    const [extra, setExtra] = useState<any>(null);
+    const disposeRef = useRef<null | (() => void)>(null);
 
 
 
@@ -77,6 +82,26 @@ export default function WidgetModello({ resource, widgetKey, onSpanChange }: Pro
 
         return () => { alive = false; };
     }, [resource, widgetKey]);
+
+    // Inizializza le azioni extra (start/stop/isRunning) della risorsa, se disponibili
+    useEffect(() => {
+        if (!utenteId) return;
+        if (typeof (cfg as any).setup === "function") {
+            const res = (cfg as any).setup({ utenteId });
+            setExtra(res?.extra ?? null);
+            disposeRef.current = res?.dispose ?? null;
+
+            return () => {
+                // cleanup quando il widget si smonta o cambia utenteId/resource
+                disposeRef.current?.();
+                disposeRef.current = null;
+            };
+        } else {
+            // la risorsa potrebbe non avere setup (es. 'progetti'): nessun problema
+            setExtra(null);
+        }
+    }, [utenteId, cfg]);
+
 
     // Persistenza singola
     useEffect(() => {
@@ -115,11 +140,13 @@ export default function WidgetModello({ resource, widgetKey, onSpanChange }: Pro
     }
 
 
+    // Se l'elemento selezionato non c'è più nel pool, lo resetto
     useEffect(() => {
-        if (!selectedId) return;
+        if (loading || !selectedId) return; // aspetta che il pool sia pronto
         const exists = pool.some((it: any) => String(it.id) === String(selectedId));
         if (!exists) setSelectedId(null);
-    }, [pool, selectedId]);
+    }, [pool, selectedId, loading]);
+
 
     // funzione da usare per refetch
     async function refetchPool(userId: string) {
@@ -133,6 +160,13 @@ export default function WidgetModello({ resource, widgetKey, onSpanChange }: Pro
         if (!pickerOpen || !utenteId) return;
         refetchPool(utenteId).catch(() => { });
     }, [pickerOpen, utenteId]);
+
+    // quando il timer cambia (start/stop) forziamo un re-render
+    useEffect(() => {
+        const onChange = () => setTimerTick(t => t + 1);
+        window.addEventListener("tasks:timerChanged", onChange as any);
+        return () => window.removeEventListener("tasks:timerChanged", onChange as any);
+    }, []);
 
 
 
@@ -248,9 +282,10 @@ export default function WidgetModello({ resource, widgetKey, onSpanChange }: Pro
                             onClick={(e) => e.stopPropagation()}
                             onPointerDown={(e) => e.stopPropagation()}
                         >
-                            {cfg.azioni(item, { navigate: (to: string) => navigate(to), utenteId })}
+                            {cfg.azioni(item, { navigate: (to: string) => navigate(to), utenteId, extra })}
                         </div>
                     )}
+
                 </div>
             )}
         </div>
