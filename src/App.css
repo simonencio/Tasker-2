@@ -1127,31 +1127,6 @@ html.dark .link {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /* 💬 ChatCommentiModal — palette blu contrastata con Tailwind */
 
 /* Badge icona "💬" nell'header */
@@ -1299,40 +1274,6 @@ html.dark .avatar-placeholder {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /* Palette colori barre Gantt */
 .gantt-bar-blue {
   background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
@@ -1359,6 +1300,77 @@ html.dark .bg-weekend {
   background-color: rgba(255, 100, 100, 0.12);
 }
 
+
+/* Durante il drag disattivo transizioni/animazioni per evitare "stretch" visivi */
+body.dragging *,
+body.dragging .card-theme,
+body.dragging .card-theme * {
+  transition: none !important;
+  animation: none !important;
+}
+
+
+
+/* Elementi durante il drag non partecipano al layout normale */
+body.dragging .dragging-item {
+  /* Mantieni dimensioni fisse durante il drag */
+  grid-column: unset !important;
+  grid-row: unset !important;
+  position: relative;
+  z-index: 50;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+
+/* Isola i widget per evitare qualsiasi ripple di layout */
+.widget-tile {
+  contain: paint;
+}
+
+/* Il tile reale, mentre lo trascini, diventa invisibile e non anima nulla.
+   Lo spazio rimane occupato perché larghezza/altezza sono già congelate inline. */
+.dragging-item {
+  opacity: 0 !important;
+  transition: none !important;
+  animation: none !important;
+  pointer-events: none !important;
+  box-sizing: border-box;
+}
+
+
+/* Contenitore verticale scrollabile per i menu del widget */
+.scroll-y {
+  max-height: 20rem;             /* ~ Tailwind max-h-80 */
+  overflow-y: auto;
+  overscroll-behavior: contain;  /* non scrollare il parent se arrivo a fine lista */
+  -webkit-overflow-scrolling: touch; /* inertial scroll su iOS */
+  padding-right: 2px;            /* piccolo spazio per scrollbar */
+}
+
+/* Scrollbar visibile ma discreta */
+.scroll-y::-webkit-scrollbar {
+  width: 8px;
+}
+.scroll-y::-webkit-scrollbar-thumb {
+  background-color: #d1d5db;     /* gray-300 */
+  border-radius: 9999px;
+}
+html.dark .scroll-y::-webkit-scrollbar-thumb {
+  background-color: #4b5563;     /* gray-600 in dark */
+}
+
+
+/* Nasconde la scrollbar ma mantiene lo scroll (cross-browser) */
+.no-scrollbar {
+  -ms-overflow-style: none;   /* IE/Edge */
+  scrollbar-width: none;      /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;              /* Chrome/Safari */
+}
+
+=======
 /* ✅ Nascondi SOLO la scrollbar verticale */
 .hide-scrollbar-y {
   -ms-overflow-style: none;     /* IE/Edge */
