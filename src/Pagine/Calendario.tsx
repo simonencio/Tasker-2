@@ -147,20 +147,20 @@ function useCalendarData(projectId: string | null) {
         return true;
     };
 
-    const writeCache = useCallback((rows: TaskCal[]) => {
-        TASKS_CACHE.set(cacheKey(projectId), rows);
+    const writeCache = useCallback((rows: TaskCal[], projectIdOverride?: string | null) => {
+        TASKS_CACHE.set(cacheKey(projectIdOverride ?? projectId), rows);
     }, [projectId]);
 
     const initialLoad = useCallback(async () => {
         const key = cacheKey(projectId);
         const cached = TASKS_CACHE.get(key);
         if (cached) {
-            // precompila le firme senza toccare lo state (niente “refresh”)
             const m = new Map<string, string>();
             cached.forEach(t => m.set(t.id, signatureOf(t)));
             sigRef.current = m;
             return;
         }
+
         let q = supabase.from("tasks").select(`
       id, nome, note, consegna, inizio_task, fine_task, parent_id, deleted_at,
       stato:stati ( nome, colore ),
@@ -177,12 +177,15 @@ function useCalendarData(projectId: string | null) {
         next.forEach(t => sigs.set(t.id, signatureOf(t)));
         sigRef.current = sigs;
 
-        // setState solo se è davvero diverso (qui parte da [] quando niente cache)
         setTaskList(next);
-        writeCache(next);
-    }, [projectId, writeCache]);
+        writeCache(next, projectId);
+    }, [projectId]);
 
-    useEffect(() => { initialLoad(); }, [initialLoad]);
+
+    useEffect(() => {
+        initialLoad();
+    }, [projectId]);
+
 
     /* ---- Upsert locale incrementale (NO array nuovo se nulla cambia) ---- */
     const upsertLocal = useCallback((row: Partial<TaskCal> & { id: string; __insertHint__?: boolean }) => {

@@ -49,7 +49,7 @@ export default function Sidebar({
 
     return (
         <aside
-            className={`absolute top-0 left-0 h-full w-full md:w-70 sidebar-theme text-theme transition-transform duration-300 z-40 ${isOpen ? "translate-x-0 sidebar-shadow-open" : "-translate-x-full"
+            className={`absolute top-0 left-0 h-full w-full md:w-64 sidebar-theme text-theme transition-transform duration-300 z-40 ${isOpen ? "translate-x-0 sidebar-shadow-open" : "-translate-x-full"
                 }`}
         >
             <nav className="flex flex-col p-4 gap-4 h-full items-center">
